@@ -164,6 +164,7 @@
     const ex=all.map(b=>'<li><span class="ex-jp">'+esc(b.jp)+'</span>'+
       (b.r?'<span class="ex-romaji">'+esc(b.r)+'</span>':'')+
       (b.de?'<span class="ex-trans hideable">'+esc(b.de)+'</span>':'')+'</li>').join('');
+    const drillable=all.filter(b=>b.jp&&b.de);
     const card=el('article','gp item'); card.dataset.filter=String(L); card.dataset.preview=L>20?'1':'0';
     card.dataset.search=norm([g.pattern,g.title,g.bildung,g.erklaerung,all.map(b=>b.jp+' '+b.de).join(' ')].join(' '));
     card.innerHTML=
@@ -173,8 +174,120 @@
       (g.tabelle?gpTable(g.tabelle):'')+
       (g.erklaerung?'<p class="gp-erk">'+esc(g.erklaerung)+'</p>':'')+
       (ex?'<ul class="gp-ex">'+ex+'</ul>':'');
+    if(drillable.length){
+      const btn=el('button','gp-learn','▶ Diese Grammatik üben '+
+        '<span class="gp-learn-n">'+drillable.length+' Sätze · beide Richtungen</span>');
+      btn.type='button';
+      btn.addEventListener('click',()=>openGrammarDrill(g,drillable));
+      card.appendChild(btn);
+    }
     return card;
   }
+
+  /* ============================================================
+     GRAMMATIK-DRILL — Beispielsätze in beide Richtungen übersetzen
+     (Modal-Overlay, lazy aufgebaut, von der Grammatik-Karte gestartet)
+     ============================================================ */
+  let drill=null;
+  function ensureDrillDom(){
+    if(drill)return drill;
+    const ov=el('div','drill-overlay'); ov.id='drill-overlay'; ov.hidden=true;
+    ov.innerHTML=
+      '<div class="drill-modal" role="dialog" aria-modal="true" aria-label="Grammatik üben">'+
+        '<div class="drill-head">'+
+          '<div class="drill-titlewrap"><span class="drill-pattern ja"></span><span class="drill-title"></span></div>'+
+          '<button class="drill-close" type="button" aria-label="Schließen">✕</button>'+
+        '</div>'+
+        '<div class="drill-stage">'+
+          '<div class="drill-top"><span class="drill-dir"></span><span class="drill-prog"></span></div>'+
+          '<div class="drill-card">'+
+            '<div class="drill-prompt-lbl"></div>'+
+            '<div class="drill-prompt"></div>'+
+            '<div class="drill-answer hidden"><div class="drill-answer-lbl"></div><div class="drill-answer-txt"></div></div>'+
+            '<div class="drill-controls">'+
+              '<button class="btn-primary drill-reveal" type="button">Aufdecken <span class="kbd">Leertaste</span></button>'+
+              '<button class="btn btn-again drill-again hidden" type="button">↻ Nochmal</button>'+
+              '<button class="btn btn-next drill-next hidden" type="button">Weiter →</button>'+
+            '</div>'+
+          '</div>'+
+          '<div class="drill-done hidden"></div>'+
+        '</div>'+
+      '</div>';
+    document.body.appendChild(ov);
+    const q=s=>ov.querySelector(s);
+    drill={ ov, pattern:q('.drill-pattern'), title:q('.drill-title'), dir:q('.drill-dir'), prog:q('.drill-prog'),
+      card:q('.drill-card'), promptLbl:q('.drill-prompt-lbl'), prompt:q('.drill-prompt'),
+      answer:q('.drill-answer'), answerLbl:q('.drill-answer-lbl'), answerTxt:q('.drill-answer-txt'),
+      reveal:q('.drill-reveal'), again:q('.drill-again'), next:q('.drill-next'), done:q('.drill-done'),
+      close:q('.drill-close'), deck:[], allCards:[], total:0 };
+    drill.reveal.addEventListener('click',drillReveal);
+    drill.next.addEventListener('click',drillNext);
+    drill.again.addEventListener('click',drillAgain);
+    drill.close.addEventListener('click',closeDrill);
+    ov.addEventListener('click',e=>{ if(e.target===ov)closeDrill(); });
+    document.addEventListener('keydown',drillKey);
+    return drill;
+  }
+  function drillKey(e){
+    if(!drill||drill.ov.hidden)return;
+    if(e.key==='Escape'){ closeDrill(); return; }
+    if(e.code==='Space'){ e.preventDefault();
+      if(!drill.answer.classList.contains('hidden'))drillNext();
+      else if(!drill.reveal.classList.contains('hidden'))drillReveal(); }
+  }
+  function openGrammarDrill(g,examples){
+    const d=ensureDrillDom();
+    d.pattern.textContent=g.pattern||'';
+    d.title.textContent=g.title||'';
+    const cards=[];
+    examples.forEach(b=>{ cards.push({dir:'jp2de',b}); cards.push({dir:'de2jp',b}); });
+    d.allCards=cards.slice();
+    d.deck=shuffle(cards); d.total=d.deck.length;
+    d.ov.hidden=false; document.body.classList.add('drill-open');
+    drillRender();
+  }
+  function closeDrill(){ if(!drill)return; drill.ov.hidden=true; document.body.classList.remove('drill-open'); }
+  function drillRestart(){ const d=drill; d.deck=shuffle(d.allCards.slice()); d.total=d.deck.length; drillRender(); }
+  function drillRender(){
+    const d=drill;
+    if(!d.deck.length){
+      d.card.classList.add('hidden'); d.done.classList.remove('hidden');
+      d.dir.textContent=''; d.prog.textContent='';
+      if(d.total){
+        d.done.innerHTML='<div class="drill-done-in">🎉 Geschafft!<br>Alle '+d.total+' Übersetzungen sitzen.</div>'+
+          '<button class="btn-primary drill-restart" type="button">↻ Nochmal üben</button>';
+        d.done.querySelector('.drill-restart').addEventListener('click',drillRestart);
+      } else {
+        d.done.innerHTML='<div class="drill-done-in">Für diesen Punkt gibt es noch keine Beispielsätze zum Üben.</div>';
+      }
+      return;
+    }
+    d.done.classList.add('hidden'); d.card.classList.remove('hidden');
+    const learned=d.total-d.deck.length;
+    d.prog.textContent='Satz '+(learned+1)+' / '+d.total;
+    const c=d.deck[0], b=c.b;
+    const jpHtml='<div class="drill-jp ja">'+esc(b.jp)+'</div>'+(b.r?'<div class="ex-romaji">'+esc(b.r)+'</div>':'');
+    const deHtml='<div class="drill-de">'+esc(b.de)+'</div>';
+    if(c.dir==='jp2de'){
+      d.dir.innerHTML='<span class="ja">日本語</span> → Deutsch';
+      d.promptLbl.textContent='Übersetze ins Deutsche:';
+      d.prompt.innerHTML=jpHtml;
+      d.answerLbl.textContent='Deutsch';
+      d.answerTxt.innerHTML=deHtml;
+    } else {
+      d.dir.innerHTML='Deutsch → <span class="ja">日本語</span>';
+      d.promptLbl.textContent='Übersetze ins Japanische:';
+      d.prompt.innerHTML=deHtml;
+      d.answerLbl.textContent='日本語';
+      d.answerTxt.innerHTML=jpHtml;
+    }
+    d.answer.classList.add('hidden');
+    d.reveal.classList.remove('hidden'); d.again.classList.add('hidden'); d.next.classList.add('hidden');
+  }
+  function drillReveal(){ const d=drill; d.answer.classList.remove('hidden'); d.reveal.classList.add('hidden');
+    d.again.classList.remove('hidden'); d.next.classList.remove('hidden'); }
+  function drillNext(){ drill.deck.shift(); drillRender(); }
+  function drillAgain(){ const c=drill.deck.shift(); drill.deck.push(c); drillRender(); }
 
   /* ============================================================  VERBEN  */
   function renderVerben(content){
