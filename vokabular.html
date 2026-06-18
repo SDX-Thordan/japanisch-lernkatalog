@@ -1,0 +1,59 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Vokabular · 語彙 — Japanisch A1.7 Lern-Katalog</title>
+<link rel="stylesheet" href="assets/style.css">
+</head>
+<body data-page="vokabular">
+
+<header class="topbar">
+  <div class="topbar-inner">
+    <a class="brand" href="index.html"><span class="jp">日本語</span><span class="lv">A1.7 Katalog</span></a>
+    <nav class="nav">
+      <a href="index.html">Übersicht</a>
+      <a href="grammatik.html">Grammatik</a>
+      <a href="vokabular.html" class="active">Vokabular</a>
+      <a href="kanji.html">Kanji</a>
+      <a href="verben.html">Verben</a>
+      <a href="ueben.html">Üben</a>
+    </nav>
+  </div>
+</header>
+
+<main>
+  <div class="page-intro">
+    <span class="kicker">語彙 · Wortschatz</span>
+    <h1>Vokabular <span class="jp">語彙</span></h1>
+    <p>Der Wortschatz von Minna no Nihongo, nach Lektion geordnet (Lektion 1–20). Jeder Eintrag mit Schreibweise,
+       Lesung (Kana + Rōmaji), Bedeutung und Wortart. Verben stehen in der ます-Form, mit Gruppe (I / II / III).</p>
+  </div>
+
+  <div class="toolbar">
+    <div class="toolbar-row">
+      <label class="search">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/></svg>
+        <input id="search-input" type="search" placeholder="Suchen: Wort, Lesung, Bedeutung …" autocomplete="off" spellcheck="false">
+      </label>
+      <button class="toggle" id="toggle-readings" type="button" aria-pressed="true"><span class="dot"></span>Furigana</button>
+      <button class="toggle" id="toggle-romaji" type="button" aria-pressed="true"><span class="dot"></span>Rōmaji</button>
+      <button class="toggle" id="toggle-cards" type="button" aria-pressed="false"><span class="dot"></span>Karteikarten</button>
+      <button class="toggle toggle-preview" id="toggle-preview" type="button" aria-pressed="false"><span class="dot"></span>L21–25 (Vorschau)</button>
+    </div>
+    <div class="chips" id="filters"></div>
+  </div>
+
+  <p class="count" id="count"></p>
+  <div id="content"></div>
+  <div class="empty hidden" id="empty">Keine Treffer. Suche oder Filter anpassen.</div>
+</main>
+
+<footer>
+  <span class="jp">日本語 A1.7</span> · Lern-Katalog — Karteikarten-Modus: die Bedeutung ist verdeckt, zum Aufdecken anklicken.
+</footer>
+
+<script src="assets/data/vokabular.js"></script>
+<script src="assets/app.js"></script>
+</body>
+</html>

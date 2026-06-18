@@ -1,0 +1,74 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Üben · 練習 — Japanisch A1.7 Lern-Katalog</title>
+<link rel="stylesheet" href="assets/style.css">
+</head>
+<body data-page="ueben">
+
+<header class="topbar">
+  <div class="topbar-inner">
+    <a class="brand" href="index.html"><span class="jp">日本語</span><span class="lv">A1.7 Katalog</span></a>
+    <nav class="nav">
+      <a href="index.html">Übersicht</a>
+      <a href="grammatik.html">Grammatik</a>
+      <a href="vokabular.html">Vokabular</a>
+      <a href="kanji.html">Kanji</a>
+      <a href="verben.html">Verben</a>
+      <a href="ueben.html" class="active">Üben</a>
+    </nav>
+  </div>
+</header>
+
+<main>
+  <div class="page-intro">
+    <span class="kicker">練習 · Karteikarten-Training</span>
+    <h1>Üben <span class="jp">練習</span></h1>
+    <p>Zehn zufällig gewählte Karten aus dem Katalog — Kanji, Vokabeln und Grammatik gemischt.
+       Überlege die Antwort, decke sie auf und entscheide: <b>„Gewusst"</b> legt die Karte ab,
+       <b>„Nochmal"</b> hängt sie wieder hinten an. So lange wiederholen, bis alle sitzen.</p>
+  </div>
+
+  <div class="trainer-setup">
+    <div class="src-pick">
+      <span class="src-label">Quellen:</span>
+      <label><input type="checkbox" id="src-grammar" checked> Grammatik</label>
+      <label><input type="checkbox" id="src-vocab" checked> Vokabular</label>
+      <label><input type="checkbox" id="src-kanji" checked> Kanji</label>
+    </div>
+    <div class="setup-actions">
+      <button class="toggle" id="toggle-readings" type="button" aria-pressed="true"><span class="dot"></span>Furigana</button>
+      <button class="toggle" id="toggle-romaji" type="button" aria-pressed="true"><span class="dot"></span>Rōmaji</button>
+      <button class="toggle toggle-preview" id="toggle-preview" type="button" aria-pressed="false"><span class="dot"></span>L21–25</button>
+      <button class="btn-primary" id="tr-new" type="button">↻ Neue Runde</button>
+    </div>
+  </div>
+
+  <div class="trainer">
+    <div class="tr-top"><span class="tag" id="tr-type"></span><span class="tr-prog" id="tr-progress"></span></div>
+    <div class="tr-card" id="tr-card">
+      <div class="tr-front" id="tr-front"></div>
+      <div class="tr-back hidden" id="tr-back"></div>
+      <div class="tr-controls">
+        <button class="btn-primary" id="tr-reveal" type="button">Aufdecken <span class="kbd">Leertaste</span></button>
+        <button class="btn btn-again hidden" id="tr-again" type="button">↻ Nochmal</button>
+        <button class="btn btn-next hidden" id="tr-next" type="button">Gewusst →</button>
+      </div>
+    </div>
+    <div class="tr-done hidden" id="tr-done"></div>
+  </div>
+</main>
+
+<footer>
+  <span class="jp">日本語 A1.7</span> · Lern-Katalog — Tastatur: <span class="kbd">Leertaste</span> deckt auf bzw. springt zur nächsten Karte.
+</footer>
+
+<script src="assets/data/kanji.js"></script>
+<script src="assets/data/vokabular.js"></script>
+<script src="assets/data/grammatik.js"></script>
+<script src="assets/data/grammatik_extra.js"></script>
+<script src="assets/app.js"></script>
+</body>
+</html>
