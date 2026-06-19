@@ -429,7 +429,7 @@ footer .jp { font-family: var(--font-ja); }
 .verb-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(264px, 1fr)); gap: .9rem; }
 .verb-card { background: var(--surface); border: 1px solid var(--border); border-radius: 13px; padding: 1rem 1.1rem 1.05rem; box-shadow: var(--shadow); }
 .vc-head { display: flex; align-items: baseline; gap: .6rem; }
-.vc-dict { font-family: var(--font-ja); font-size: 1.75rem; font-weight: 600; color: var(--ink); }
+.vc-dict { font-family: var(--font-ja-sans); font-size: 1.75rem; font-weight: 600; color: var(--ink); }
 .vc-head .tag { margin-left: auto; }
 .vc-de { color: var(--muted); margin: .15rem 0 .55rem; font-weight: 600; }
 table.vforms { width: 100%; border-collapse: collapse; font-size: .92rem; }

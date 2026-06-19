@@ -311,9 +311,9 @@
     });
     buildChips([1,2,3], g=>({1:'Gruppe I',2:'Gruppe II',3:'Gruppe III'}[g]));
   }
-  const VERB_ROWS=[['辞書形','dict','Wörterbuchform'],['ます形','masu','höflich'],['ません','masen','höfl. verneint'],
-    ['た形','ta','Vergangenheit (einfach)'],['て形','te','Verbindung'],['ない形','nai','Verneinung (einfach)'],
-    ['たい形','tai','Wunsch „möchte"'],['ましょう','mashou','Vorschlag']];
+  const VERB_ROWS=[['Wörterbuch-Form','dict','(Grundform)'],['masu-Form','masu','(höflich)'],['masen-Form','masen','(höflich verneint)'],
+    ['ta-Form','ta','(Vergangenheit, einfach)'],['te-Form','te','(Verbindung, mit Hiragana て)'],['nai-Form','nai','(Verneinung, einfach)'],
+    ['tai-Form','tai','(Wunsch „möchte")'],['mashou-Form','mashou','(Vorschlag „lass uns")']];
   function verbCard(o){
     const {v,g,kana,disp}=o;
     const body=VERB_ROWS.map(([lbl,key,note])=>'<tr><th>'+lbl+'<span class="vf-note">'+note+'</span></th><td class="ja">'+rubyPair(disp[key],kana[key])+'</td></tr>').join('');
