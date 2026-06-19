@@ -228,7 +228,7 @@ body:not(.show-preview) .chip-preview { display: none; }
 }
 .kc-top { display: flex; align-items: flex-start; gap: .8rem; }
 .kanji-char {
-  font-family: var(--font-ja);
+  font-family: var(--font-ja-sans);
   font-size: 3.7rem;
   line-height: 1;
   color: var(--ink);
@@ -467,7 +467,7 @@ table.conj-table tbody tr:last-child th, table.conj-table tbody tr:last-child td
 .tr-prog { color: var(--muted); font-size: .9rem; font-weight: 700; }
 .tr-card { background: var(--surface); border: 1px solid var(--border); border-radius: 16px; box-shadow: var(--shadow); padding: 2rem 1.6rem 1.4rem; min-height: 260px; display: flex; flex-direction: column; }
 .tr-front { text-align: center; }
-.tr-big { font-family: var(--font-ja); font-size: 5rem; line-height: 1; margin: .3rem 0; color: var(--ink); }
+.tr-big { font-family: var(--font-ja-sans); font-size: 5rem; line-height: 1; margin: .3rem 0; color: var(--ink); }
 .tr-word { font-family: var(--font-ja-sans); font-size: 2.4rem; font-weight: 600; margin: .3rem 0; }
 .tr-pat { font-family: var(--font-ja-sans); font-size: 2rem; font-weight: 700; color: var(--accent-d); margin: .3rem 0; }
 .tr-q { color: var(--faint); font-size: .95rem; margin-top: .7rem; }
