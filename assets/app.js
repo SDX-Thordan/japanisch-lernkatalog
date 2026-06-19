@@ -30,6 +30,14 @@
   function ruby(base, reading){ if(!reading||reading===base) return esc(base); return '<ruby>'+esc(base)+'<rt>'+esc(reading)+'</rt></ruby>'; }
   function rubyPair(disp, read){ return (disp!==read) ? ruby(disp, read) : esc(disp); }
   function norm(s){ return String(s==null?'':s).toLowerCase(); }
+  // Wandelt einen Beispielsatz in Ruby-HTML um, falls Furigana-Daten vorliegen (Notation {Basis|Lesung}).
+  function furiToRuby(jp){
+    const f=(window.GRAMMATIK_FURIGANA||{})[jp];
+    if(!f) return esc(jp);
+    let out='', last=0, m; const re=/\{([^|{}]+)\|([^{}]+)\}/g;
+    while((m=re.exec(f))){ out+=esc(f.slice(last,m.index)); out+='<ruby>'+esc(m[1])+'<rt>'+esc(m[2])+'</rt></ruby>'; last=re.lastIndex; }
+    out+=esc(f.slice(last)); return out;
+  }
 
   /* ============================================================
      VERB-KONJUGATOR (Minna no Nihongo Gruppen I/II/III)
@@ -161,7 +169,7 @@
   function grammarCard(g,L){
     const extra=(window.GRAMMATIK_EXTRA&&window.GRAMMATIK_EXTRA[g.pattern])||[];
     const all=(g.beispiele||[]).concat(extra);
-    const ex=all.map(b=>'<li><span class="ex-jp">'+esc(b.jp)+'</span>'+
+    const ex=all.map(b=>'<li><span class="ex-jp">'+furiToRuby(b.jp)+'</span>'+
       (b.r?'<span class="ex-romaji">'+esc(b.r)+'</span>':'')+
       (b.de?'<span class="ex-trans hideable">'+esc(b.de)+'</span>':'')+'</li>').join('');
     const drillable=all.filter(b=>b.jp&&b.de);
@@ -266,7 +274,7 @@
     const learned=d.total-d.deck.length;
     d.prog.textContent='Satz '+(learned+1)+' / '+d.total;
     const c=d.deck[0], b=c.b;
-    const jpHtml='<div class="drill-jp ja">'+esc(b.jp)+'</div>'+(b.r?'<div class="ex-romaji">'+esc(b.r)+'</div>':'');
+    const jpHtml='<div class="drill-jp ja">'+furiToRuby(b.jp)+'</div>'+(b.r?'<div class="ex-romaji">'+esc(b.r)+'</div>':'');
     const deHtml='<div class="drill-de">'+esc(b.de)+'</div>';
     if(c.dir==='jp2de'){
       d.dir.innerHTML='<span class="ja">日本語</span> → Deutsch';
@@ -461,7 +469,7 @@
       '<div class="tr-mean">'+esc(v.de)+'</div>'+
       '<div class="tr-sub"><span class="vocab-romaji">'+esc(v.romaji)+'</span></div>'+
       '<div class="tr-tag"><span class="pos">'+esc(v.pos)+'</span> · Lektion '+v.lesson+'</div>'; }
-    const g=c.d, ex=(g.beispiele||[]).slice(0,2).map(b=>'<li><span class="ex-jp">'+esc(b.jp)+'</span>'+
+    const g=c.d, ex=(g.beispiele||[]).slice(0,2).map(b=>'<li><span class="ex-jp">'+furiToRuby(b.jp)+'</span>'+
       (b.r?'<span class="ex-romaji">'+esc(b.r)+'</span>':'')+'<span class="ex-trans">'+esc(b.de)+'</span></li>').join('');
     return '<div class="tr-mean">'+esc(g.title||'')+' <span class="tag">L'+g.lesson+'</span></div>'+
       (g.bildung?'<div class="gp-bildung"><b>Bildung:</b> '+esc(g.bildung)+'</div>':'')+
