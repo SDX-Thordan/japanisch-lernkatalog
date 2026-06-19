@@ -443,9 +443,22 @@
       if(!back.classList.contains('hidden'))next(); else if(!revealBtn.classList.contains('hidden'))reveal(); } });
     start();
   }
+  // Menge aller Kanji, die in der Kanji-Liste vorkommen (für „außerhalb der Liste“-Erkennung).
+  let _kanjiSet=null;
+  function kanjiSet(){ if(_kanjiSet)return _kanjiSet; _kanjiSet=new Set();
+    (window.KANJI||[]).forEach(k=>{ for(const ch of String(k.k||'')) _kanjiSet.add(ch); }); return _kanjiSet; }
+  function isKanjiChar(ch){ return /[㐀-鿿豈-﫿]/.test(ch); }
+  // true, wenn das Wort mindestens ein Kanji enthält, das NICHT in der Kanji-Liste steht.
+  function hasUnlistedKanji(word){ const set=kanjiSet();
+    for(const ch of String(word||'')){ if(isKanjiChar(ch) && !set.has(ch)) return true; } return false; }
   function frontHtml(c){
     if(c.t==='kanji')return '<div class="tr-big ja">'+esc(c.d.k)+'</div><div class="tr-q">On-/Kun-Lesung & Bedeutung?</div>';
-    if(c.t==='vocab'){ const w=(c.d.kanji&&c.d.kanji.length)?c.d.kanji:c.d.kana; return '<div class="tr-word ja">'+esc(w)+'</div><div class="tr-q">Lesung & Bedeutung?</div>'; }
+    if(c.t==='vocab'){ const v=c.d, w=(v.kanji&&v.kanji.length)?v.kanji:v.kana;
+      // Enthält das Wort ein Kanji außerhalb der Liste, ist die Lesung nicht erlernbar → Furigana vorgeben.
+      const furi=hasUnlistedKanji(w);
+      return '<div class="tr-word ja">'+(furi?ruby(w,v.kana):esc(w))+'</div>'+
+        (furi?'<div class="tr-furi-note">enthält Kanji außerhalb der Kanji-Liste</div>':'')+
+        '<div class="tr-q">Lesung & Bedeutung?</div>'; }
     return '<div class="tr-pat ja">'+esc(c.d.pattern)+'</div><div class="tr-q">Bedeutung & Bildung?</div>';
   }
   function backHtml(c){
