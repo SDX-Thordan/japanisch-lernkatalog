@@ -455,10 +455,13 @@
         (onr?'<div class="reading-row"><span class="lbl">音</span><span class="vals">'+esc(onr)+'</span></div>':'')+
         (kunr?'<div class="reading-row"><span class="lbl kun">訓</span><span class="vals">'+esc(kunr)+'</span></div>':'')+'</div>'+
         (ex?'<div class="kc-examples">'+ex+'</div>':''); }
-    if(c.t==='vocab'){ const v=c.d; return '<div class="tr-mean">'+esc(v.de)+'</div>'+
-      '<div class="tr-sub"><span class="vocab-reading">'+esc(v.kana)+'</span> <span class="vocab-romaji">'+esc(v.romaji)+'</span></div>'+
+    if(c.t==='vocab'){ const v=c.d; const written=(v.kanji&&v.kanji.length)?v.kanji:v.kana;
+      return '<div class="tr-answer-jp ja">'+ruby(written,v.kana)+'</div>'+
+      '<div class="tr-mean">'+esc(v.de)+'</div>'+
+      '<div class="tr-sub"><span class="vocab-romaji">'+esc(v.romaji)+'</span></div>'+
       '<div class="tr-tag"><span class="pos">'+esc(v.pos)+'</span> · Lektion '+v.lesson+'</div>'; }
-    const g=c.d, ex=(g.beispiele||[]).slice(0,2).map(b=>'<li><span class="ex-jp">'+esc(b.jp)+'</span><span class="ex-trans">'+esc(b.de)+'</span></li>').join('');
+    const g=c.d, ex=(g.beispiele||[]).slice(0,2).map(b=>'<li><span class="ex-jp">'+esc(b.jp)+'</span>'+
+      (b.r?'<span class="ex-romaji">'+esc(b.r)+'</span>':'')+'<span class="ex-trans">'+esc(b.de)+'</span></li>').join('');
     return '<div class="tr-mean">'+esc(g.title||'')+' <span class="tag">L'+g.lesson+'</span></div>'+
       (g.bildung?'<div class="gp-bildung"><b>Bildung:</b> '+esc(g.bildung)+'</div>':'')+
       (g.erklaerung?'<p class="gp-erk">'+esc(g.erklaerung)+'</p>':'')+(ex?'<ul class="gp-ex">'+ex+'</ul>':'');
