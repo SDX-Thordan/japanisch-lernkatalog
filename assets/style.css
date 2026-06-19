@@ -433,10 +433,22 @@ footer .jp { font-family: var(--font-ja); }
 .vc-head .tag { margin-left: auto; }
 .vc-de { color: var(--muted); margin: .15rem 0 .55rem; font-weight: 600; }
 table.vforms { width: 100%; border-collapse: collapse; font-size: .92rem; }
-table.vforms th { text-align: left; font-family: var(--font-ja-sans); font-weight: 700; color: var(--indigo); padding: .3rem .5rem .3rem 0; white-space: nowrap; vertical-align: top; }
-table.vforms td { font-family: var(--font-ja-sans); padding: .3rem 0; }
+table.vforms th { text-align: left; font-family: var(--font-ja-sans); font-weight: 700; color: var(--indigo); padding: .3rem .5rem .3rem 0; vertical-align: top; }
+table.vforms td { font-family: var(--font-ja-sans); padding: .3rem 0; vertical-align: top; }
 table.vforms tr + tr th, table.vforms tr + tr td { border-top: 1px solid var(--border-2); }
 .vf-note { display: block; font-family: var(--font-ui); font-size: .66rem; color: var(--faint); font-weight: 500; }
+/* Anklickbare Form-Zeile mit aufklappbarer Bildungsregel */
+.vf-row { cursor: pointer; }
+.vf-row th { padding-left: 1.05rem; position: relative; transition: color .12s; }
+.vf-row th::before { content: "▸"; position: absolute; left: 0; top: .28rem; font-size: .7rem; color: var(--faint); transition: transform .15s, color .12s; }
+.vf-row:hover th { color: var(--accent-d); }
+.vf-row:hover th::before { color: var(--accent); }
+.vf-row.open th::before { transform: rotate(90deg); color: var(--accent); }
+.vf-row:focus { outline: none; }
+.vf-row:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; border-radius: 4px; }
+.vf-rule { display: none; font-family: var(--font-ja-sans); font-weight: 500; font-size: .8rem; line-height: 1.55; color: var(--muted); margin: .3rem 0 .15rem; padding: .4rem .6rem; background: var(--surface-2); border-left: 3px solid var(--indigo); border-radius: 0 6px 6px 0; }
+.vf-rule b { color: var(--indigo); }
+.vf-row.open .vf-rule { display: block; }
 
 /* ---------- Konjugationstabelle (Grammatik) ---------- */
 table.conj-table { width: 100%; border-collapse: collapse; font-size: .85rem; margin: .65rem 0; background: var(--surface-2); border: 1px solid var(--border-2); border-radius: 8px; overflow: hidden; }
@@ -585,6 +597,8 @@ body.drill-open { overflow: hidden; }
   body.romaji-off .vocab-romaji,
   body.romaji-off .ex-romaji { visibility: visible !important; }
   body.cards-mode .hideable { filter: none !important; background: transparent !important; }
+  .vf-rule { display: block !important; }
+  .vf-row th::before { display: none; }
   .trainer-setup, .tr-controls, .src-pick { display: none !important; }
   .tr-back { display: block !important; }
   .verb-card, .tr-card, table.conj-table { break-inside: avoid; }
