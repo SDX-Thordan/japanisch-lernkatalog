@@ -310,13 +310,36 @@
       group.appendChild(grid); content.appendChild(group);
     });
     buildChips([1,2,3], g=>({1:'Gruppe I',2:'Gruppe II',3:'Gruppe III'}[g]));
+    // Klick/Enter auf eine Form-Zeile blendet kurz die Bildungsregel ein.
+    const toggleRow=row=>{ const open=row.classList.toggle('open'); row.setAttribute('aria-expanded',open?'true':'false'); };
+    content.addEventListener('click',e=>{ const row=e.target.closest('.vf-row'); if(row)toggleRow(row); });
+    content.addEventListener('keydown',e=>{ if(e.key!=='Enter'&&e.code!=='Space')return; const row=e.target.closest('.vf-row'); if(row){ e.preventDefault(); toggleRow(row); } });
   }
-  const VERB_ROWS=[['Wörterbuch-Form','dict','(Grundform)'],['masu-Form','masu','(höflich)'],['masen-Form','masen','(höflich verneint)'],
-    ['ta-Form','ta','(Vergangenheit, einfach)'],['te-Form','te','(Verbindung, mit Hiragana て)'],['nai-Form','nai','(Verneinung, einfach)'],
-    ['tai-Form','tai','(Wunsch „möchte")'],['mashou-Form','mashou','(Vorschlag „lass uns")']];
+  const VERB_ROWS=[['Wörterbuchform','dict'],['höflich (ます-Form)','masu'],['höflich verneint (ません-Form)','masen'],
+    ['Vergangenheit (た-Form)','ta'],['Verbindung (て-Form)','te'],['Verneinung (ない-Form)','nai'],
+    ['Wunsch (たい-Form)','tai'],['Vorschlag (ましょう-Form)','mashou']];
+  // Kurze Bildungsregel je Form; bei dict/ta/te/nai gruppenabhängig (g = 1/2/3).
+  function verbRule(key,g){
+    const R={
+      dict:{1:'ます-Stamm: letztes „-i“ → „-u“ (かきます→かく).',2:'ます-Stamm + る (たべます→たべる).',3:'unregelmäßig: します→する, きます→くる.'},
+      masu:{0:'Die höfliche Grundform auf ～ます.'},
+      masen:{0:'～ます → ～ません (höfliche Verneinung).'},
+      ta:{1:'wie die te-Form, aber ～た／～だ statt ～て／～で (かいて→かいた, よんで→よんだ).',2:'ます-Stamm + た (たべた).',3:'しました→した, きました→きた.'},
+      te:{1:'う・つ・る→って, む・ぶ・ぬ→んで, く→いて, ぐ→いで, す→して. Ausnahme: 行く→行って.',2:'ます-Stamm + て (たべて).',3:'します→して, きます→きて.'},
+      nai:{1:'Wörterbuchform „-u“ → „-a“ + ない (かく→かかない); ～う → ～わない.',2:'ます-Stamm + ない (たべない).',3:'します→しない, きます→こない.'},
+      tai:{0:'ます-Stamm + たい (たべます→たべたい).'},
+      mashou:{0:'～ます → ～ましょう (Vorschlag „lass uns …“).'}
+    };
+    const m=R[key]||{}; return m[g]||m[0]||'';
+  }
   function verbCard(o){
     const {v,g,kana,disp}=o;
-    const body=VERB_ROWS.map(([lbl,key,note])=>'<tr><th>'+lbl+'<span class="vf-note">'+note+'</span></th><td class="ja">'+rubyPair(disp[key],kana[key])+'</td></tr>').join('');
+    const body=VERB_ROWS.map(([lbl,key])=>{
+      const rule=verbRule(key,g);
+      return '<tr class="vf-row" tabindex="0" role="button" aria-expanded="false"><th>'+lbl+
+        (rule?'<div class="vf-rule"><b>Bildung:</b> '+rule+'</div>':'')+
+        '</th><td class="ja">'+rubyPair(disp[key],kana[key])+'</td></tr>';
+    }).join('');
     const gname={1:'Gruppe I',2:'Gruppe II',3:'Gruppe III'}[g];
     const card=el('article','verb-card item'); card.dataset.filter=String(g); card.dataset.preview=v.lesson>20?'1':'0';
     card.dataset.search=norm([v.kana,v.kanji,v.romaji,v.de,Object.keys(kana).map(k=>kana[k]).join(' ')].join(' '));
