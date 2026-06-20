@@ -181,6 +181,9 @@ body:not(.show-preview) .chip-preview { display: none; }
 
 /* Filter-Chips */
 .chips { display: flex; gap: .4rem; flex-wrap: wrap; margin-top: .6rem; }
+.filter-row { display: flex; align-items: baseline; gap: .6rem; flex-wrap: wrap; margin-top: .55rem; }
+.filter-row .chips { margin-top: 0; flex: 1; }
+.filter-label { font-size: .74rem; font-weight: 700; text-transform: uppercase; letter-spacing: .05em; color: var(--faint); min-width: 4.2rem; }
 .chip {
   border: 1px solid var(--border);
   background: var(--surface);
@@ -296,7 +299,6 @@ table.vocab td { padding: .5rem .8rem; border-bottom: 1px solid var(--border-2);
 table.vocab tr:hover td { background: var(--surface-2); }
 .vocab-jp { font-family: var(--font-ja-sans); font-size: 1.12rem; font-weight: 600; }
 .vocab-reading { font-family: var(--font-ja-sans); color: var(--indigo); }
-.vocab-romaji { color: var(--faint); font-size: .82rem; font-style: italic; }
 .pos {
   font-size: .74rem; font-weight: 700; color: var(--muted);
   background: var(--chip); padding: .12rem .45rem; border-radius: 5px; white-space: nowrap;
@@ -325,15 +327,27 @@ table.vocab tr:hover td { background: var(--surface-2); }
 .gp-ex { list-style: none; padding: 0; margin: .5rem 0 0; display: flex; flex-direction: column; gap: .45rem; }
 .gp-ex li { padding-left: 1rem; border-left: 2px solid var(--border); }
 .ex-jp { font-family: var(--font-ja-sans); font-size: 1.02rem; }
-.ex-romaji { color: var(--faint); font-size: .8rem; font-style: italic; display: block; }
 .ex-trans { color: var(--muted); display: block; }
+
+/* ---------- Ein-/ausklappbare Karten (Grammatik & Verben) ---------- */
+.card-toggle { cursor: pointer; user-select: none; }
+.collapse-chev { display: inline-block; flex: none; width: .85em; color: var(--faint); transition: transform .15s, color .12s; }
+.collapse-chev::before { content: "▾"; font-size: .8em; }
+.collapsible.collapsed .collapse-chev { transform: rotate(-90deg); }
+.card-toggle:hover .collapse-chev { color: var(--accent); }
+.collapsible.collapsed .collapse-body { display: none; }
+.gp.collapsible.collapsed { padding-bottom: .85rem; }
+.gp .gp-head.card-toggle { gap: .55rem; }
+.verb-card.collapsible.collapsed { padding-bottom: 1rem; }
+.verb-card .vc-head.card-toggle { gap: .5rem; }
+/* Beim Suchen alle Treffer aufgeklappt zeigen */
+body.searching .collapsible.collapsed .collapse-body { display: block; }
+body.searching .collapsible.collapsed .collapse-chev { transform: none; }
 
 /* ---------- Furigana / Lesungen-Schalter ---------- */
 ruby rt { font-size: .58em; color: var(--indigo); font-weight: 500; user-select: none; }
 body.furigana-off rt { visibility: hidden; }
 body.furigana-off .vocab-reading { visibility: hidden; }
-body.romaji-off .vocab-romaji,
-body.romaji-off .ex-romaji { visibility: hidden; }
 
 /* ---------- Karteikarten-Modus ---------- */
 .hideable { transition: filter .12s, background .12s; }
@@ -551,11 +565,9 @@ body.drill-open { overflow: hidden; }
 .drill-prompt { text-align: center; padding: .6rem 0 .2rem; }
 .drill-jp { font-family: var(--font-ja-sans); font-size: 1.55rem; line-height: 1.5; color: var(--ink); }
 .drill-de { font-size: 1.25rem; line-height: 1.5; color: var(--ink); }
-.drill-prompt .ex-romaji { font-size: .85rem; margin-top: .3rem; }
 .drill-answer { border-top: 1px dashed var(--border); margin-top: 1rem; padding-top: 1rem; text-align: center; }
 .drill-answer-lbl { text-align: center; }
 .drill-answer .drill-jp, .drill-answer .drill-de { color: var(--good); font-weight: 600; }
-.drill-answer .ex-romaji { color: var(--faint); margin-top: .3rem; }
 .drill-controls { display: flex; gap: .6rem; justify-content: center; margin-top: auto; padding-top: 1.4rem; }
 .drill-done { text-align: center; padding: 2rem 1rem; }
 .drill-done-in { font-size: 1.2rem; line-height: 1.8; margin-bottom: 1rem; }
@@ -595,12 +607,13 @@ body.drill-open { overflow: hidden; }
   main { max-width: none; padding: 0; }
   /* Im Druck immer alle Lesungen zeigen */
   body.furigana-off rt,
-  body.furigana-off .vocab-reading,
-  body.romaji-off .vocab-romaji,
-  body.romaji-off .ex-romaji { visibility: visible !important; }
+  body.furigana-off .vocab-reading { visibility: visible !important; }
   body.cards-mode .hideable { filter: none !important; background: transparent !important; }
   .vf-rule { display: block !important; }
   .vf-row th::before { display: none; }
+  /* im Druck alle Karten aufgeklappt */
+  .collapsible.collapsed .collapse-body { display: block !important; }
+  .collapse-chev { display: none !important; }
   .trainer-setup, .tr-controls, .src-pick { display: none !important; }
   .tr-back { display: block !important; }
   .verb-card, .tr-card, table.conj-table { break-inside: avoid; }
