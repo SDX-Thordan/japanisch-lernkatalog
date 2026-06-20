@@ -191,7 +191,7 @@
     const card=el('article','gp item collapsible collapsed'); card.dataset.filter=String(L); card.dataset.preview=L>20?'1':'0';
     card.dataset.search=norm([g.pattern,g.title,g.bildung,g.erklaerung,all.map(b=>b.jp+' '+b.de).join(' ')].join(' '));
     card.innerHTML=
-      '<div class="gp-head card-toggle"><span class="collapse-chev"></span><span class="gp-pattern">'+esc(g.pattern)+'</span>'+
+      '<div class="gp-head card-toggle"><span class="gp-pattern">'+esc(g.pattern)+'</span>'+
       (g.title?'<span class="gp-title">'+esc(g.title)+'</span>':'')+'<span class="tag">L'+L+'</span></div>'+
       '<div class="collapse-body">'+
       (g.bildung?'<div class="gp-bildung"><b>Bildung:</b> '+esc(g.bildung)+'</div>':'')+
@@ -371,7 +371,7 @@
     const card=el('article','verb-card item collapsible collapsed'); card.dataset.filter=String(g); card.dataset.preview=v.lesson>20?'1':'0';
     card.dataset.search=norm([v.kana,v.kanji,v.de,Object.keys(kana).map(k=>kana[k]).join(' ')].join(' '));
     card.innerHTML=
-      '<div class="vc-head card-toggle"><span class="collapse-chev"></span><span class="vc-dict ja">'+rubyPair(disp.dict,kana.dict)+'</span>'+
+      '<div class="vc-head card-toggle"><span class="vc-dict ja">'+rubyPair(disp.dict,kana.dict)+'</span>'+
       '<span class="tag">'+gname+' · L'+v.lesson+'</span></div>'+
       '<div class="vc-de">'+esc(v.de)+'</div>'+
       '<div class="collapse-body"><table class="vforms hideable">'+body+'</table></div>';

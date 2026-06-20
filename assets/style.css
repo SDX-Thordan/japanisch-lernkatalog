@@ -331,18 +331,11 @@ table.vocab tr:hover td { background: var(--surface-2); }
 
 /* ---------- Ein-/ausklappbare Karten (Grammatik & Verben) ---------- */
 .card-toggle { cursor: pointer; user-select: none; }
-.collapse-chev { display: inline-block; flex: none; width: .85em; color: var(--faint); transition: transform .15s, color .12s; }
-.collapse-chev::before { content: "▾"; font-size: .8em; }
-.collapsible.collapsed .collapse-chev { transform: rotate(-90deg); }
-.card-toggle:hover .collapse-chev { color: var(--accent); }
 .collapsible.collapsed .collapse-body { display: none; }
 .gp.collapsible.collapsed { padding-bottom: .85rem; }
-.gp .gp-head.card-toggle { gap: .55rem; }
 .verb-card.collapsible.collapsed { padding-bottom: 1rem; }
-.verb-card .vc-head.card-toggle { gap: .5rem; }
 /* Beim Suchen alle Treffer aufgeklappt zeigen */
 body.searching .collapsible.collapsed .collapse-body { display: block; }
-body.searching .collapsible.collapsed .collapse-chev { transform: none; }
 
 /* ---------- Furigana / Lesungen-Schalter ---------- */
 ruby rt { font-size: .58em; color: var(--indigo); font-weight: 500; user-select: none; }
@@ -613,7 +606,6 @@ body.drill-open { overflow: hidden; }
   .vf-row th::before { display: none; }
   /* im Druck alle Karten aufgeklappt */
   .collapsible.collapsed .collapse-body { display: block !important; }
-  .collapse-chev { display: none !important; }
   .trainer-setup, .tr-controls, .src-pick { display: none !important; }
   .tr-back { display: block !important; }
   .verb-card, .tr-card, table.conj-table { break-inside: avoid; }
