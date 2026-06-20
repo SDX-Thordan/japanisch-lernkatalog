@@ -89,7 +89,7 @@
   }
 
   /* ---------- Zustand für Listen-Seiten ---------- */
-  let items=[], groups=[], activeFilter='all', query='';
+  let items=[], groups=[], activeFilter='all', activeType='all', query='';
 
   /* ============================================================  KANJI  */
   function renderKanji(content){
@@ -136,17 +136,27 @@
       wrap.appendChild(table); group.appendChild(wrap); content.appendChild(group);
     });
     buildChips(Object.keys(byLesson).map(Number).sort((a,b)=>a-b), L=>'L'+L);
+    buildTypeChips();
   }
   function vocabRow(w){
     const written=(w.kanji&&w.kanji.length)?w.kanji:w.kana;
     const showKana=(w.kanji&&w.kanji.length&&w.kanji!==w.kana);
     const tr=el('tr','item'); tr.dataset.filter=String(w.lesson); tr.dataset.preview=w.lesson>20?'1':'0';
-    tr.dataset.search=norm([w.kanji,w.kana,w.romaji,w.de,w.pos].join(' '));
+    tr.dataset.type=vocabType(w.pos);
+    tr.dataset.search=norm([w.kanji,w.kana,w.de,w.pos].join(' '));
     tr.innerHTML='<td class="vocab-jp">'+esc(written)+'</td><td>'+
-      (showKana?'<span class="vocab-reading">'+esc(w.kana)+'</span> ':'')+
-      '<span class="vocab-romaji">'+esc(w.romaji)+'</span></td>'+
+      (showKana?'<span class="vocab-reading">'+esc(w.kana)+'</span>':'')+'</td>'+
       '<td class="de hideable">'+esc(w.de)+'</td><td><span class="pos">'+esc(w.pos)+'</span></td>';
     return tr;
+  }
+  // Ordnet eine Wortart einer Filter-Kategorie zu.
+  function vocabType(pos){ pos=pos||'';
+    if(/^V\./.test(pos))return 'verb';
+    if(/Adj/.test(pos))return 'adj';
+    if(/Adv/.test(pos))return 'adv';
+    if(/Partikel/.test(pos))return 'part';
+    if(/^N\./.test(pos))return 'noun';
+    return 'other';
   }
 
   /* ============================================================  GRAMMATIK  */
@@ -161,6 +171,12 @@
       content.appendChild(group);
     });
     buildChips(Object.keys(byLesson).map(Number).sort((a,b)=>a-b), L=>'L'+L);
+    initCollapse(content);
+  }
+  // Klick auf den Karten-Kopf (.card-toggle) klappt die Karte auf/zu.
+  function initCollapse(content){
+    content.addEventListener('click',e=>{ const h=e.target.closest('.card-toggle'); if(!h)return;
+      const card=h.closest('.collapsible'); if(card)card.classList.toggle('collapsed'); });
   }
   function gpTable(t){
     const rows=(t.rows||[]).map(r=>'<tr><th>'+esc(r.g)+'</th><td>'+esc(r.regel)+'</td><td class="ja">'+esc(r.bsp)+'</td></tr>').join('');
@@ -170,24 +186,25 @@
     const extra=(window.GRAMMATIK_EXTRA&&window.GRAMMATIK_EXTRA[g.pattern])||[];
     const all=(g.beispiele||[]).concat(extra);
     const ex=all.map(b=>'<li><span class="ex-jp">'+furiToRuby(b.jp)+'</span>'+
-      (b.r?'<span class="ex-romaji">'+esc(b.r)+'</span>':'')+
       (b.de?'<span class="ex-trans hideable">'+esc(b.de)+'</span>':'')+'</li>').join('');
     const drillable=all.filter(b=>b.jp&&b.de);
-    const card=el('article','gp item'); card.dataset.filter=String(L); card.dataset.preview=L>20?'1':'0';
+    const card=el('article','gp item collapsible collapsed'); card.dataset.filter=String(L); card.dataset.preview=L>20?'1':'0';
     card.dataset.search=norm([g.pattern,g.title,g.bildung,g.erklaerung,all.map(b=>b.jp+' '+b.de).join(' ')].join(' '));
     card.innerHTML=
-      '<div class="gp-head"><span class="gp-pattern">'+esc(g.pattern)+'</span>'+
+      '<div class="gp-head card-toggle"><span class="collapse-chev"></span><span class="gp-pattern">'+esc(g.pattern)+'</span>'+
       (g.title?'<span class="gp-title">'+esc(g.title)+'</span>':'')+'<span class="tag">L'+L+'</span></div>'+
+      '<div class="collapse-body">'+
       (g.bildung?'<div class="gp-bildung"><b>Bildung:</b> '+esc(g.bildung)+'</div>':'')+
       (g.tabelle?gpTable(g.tabelle):'')+
       (g.erklaerung?'<p class="gp-erk">'+esc(g.erklaerung)+'</p>':'')+
-      (ex?'<ul class="gp-ex">'+ex+'</ul>':'');
+      (ex?'<ul class="gp-ex">'+ex+'</ul>':'')+
+      '</div>';
     if(drillable.length){
       const btn=el('button','gp-learn','▶ Diese Grammatik üben '+
         '<span class="gp-learn-n">'+drillable.length+' Sätze · beide Richtungen</span>');
       btn.type='button';
       btn.addEventListener('click',()=>openGrammarDrill(g,drillable));
-      card.appendChild(btn);
+      card.querySelector('.collapse-body').appendChild(btn);
     }
     return card;
   }
@@ -274,7 +291,7 @@
     const learned=d.total-d.deck.length;
     d.prog.textContent='Satz '+(learned+1)+' / '+d.total;
     const c=d.deck[0], b=c.b;
-    const jpHtml='<div class="drill-jp ja">'+furiToRuby(b.jp)+'</div>'+(b.r?'<div class="ex-romaji">'+esc(b.r)+'</div>':'');
+    const jpHtml='<div class="drill-jp ja">'+furiToRuby(b.jp)+'</div>';
     const deHtml='<div class="drill-de">'+esc(b.de)+'</div>';
     if(c.dir==='jp2de'){
       d.dir.innerHTML='<span class="ja">日本語</span> → Deutsch';
@@ -318,9 +335,11 @@
       group.appendChild(grid); content.appendChild(group);
     });
     buildChips([1,2,3], g=>({1:'Gruppe I',2:'Gruppe II',3:'Gruppe III'}[g]));
-    // Klick/Enter auf eine Form-Zeile blendet kurz die Bildungsregel ein.
+    // Klick auf den Karten-Kopf klappt die Verbkarte auf/zu; Klick/Enter auf eine Form-Zeile zeigt die Bildungsregel.
     const toggleRow=row=>{ const open=row.classList.toggle('open'); row.setAttribute('aria-expanded',open?'true':'false'); };
-    content.addEventListener('click',e=>{ const row=e.target.closest('.vf-row'); if(row)toggleRow(row); });
+    content.addEventListener('click',e=>{ const h=e.target.closest('.card-toggle');
+      if(h){ const card=h.closest('.collapsible'); if(card)card.classList.toggle('collapsed'); return; }
+      const row=e.target.closest('.vf-row'); if(row)toggleRow(row); });
     content.addEventListener('keydown',e=>{ if(e.key!=='Enter'&&e.code!=='Space')return; const row=e.target.closest('.vf-row'); if(row){ e.preventDefault(); toggleRow(row); } });
   }
   const VERB_ROWS=[['Wörterbuchform','dict'],['höflich (ます-Form)','masu'],['höflich verneint (ません-Form)','masen'],
@@ -349,13 +368,13 @@
         '</th><td class="ja">'+rubyPair(disp[key],kana[key])+'</td></tr>';
     }).join('');
     const gname={1:'Gruppe I',2:'Gruppe II',3:'Gruppe III'}[g];
-    const card=el('article','verb-card item'); card.dataset.filter=String(g); card.dataset.preview=v.lesson>20?'1':'0';
-    card.dataset.search=norm([v.kana,v.kanji,v.romaji,v.de,Object.keys(kana).map(k=>kana[k]).join(' ')].join(' '));
+    const card=el('article','verb-card item collapsible collapsed'); card.dataset.filter=String(g); card.dataset.preview=v.lesson>20?'1':'0';
+    card.dataset.search=norm([v.kana,v.kanji,v.de,Object.keys(kana).map(k=>kana[k]).join(' ')].join(' '));
     card.innerHTML=
-      '<div class="vc-head"><span class="vc-dict ja">'+rubyPair(disp.dict,kana.dict)+'</span>'+
+      '<div class="vc-head card-toggle"><span class="collapse-chev"></span><span class="vc-dict ja">'+rubyPair(disp.dict,kana.dict)+'</span>'+
       '<span class="tag">'+gname+' · L'+v.lesson+'</span></div>'+
       '<div class="vc-de">'+esc(v.de)+'</div>'+
-      '<table class="vforms hideable">'+body+'</table>';
+      '<div class="collapse-body"><table class="vforms hideable">'+body+'</table></div>';
     return card;
   }
 
@@ -372,12 +391,22 @@
     box.appendChild(mk('all','Alle'));
     values.forEach(v=>box.appendChild(mk(String(v),labelFn(v))));
   }
+  // Wortart-Chips (nur Vokabular-Seite).
+  function buildTypeChips(){
+    const box=document.getElementById('type-filters'); if(!box)return;
+    const defs=[['all','Alle'],['noun','Nomen'],['verb','Verben'],['adj','Adjektive'],['adv','Adverbien'],['part','Partikel']];
+    defs.forEach(([val,label])=>{ const c=el('button','chip'+(val==='all'?' on':'')); c.textContent=label; c.dataset.tval=val;
+      c.addEventListener('click',()=>{ activeType=val; box.querySelectorAll('.chip').forEach(x=>x.classList.toggle('on',x.dataset.tval===val)); applyFilter(); });
+      box.appendChild(c); });
+  }
   function applyFilter(){
     const q=query.trim().toLowerCase(); let shown=0;
     const previewOn=document.body.classList.contains('show-preview');
+    document.body.classList.toggle('searching',q.length>0);
     items.forEach(it=>{ const okF=activeFilter==='all'||it.dataset.filter===activeFilter; const okQ=!q||(it.dataset.search||'').indexOf(q)!==-1;
       const okP=previewOn||it.dataset.preview!=='1';
-      const vis=okF&&okQ&&okP; it.classList.toggle('hidden',!vis); if(vis)shown++; });
+      const okT=activeType==='all'||it.dataset.type===activeType;
+      const vis=okF&&okQ&&okP&&okT; it.classList.toggle('hidden',!vis); if(vis)shown++; });
     groups.forEach(g=>{ const n=g.querySelectorAll('.item:not(.hidden)').length; g.classList.toggle('hidden',n===0);
       const gc=g.querySelector('.gcount'); if(gc)gc.textContent=n; });
     const c=document.getElementById('count'); if(c)c.textContent='Zeige '+shown+' von '+items.length+' Einträgen';
@@ -395,11 +424,6 @@
     body.classList.toggle('furigana-off',!furiOn);
     const fBtn=document.getElementById('toggle-readings'); setPressed(fBtn,furiOn);
     if(fBtn)fBtn.addEventListener('click',()=>{ const off=body.classList.toggle('furigana-off'); setPressed(fBtn,!off); lsSet('katalog_furigana',off?'off':'on'); });
-    // Rōmaji (Standard: AN) — blendet die Rōmaji-Umschrift aus
-    const romaOn=lsGet('katalog_romaji')!=='off';
-    body.classList.toggle('romaji-off',!romaOn);
-    const roBtn=document.getElementById('toggle-romaji'); setPressed(roBtn,romaOn);
-    if(roBtn)roBtn.addEventListener('click',()=>{ const off=body.classList.toggle('romaji-off'); setPressed(roBtn,!off); lsSet('katalog_romaji',off?'off':'on'); });
     // Karteikarten (Standard: AUS)
     const cardsOn=lsGet('katalog_cards')==='on';
     body.classList.toggle('cards-mode',cardsOn);
@@ -467,10 +491,9 @@
     if(c.t==='vocab'){ const v=c.d; const written=(v.kanji&&v.kanji.length)?v.kanji:v.kana;
       return '<div class="tr-answer-jp ja">'+ruby(written,v.kana)+'</div>'+
       '<div class="tr-mean">'+esc(v.de)+'</div>'+
-      '<div class="tr-sub"><span class="vocab-romaji">'+esc(v.romaji)+'</span></div>'+
       '<div class="tr-tag"><span class="pos">'+esc(v.pos)+'</span> · Lektion '+v.lesson+'</div>'; }
     const g=c.d, ex=(g.beispiele||[]).slice(0,2).map(b=>'<li><span class="ex-jp">'+furiToRuby(b.jp)+'</span>'+
-      (b.r?'<span class="ex-romaji">'+esc(b.r)+'</span>':'')+'<span class="ex-trans">'+esc(b.de)+'</span></li>').join('');
+      '<span class="ex-trans">'+esc(b.de)+'</span></li>').join('');
     return '<div class="tr-mean">'+esc(g.title||'')+' <span class="tag">L'+g.lesson+'</span></div>'+
       (g.bildung?'<div class="gp-bildung"><b>Bildung:</b> '+esc(g.bildung)+'</div>':'')+
       (g.erklaerung?'<p class="gp-erk">'+esc(g.erklaerung)+'</p>':'')+(ex?'<ul class="gp-ex">'+ex+'</ul>':'');
