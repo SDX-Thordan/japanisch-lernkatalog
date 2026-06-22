@@ -29,7 +29,19 @@
   function esc(s){ return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
   function ruby(base, reading){ if(!reading||reading===base) return esc(base); return '<ruby>'+esc(base)+'<rt>'+esc(reading)+'</rt></ruby>'; }
   function rubyPair(disp, read){ return (disp!==read) ? ruby(disp, read) : esc(disp); }
-  function norm(s){ return String(s==null?'':s).toLowerCase(); }
+  // Suchnormalisierung: kleinschreiben + Makrone falten (ō→o …), damit ASCII-Rōmaji wie „kyoshi" auch „kyōshi" trifft.
+  function norm(s){ return String(s==null?'':s).toLowerCase()
+    .replace(/[āáàâ]/g,'a').replace(/[īíìî]/g,'i').replace(/[ūúùû]/g,'u').replace(/[ēéèê]/g,'e').replace(/[ōóòô]/g,'o'); }
+  // Kompakte Hepburn-Umschrift von Kana → Rōmaji (nur für den Suchindex der Verbformen).
+  const ROMA_DI={'きゃ':'kya','きゅ':'kyu','きょ':'kyo','しゃ':'sha','しゅ':'shu','しょ':'sho','ちゃ':'cha','ちゅ':'chu','ちょ':'cho','にゃ':'nya','にゅ':'nyu','にょ':'nyo','ひゃ':'hya','ひゅ':'hyu','ひょ':'hyo','みゃ':'mya','みゅ':'myu','みょ':'myo','りゃ':'rya','りゅ':'ryu','りょ':'ryo','ぎゃ':'gya','ぎゅ':'gyu','ぎょ':'gyo','じゃ':'ja','じゅ':'ju','じょ':'jo','びゃ':'bya','びゅ':'byu','びょ':'byo','ぴゃ':'pya','ぴゅ':'pyu','ぴょ':'pyo'};
+  const ROMA_MO={'あ':'a','い':'i','う':'u','え':'e','お':'o','か':'ka','き':'ki','く':'ku','け':'ke','こ':'ko','が':'ga','ぎ':'gi','ぐ':'gu','げ':'ge','ご':'go','さ':'sa','し':'shi','す':'su','せ':'se','そ':'so','ざ':'za','じ':'ji','ず':'zu','ぜ':'ze','ぞ':'zo','た':'ta','ち':'chi','つ':'tsu','て':'te','と':'to','だ':'da','ぢ':'ji','づ':'zu','で':'de','ど':'do','な':'na','に':'ni','ぬ':'nu','ね':'ne','の':'no','は':'ha','ひ':'hi','ふ':'fu','へ':'he','ほ':'ho','ば':'ba','び':'bi','ぶ':'bu','べ':'be','ぼ':'bo','ぱ':'pa','ぴ':'pi','ぷ':'pu','ぺ':'pe','ぽ':'po','ま':'ma','み':'mi','む':'mu','め':'me','も':'mo','や':'ya','ゆ':'yu','よ':'yo','ら':'ra','り':'ri','る':'ru','れ':'re','ろ':'ro','わ':'wa','を':'o','ん':'n','ー':''};
+  function kanaToRomaji(k){ k=String(k||''); let r='';
+    for(let i=0;i<k.length;i++){ const two=k.substr(i,2);
+      if(ROMA_DI[two]){ r+=ROMA_DI[two]; i++; continue; }
+      const c=k[i];
+      if(c==='っ'){ const nr=ROMA_DI[k.substr(i+1,2)]||ROMA_MO[k[i+1]]||''; if(nr)r+=nr[0]; continue; }
+      r+=(ROMA_MO[c]!=null)?ROMA_MO[c]:c; }
+    return r; }
   // Wandelt einen Beispielsatz in Ruby-HTML um, falls Furigana-Daten vorliegen (Notation {Basis|Lesung}).
   function furiToRuby(jp){
     const f=(window.GRAMMATIK_FURIGANA||{})[jp];
@@ -143,7 +155,7 @@
     const showKana=(w.kanji&&w.kanji.length&&w.kanji!==w.kana);
     const tr=el('tr','item'); tr.dataset.filter=String(w.lesson); tr.dataset.preview=w.lesson>20?'1':'0';
     tr.dataset.type=vocabType(w.pos);
-    tr.dataset.search=norm([w.kanji,w.kana,w.de,w.pos].join(' '));
+    tr.dataset.search=norm([w.kanji,w.kana,w.romaji,w.de,w.pos].join(' '));
     tr.innerHTML='<td class="vocab-jp">'+esc(written)+'</td><td>'+
       (showKana?'<span class="vocab-reading">'+esc(w.kana)+'</span>':'')+'</td>'+
       '<td class="de hideable">'+esc(w.de)+'</td><td><span class="pos">'+esc(w.pos)+'</span></td>';
@@ -189,7 +201,7 @@
       (b.de?'<span class="ex-trans hideable">'+esc(b.de)+'</span>':'')+'</li>').join('');
     const drillable=all.filter(b=>b.jp&&b.de);
     const card=el('article','gp item collapsible collapsed'); card.dataset.filter=String(L); card.dataset.preview=L>20?'1':'0';
-    card.dataset.search=norm([g.pattern,g.title,g.bildung,g.erklaerung,all.map(b=>b.jp+' '+b.de).join(' ')].join(' '));
+    card.dataset.search=norm([g.pattern,g.title,g.bildung,g.erklaerung,all.map(b=>b.jp+' '+(b.r||'')+' '+b.de).join(' ')].join(' '));
     card.innerHTML=
       '<div class="gp-head card-toggle"><span class="gp-pattern">'+esc(g.pattern)+'</span>'+
       (g.title?'<span class="gp-title">'+esc(g.title)+'</span>':'')+'<span class="tag">L'+L+'</span></div>'+
@@ -369,7 +381,7 @@
     }).join('');
     const gname={1:'Gruppe I',2:'Gruppe II',3:'Gruppe III'}[g];
     const card=el('article','verb-card item collapsible collapsed'); card.dataset.filter=String(g); card.dataset.preview=v.lesson>20?'1':'0';
-    card.dataset.search=norm([v.kana,v.kanji,v.de,Object.keys(kana).map(k=>kana[k]).join(' ')].join(' '));
+    card.dataset.search=norm([v.kana,v.kanji,v.romaji,v.de,Object.keys(kana).map(k=>kana[k]+' '+kanaToRomaji(kana[k])).join(' ')].join(' '));
     card.innerHTML=
       '<div class="vc-head card-toggle"><span class="vc-dict ja">'+rubyPair(disp.dict,kana.dict)+'</span>'+
       '<span class="tag">'+gname+' · L'+v.lesson+'</span></div>'+
@@ -400,7 +412,7 @@
       box.appendChild(c); });
   }
   function applyFilter(){
-    const q=query.trim().toLowerCase(); let shown=0;
+    const q=norm(query.trim()); let shown=0;
     const previewOn=document.body.classList.contains('show-preview');
     document.body.classList.toggle('searching',q.length>0);
     items.forEach(it=>{ const okF=activeFilter==='all'||it.dataset.filter===activeFilter; const okQ=!q||(it.dataset.search||'').indexOf(q)!==-1;
