@@ -16,10 +16,13 @@ test('Heute startet eine gemischte Session', async ({ page }) => {
 
 test('Grammatik zeigt „Mehr erklären" und kann eine Übung öffnen', async ({ page }) => {
   await page.goto('/grammatik.html');
-  const learn = page.locator('.gp-plus .gp-learn').first();
+  // Grammatik-Karten sind eingeklappt — erst aufklappen, dann ist der Üben-Button sichtbar.
+  const card = page.locator('.gp:has(.gp-plus .gp-learn)').first();
+  await card.locator('.gp-head').click();
+  const learn = card.locator('.gp-plus .gp-learn').first();
   await learn.scrollIntoViewIfNeeded();
   await learn.click();
-  await expect(page.locator('.gp-ex-host .ex-opt').first()).toBeVisible();
+  await expect(card.locator('.gp-ex-host .ex-opt').first()).toBeVisible();
 });
 
 test('Schreiben lädt das KanjiVG-Canvas', async ({ page }) => {
