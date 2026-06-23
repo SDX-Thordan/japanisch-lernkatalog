@@ -1,0 +1,23 @@
+{
+  "name": "japanisch-lernkatalog",
+  "version": "1.0.0",
+  "description": "Japanisch A1.7 Lern-Katalog — Lern-App (Web/PWA + Android-APK via Capacitor)",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "e2e": "playwright test",
+    "build:www": "node scripts/build-www.mjs",
+    "cap:sync": "npm run build:www && cap sync android"
+  },
+  "license": "MIT",
+  "devDependencies": {
+    "@capacitor/android": "^6.1.2",
+    "@capacitor/cli": "^6.1.2",
+    "@capacitor/core": "^6.1.2",
+    "@playwright/test": "^1.48.0",
+    "jsdom": "^25.0.1",
+    "vitest": "^2.1.4"
+  }
+}

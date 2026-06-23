@@ -1,0 +1,19 @@
+# Node / Tooling
+node_modules/
+npm-debug.log*
+
+# Capacitor staged web assets (generiert aus den Quell-Assets)
+www/
+
+# Test-/Build-Output
+coverage/
+test-results/
+playwright-report/
+.playwright/
+
+# Android: das Capacitor-Projekt wird in CI per `npx cap add android` frisch erzeugt
+# (deterministisch aus @capacitor/android) und nicht eingecheckt.
+android/
+
+# OS
+.DS_Store

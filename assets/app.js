@@ -218,7 +218,44 @@
       btn.addEventListener('click',()=>openGrammarDrill(g,drillable));
       card.querySelector('.collapse-body').appendChild(btn);
     }
+    const plus=(window.GRAMMATIK_PLUS||{})[g.pattern];
+    if(plus)card.querySelector('.collapse-body').appendChild(grammarPlusBlock(g,plus));
     return card;
+  }
+  // Additiver „Mehr erklären"-Block + Übungen (window.Exercises) für Muster mit GRAMMATIK_PLUS.
+  function grammarPlusBlock(g,plus){
+    const wrap=el('div','gp-plus');
+    if(plus.erklaerung_lang)wrap.appendChild(el('div','gp-plus-erk','<b>Mehr erklären:</b> '+esc(plus.erklaerung_lang)));
+    if(plus.fehler&&plus.fehler.length){
+      wrap.appendChild(el('div','gp-plus-h','Häufige Fehler'));
+      const ul=el('ul','gp-fehler'); plus.fehler.forEach(f=>ul.appendChild(el('li',null,esc(f)))); wrap.appendChild(ul);
+    }
+    if(plus.kontrast&&plus.kontrast.length){
+      wrap.appendChild(el('div','gp-plus-h','Abgrenzung'));
+      const ul=el('ul','gp-kontrast');
+      plus.kontrast.forEach(k=>ul.appendChild(el('li',null,'<span class="ja">'+esc(k.a)+'</span> ↔ <span class="ja">'+esc(k.b)+'</span> — '+esc(k.note))));
+      wrap.appendChild(ul);
+    }
+    if(plus.uebungen&&plus.uebungen.length&&window.Exercises){
+      const btn=el('button','gp-learn','▶ Grammatik-Übungen <span class="gp-learn-n">'+plus.uebungen.length+' Aufgaben</span>'); btn.type='button';
+      const host=el('div','gp-ex-host hidden');
+      btn.addEventListener('click',()=>{ host.classList.toggle('hidden');
+        if(!host.dataset.built){ buildPlusExercises(host,g.pattern,plus.uebungen); host.dataset.built='1'; } });
+      wrap.appendChild(btn); wrap.appendChild(host);
+    }
+    return wrap;
+  }
+  function buildPlusExercises(host,pattern,uebungen){
+    let i=0; const stage=el('div','gp-ex-stage'); host.appendChild(stage);
+    function show(){
+      if(i>=uebungen.length){ stage.innerHTML='<div class="gp-ex-done">✓ Alle Übungen erledigt.</div>'; return; }
+      const ex=Object.assign({},uebungen[i],{srsId:'g:'+pattern});
+      window.Exercises.renderExercise(ex,stage,{ onResult:()=>{
+        const nx=el('button','btn btn-next gp-ex-next','Weiter →'); nx.type='button';
+        nx.addEventListener('click',()=>{ i++; show(); }); stage.appendChild(nx);
+      }});
+    }
+    show();
   }
 
   /* ============================================================
@@ -479,8 +516,10 @@
       revealBtn.classList.remove('hidden'); againBtn.classList.add('hidden'); nextBtn.classList.add('hidden');
     }
     function reveal(){ back.classList.remove('hidden'); revealBtn.classList.add('hidden'); againBtn.classList.remove('hidden'); nextBtn.classList.remove('hidden'); }
-    function next(){ deck.shift(); render(); }
-    function again(){ const c=deck.shift(); deck.push(c); render(); }
+    // Bewertung an die SRS-Engine koppeln (falls geladen): „Gewusst" = 1, „Nochmal" = 0.
+    function gradeCurrent(g){ const c=deck[0]; if(c&&window.SRS){ const id=window.SRS.srsId(c.t,c.d); if(id)window.SRS.grade(id,g); } }
+    function next(){ gradeCurrent(1); deck.shift(); render(); }
+    function again(){ gradeCurrent(0); const c=deck.shift(); deck.push(c); render(); }
     revealBtn.addEventListener('click',reveal); nextBtn.addEventListener('click',next); againBtn.addEventListener('click',again);
     if(newBtn)newBtn.addEventListener('click',start);
     document.addEventListener('keydown',e=>{ if(e.code==='Space'){ e.preventDefault();
@@ -511,6 +550,89 @@
       (g.erklaerung?'<p class="gp-erk">'+esc(g.erklaerung)+'</p>':'')+(ex?'<ul class="gp-ex">'+ex+'</ul>':'');
   }
 
+  /* ============================================================  HEUTE (Tagesaufgabe)  */
+  function setText(id,v){ const e=document.getElementById(id); if(e)e.textContent=v; }
+  function clampInt(id,dflt){ const e=document.getElementById(id); let n=e?parseInt(e.value,10):dflt; if(isNaN(n)||n<0)n=dflt; return n; }
+  function initHeute(){
+    const stage=document.getElementById('h-stage'); if(!stage||!window.SRS)return;
+    const setup=document.getElementById('h-setup'), body=document.getElementById('h-body'),
+      prog=document.getElementById('h-prog'), typeTag=document.getElementById('h-type'),
+      done=document.getElementById('h-done'), startBtn=document.getElementById('h-start');
+    let deck=[], total=0;
+    function refreshStats(){ const s=window.SRS.stats(); setText('h-streak',s.streakDays); setText('h-due',s.due); setText('h-learned',s.learned); }
+    function start(){
+      const previewOn=document.body.classList.contains('show-preview');
+      deck=window.SRS.buildQueue({sources:['kanji','vocab','grammar'],newLimit:clampInt('h-newlimit',5),reviewLimit:clampInt('h-revlimit',15),includePreview:previewOn});
+      total=deck.length; setup.classList.add('hidden'); done.classList.add('hidden'); stage.classList.remove('hidden'); render();
+    }
+    function finishItem(grade){ const c=deck[0]; if(grade!=null&&c)window.SRS.grade(c.id,grade); deck.shift(); refreshStats(); render(); }
+    function render(){
+      if(!deck.length){ stage.classList.add('hidden'); done.classList.remove('hidden');
+        done.innerHTML=(total?'<div class="tr-done-in">🎉 Tagesrunde geschafft!<br>'+total+' Aufgaben erledigt.</div>':'<div class="tr-done-in">Für heute ist alles erledigt. 🎌</div>')+
+          '<button class="btn-primary" id="h-again" type="button">↻ Noch eine Runde</button>';
+        const a=document.getElementById('h-again'); if(a)a.addEventListener('click',()=>{ done.classList.add('hidden'); setup.classList.remove('hidden'); refreshStats(); });
+        return; }
+      const c=deck[0], learned=total-deck.length;
+      prog.textContent='Aufgabe '+(learned+1)+' / '+total;
+      typeTag.textContent=({kanji:'漢字 Kanji',vocab:'語彙 Vokabel',grammar:'文法 Grammatik'}[c.type]||'')+(c.reason==='due'?' · Wiederholung':' · neu');
+      typeTag.className='tag tr-type-'+c.type;
+      if(c.type==='grammar'&&window.Exercises&&window.SATZ_TEMPLATES&&window.SATZ_TEMPLATES[c.data.pattern])renderExerciseItem(c);
+      else renderFlashcard(c);
+    }
+    function renderFlashcard(c){
+      const fc={t:c.type,d:c.data};
+      body.innerHTML='<div class="tr-card"><div class="tr-front">'+frontHtml(fc)+'</div><div class="tr-back hidden">'+backHtml(fc)+'</div>'+
+        '<div class="tr-controls"><button class="btn-primary h-reveal" type="button">Aufdecken <span class="kbd">Leertaste</span></button>'+
+        '<button class="btn btn-again h-again2 hidden" type="button">↻ Nochmal</button>'+
+        '<button class="btn btn-next h-good hidden" type="button">Gewusst →</button></div></div>';
+      const back=body.querySelector('.tr-back'), reveal=body.querySelector('.h-reveal'), again=body.querySelector('.h-again2'), good=body.querySelector('.h-good');
+      reveal.addEventListener('click',()=>{ back.classList.remove('hidden'); reveal.classList.add('hidden'); again.classList.remove('hidden'); good.classList.remove('hidden'); });
+      good.addEventListener('click',()=>finishItem(1));
+      again.addEventListener('click',()=>{ const c2=deck.shift(); window.SRS.grade(c2.id,0); deck.push(c2); refreshStats(); render(); });
+    }
+    function renderExerciseItem(c){
+      const tpls=window.SATZ_TEMPLATES[c.data.pattern], tpl=tpls[Math.floor(Math.random()*tpls.length)];
+      const ex=window.Exercises.fromTemplate(tpl,{});
+      body.innerHTML='<div class="tr-card"><div class="h-ex-pat ja">'+esc(c.data.pattern)+'</div><div class="h-ex"></div><div class="h-next-wrap"></div></div>';
+      const mount=body.querySelector('.h-ex'), nextWrap=body.querySelector('.h-next-wrap');
+      window.Exercises.renderExercise(ex,mount,{ onResult:()=>{ const nx=el('button','btn-primary h-next','Weiter →'); nx.type='button';
+        nx.addEventListener('click',()=>finishItem(null)); nextWrap.appendChild(nx); } });
+    }
+    document.addEventListener('keydown',e=>{ if(stage.classList.contains('hidden'))return; if(e.code!=='Space')return;
+      const reveal=body.querySelector('.h-reveal'), good=body.querySelector('.h-good');
+      if(reveal&&!reveal.classList.contains('hidden')){ e.preventDefault(); reveal.click(); }
+      else if(good&&!good.classList.contains('hidden')){ e.preventDefault(); good.click(); } });
+    if(startBtn)startBtn.addEventListener('click',start);
+    refreshStats();
+  }
+
+  /* ============================================================  FORTSCHRITT (Statistik + Sicherung)  */
+  function initFortschritt(){
+    const root=document.getElementById('f-root'); if(!root||!window.SRS)return;
+    function draw(){
+      const s=window.SRS.stats(), snap=window.SRS.snapshot(), fc=window.SRS.forecast(undefined,7);
+      const maxC=Math.max(1,...fc.map(d=>d.count));
+      const bars=fc.map(d=>'<div class="f-bar"><div class="f-bar-fill" style="height:'+Math.round(d.count/maxC*100)+'%"></div>'+
+        '<span class="f-bar-n">'+d.count+'</span><span class="f-bar-d">'+d.date.slice(5)+'</span></div>').join('');
+      setText('f-streak',s.streakDays); setText('f-learned',s.learned); setText('f-due',s.due); setText('f-reviews',s.totalReviews);
+      const forecast=document.getElementById('f-forecast'); if(forecast)forecast.innerHTML=bars;
+    }
+    draw();
+    const exp=document.getElementById('f-export'); if(exp)exp.addEventListener('click',()=>window.SRS.downloadBackup());
+    const imp=document.getElementById('f-import'); const file=document.getElementById('f-file');
+    if(imp&&file){ imp.addEventListener('click',()=>file.click());
+      file.addEventListener('change',()=>{ const f=file.files&&file.files[0]; if(!f)return; const r=new FileReader();
+        r.onload=()=>{ const res=window.SRS.importJSON(String(r.result),{merge:true}); const msg=document.getElementById('f-msg');
+          if(msg)msg.textContent=res.ok?'✓ Fortschritt importiert (zusammengeführt).':'✗ Datei ungültig oder falsche Version.'; draw(); }; r.readAsText(f); }); }
+    const rst=document.getElementById('f-reset'); if(rst)rst.addEventListener('click',()=>{
+      if(window.confirm('Wirklich den gesamten Fortschritt löschen? Tipp: vorher exportieren.')){ window.SRS.reset(); const msg=document.getElementById('f-msg'); if(msg)msg.textContent='Fortschritt zurückgesetzt.'; draw(); } });
+  }
+
+  /* ============================================================  SCHREIBEN (Kanji-Schreibübung)  */
+  function initSchreiben(){
+    if(window.KanjiWrite && typeof window.KanjiWrite.initPage==='function') window.KanjiWrite.initPage();
+  }
+
   /* ============================================================  INIT  */
   function init(){
     const page=document.body.dataset.page;
@@ -525,7 +647,23 @@
       applyFilter();
     }
     if(page==='ueben')initTraining();
+    if(page==='heute')initHeute();
+    if(page==='fortschritt')initFortschritt();
+    if(page==='schreiben')initSchreiben();
     initSearch(); initToggles();
   }
+  /* ---------- geteilte Helfer für die neuen Module (srs.js, exercises.js, kanji-write.js) ----------
+     Additiv: macht die intern definierten Helfer nutzbar, ohne sie zu duplizieren.
+     Vor init() gesetzt, damit Render-Code (z. B. Grammatik-Übungen) sie schon nutzen kann. */
+  window.Katalog = {
+    el, esc, ruby, rubyPair, norm, furiToRuby, kanaToRomaji, shuffle,
+    conjugate, allForms, verbGroup, lsGet, lsSet
+  };
+
   if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',init); else init();
+
+  /* ---------- PWA: Service Worker registrieren (offline-fähig, installierbar) ---------- */
+  if(typeof navigator!=='undefined' && 'serviceWorker' in navigator && location.protocol!=='file:'){
+    window.addEventListener('load',function(){ navigator.serviceWorker.register('service-worker.js').catch(function(){}); });
+  }
 })();

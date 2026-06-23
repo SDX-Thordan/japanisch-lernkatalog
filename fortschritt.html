@@ -1,0 +1,74 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Fortschritt · 進捗 — Japanisch A1.7 Lern-Katalog</title>
+<link rel="stylesheet" href="assets/style.css">
+<link rel="manifest" href="manifest.webmanifest">
+<meta name="theme-color" content="#b23a2e">
+<link rel="apple-touch-icon" href="assets/icons/icon-192.png">
+</head>
+<body data-page="fortschritt">
+
+<header class="topbar">
+  <div class="topbar-inner">
+    <a class="brand" href="index.html"><span class="jp">日本語</span><span class="lv">A1.7 Katalog</span></a>
+    <nav class="nav">
+      <a href="index.html">Übersicht</a>
+      <a href="heute.html">Heute</a>
+      <a href="grammatik.html">Grammatik</a>
+      <a href="vokabular.html">Vokabular</a>
+      <a href="kanji.html">Kanji</a>
+      <a href="schreiben.html">Schreiben</a>
+      <a href="verben.html">Verben</a>
+      <a href="ueben.html">Üben</a>
+      <a href="fortschritt.html" class="active">Fortschritt</a>
+    </nav>
+  </div>
+</header>
+
+<main id="f-root">
+  <div class="page-intro">
+    <span class="kicker">進捗 · Dein Fortschritt</span>
+    <h1>Fortschritt <span class="jp">進捗</span></h1>
+    <p>Dein Lernstand wird im Browser gespeichert. Sichere ihn bei Bedarf als JSON-Datei und
+       spiele ihn auf einem anderen Gerät wieder ein.</p>
+  </div>
+
+  <div class="heute-stats">
+    <div class="hstat"><span class="hstat-n" id="f-streak">0</span><span class="hstat-l">🔥 Streak (Tage)</span></div>
+    <div class="hstat"><span class="hstat-n" id="f-learned">0</span><span class="hstat-l">gelernt gesamt</span></div>
+    <div class="hstat"><span class="hstat-n" id="f-due">0</span><span class="hstat-l">heute fällig</span></div>
+    <div class="hstat"><span class="hstat-n" id="f-reviews">0</span><span class="hstat-l">Wiederholungen</span></div>
+  </div>
+
+  <section class="panel">
+    <h2>Fällig in den nächsten 7 Tagen</h2>
+    <div class="f-forecast" id="f-forecast"></div>
+  </section>
+
+  <section class="panel">
+    <h2>Sicherung <span class="jp">バックアップ</span></h2>
+    <p style="color:var(--muted);margin-top:0">Exportiere deinen Fortschritt als JSON oder importiere eine Sicherung (wird zusammengeführt).</p>
+    <div class="f-actions">
+      <button class="btn-primary" id="f-export" type="button">⬇ Export (JSON)</button>
+      <button class="btn" id="f-import" type="button">⬆ Import …</button>
+      <input type="file" id="f-file" accept="application/json,.json" hidden>
+      <button class="btn f-danger" id="f-reset" type="button">Fortschritt zurücksetzen</button>
+    </div>
+    <p class="f-msg" id="f-msg" role="status"></p>
+  </section>
+</main>
+
+<footer>
+  <span class="jp">日本語 A1.7</span> · Lern-Katalog — Fortschritt &amp; Sicherung.
+</footer>
+
+<script src="assets/data/kanji.js"></script>
+<script src="assets/data/vokabular.js"></script>
+<script src="assets/data/grammatik.js"></script>
+<script src="assets/srs.js"></script>
+<script src="assets/app.js"></script>
+</body>
+</html>
