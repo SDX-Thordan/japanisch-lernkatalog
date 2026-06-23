@@ -1,0 +1,60 @@
+name: Build APK
+
+on:
+  push:
+    branches: [ main, claude/japanese-learning-app-j2m6r8 ]
+  workflow_dispatch:
+
+jobs:
+  # Gate: Tests müssen grün sein, bevor die APK gebaut wird.
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - run: npm ci
+      - name: Unit-Tests (Vitest)
+        run: npm test
+      - name: Playwright-Browser
+        run: npx playwright install --with-deps chromium
+      - name: E2E-Smokes (Playwright)
+        run: npm run e2e
+
+  build:
+    needs: test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+      - name: Android SDK
+        uses: android-actions/setup-android@v3
+
+      - run: npm ci
+
+      - name: Web-Assets nach www/ stagen
+        run: npm run build:www
+
+      - name: Android-Projekt erzeugen (Capacitor) + synchronisieren
+        run: |
+          npx cap add android
+          npx cap sync android
+
+      - name: Debug-APK bauen
+        run: cd android && chmod +x ./gradlew && ./gradlew assembleDebug --no-daemon
+
+      - name: APK als Artefakt hochladen
+        uses: actions/upload-artifact@v4
+        with:
+          name: japanisch-katalog-debug-apk
+          path: android/app/build/outputs/apk/debug/app-debug.apk
+          if-no-files-found: error

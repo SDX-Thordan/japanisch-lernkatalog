@@ -11,13 +11,9 @@ test-results/
 playwright-report/
 .playwright/
 
-# Android Build-Output (Gradle); das Projekt selbst ist eingecheckt
-android/.gradle/
-android/build/
-android/app/build/
-android/local.properties
-android/.idea/
-android/app/src/main/assets/public/
+# Android: das Capacitor-Projekt wird in CI per `npx cap add android` frisch erzeugt
+# (deterministisch aus @capacitor/android) und nicht eingecheckt.
+android/
 
 # OS
 .DS_Store
