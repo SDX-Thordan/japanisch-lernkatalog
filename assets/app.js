@@ -479,8 +479,10 @@
       revealBtn.classList.remove('hidden'); againBtn.classList.add('hidden'); nextBtn.classList.add('hidden');
     }
     function reveal(){ back.classList.remove('hidden'); revealBtn.classList.add('hidden'); againBtn.classList.remove('hidden'); nextBtn.classList.remove('hidden'); }
-    function next(){ deck.shift(); render(); }
-    function again(){ const c=deck.shift(); deck.push(c); render(); }
+    // Bewertung an die SRS-Engine koppeln (falls geladen): „Gewusst" = 1, „Nochmal" = 0.
+    function gradeCurrent(g){ const c=deck[0]; if(c&&window.SRS){ const id=window.SRS.srsId(c.t,c.d); if(id)window.SRS.grade(id,g); } }
+    function next(){ gradeCurrent(1); deck.shift(); render(); }
+    function again(){ gradeCurrent(0); const c=deck.shift(); deck.push(c); render(); }
     revealBtn.addEventListener('click',reveal); nextBtn.addEventListener('click',next); againBtn.addEventListener('click',again);
     if(newBtn)newBtn.addEventListener('click',start);
     document.addEventListener('keydown',e=>{ if(e.code==='Space'){ e.preventDefault();
