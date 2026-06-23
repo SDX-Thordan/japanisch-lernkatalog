@@ -33,6 +33,8 @@ window.GRAMMATIK_PLUS = {
     ],
     uebungen: [
       { typ: "mc", frage: "ミラーさんは会社員です＿。", optionen: ["か", "ね", "よ", "の"], richtig: 0, erkl: "か bildet die Ja/Nein-Frage." },
+      { typ: "cloze", satz: "あなたは学生です＿。（Frage）", luecke: "か", erkl: "Frage → か am Satzende." },
+      { typ: "mc", frage: "Was ändert sich bei der Frage gegenüber der Aussage?", optionen: ["nur か anhängen", "Subjekt nach vorn", "Verb nach vorn", "です weglassen"], richtig: 0, erkl: "Wortstellung bleibt; nur か anhängen." },
     ],
   },
 
@@ -63,6 +65,8 @@ window.GRAMMATIK_PLUS = {
     ],
     uebungen: [
       { typ: "mc", frage: "あした東京＿行きます。", optionen: ["へ", "を", "が", "も"], richtig: 0, erkl: "Ziel der Bewegung → へ (oder に)." },
+      { typ: "cloze", satz: "うち＿帰ります。（nach Hause）", luecke: "へ", erkl: "Bewegungsziel → へ." },
+      { typ: "mc", frage: "へ als Richtungspartikel spricht man …", optionen: ["e", "he", "we", "ye"], richtig: 0, erkl: "へ = „e“." },
     ],
   },
 
