@@ -1,0 +1,23 @@
+# Node / Tooling
+node_modules/
+npm-debug.log*
+
+# Capacitor staged web assets (generiert aus den Quell-Assets)
+www/
+
+# Test-/Build-Output
+coverage/
+test-results/
+playwright-report/
+.playwright/
+
+# Android Build-Output (Gradle); das Projekt selbst ist eingecheckt
+android/.gradle/
+android/build/
+android/app/build/
+android/local.properties
+android/.idea/
+android/app/src/main/assets/public/
+
+# OS
+.DS_Store

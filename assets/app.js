@@ -528,4 +528,11 @@
     initSearch(); initToggles();
   }
   if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',init); else init();
+
+  /* ---------- geteilte Helfer für die neuen Module (srs.js, exercises.js, kanji-write.js) ----------
+     Additiv: macht die intern definierten Helfer nutzbar, ohne sie zu duplizieren. */
+  window.Katalog = {
+    el, esc, ruby, rubyPair, norm, furiToRuby, kanaToRomaji, shuffle,
+    conjugate, allForms, verbGroup, lsGet, lsSet
+  };
 })();
