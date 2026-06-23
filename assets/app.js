@@ -661,4 +661,9 @@
   };
 
   if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',init); else init();
+
+  /* ---------- PWA: Service Worker registrieren (offline-fähig, installierbar) ---------- */
+  if(typeof navigator!=='undefined' && 'serviceWorker' in navigator && location.protocol!=='file:'){
+    window.addEventListener('load',function(){ navigator.serviceWorker.register('service-worker.js').catch(function(){}); });
+  }
 })();
