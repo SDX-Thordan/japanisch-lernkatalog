@@ -218,7 +218,44 @@
       btn.addEventListener('click',()=>openGrammarDrill(g,drillable));
       card.querySelector('.collapse-body').appendChild(btn);
     }
+    const plus=(window.GRAMMATIK_PLUS||{})[g.pattern];
+    if(plus)card.querySelector('.collapse-body').appendChild(grammarPlusBlock(g,plus));
     return card;
+  }
+  // Additiver „Mehr erklären"-Block + Übungen (window.Exercises) für Muster mit GRAMMATIK_PLUS.
+  function grammarPlusBlock(g,plus){
+    const wrap=el('div','gp-plus');
+    if(plus.erklaerung_lang)wrap.appendChild(el('div','gp-plus-erk','<b>Mehr erklären:</b> '+esc(plus.erklaerung_lang)));
+    if(plus.fehler&&plus.fehler.length){
+      wrap.appendChild(el('div','gp-plus-h','Häufige Fehler'));
+      const ul=el('ul','gp-fehler'); plus.fehler.forEach(f=>ul.appendChild(el('li',null,esc(f)))); wrap.appendChild(ul);
+    }
+    if(plus.kontrast&&plus.kontrast.length){
+      wrap.appendChild(el('div','gp-plus-h','Abgrenzung'));
+      const ul=el('ul','gp-kontrast');
+      plus.kontrast.forEach(k=>ul.appendChild(el('li',null,'<span class="ja">'+esc(k.a)+'</span> ↔ <span class="ja">'+esc(k.b)+'</span> — '+esc(k.note))));
+      wrap.appendChild(ul);
+    }
+    if(plus.uebungen&&plus.uebungen.length&&window.Exercises){
+      const btn=el('button','gp-learn','▶ Grammatik-Übungen <span class="gp-learn-n">'+plus.uebungen.length+' Aufgaben</span>'); btn.type='button';
+      const host=el('div','gp-ex-host hidden');
+      btn.addEventListener('click',()=>{ host.classList.toggle('hidden');
+        if(!host.dataset.built){ buildPlusExercises(host,g.pattern,plus.uebungen); host.dataset.built='1'; } });
+      wrap.appendChild(btn); wrap.appendChild(host);
+    }
+    return wrap;
+  }
+  function buildPlusExercises(host,pattern,uebungen){
+    let i=0; const stage=el('div','gp-ex-stage'); host.appendChild(stage);
+    function show(){
+      if(i>=uebungen.length){ stage.innerHTML='<div class="gp-ex-done">✓ Alle Übungen erledigt.</div>'; return; }
+      const ex=Object.assign({},uebungen[i],{srsId:'g:'+pattern});
+      window.Exercises.renderExercise(ex,stage,{ onResult:()=>{
+        const nx=el('button','btn btn-next gp-ex-next','Weiter →'); nx.type='button';
+        nx.addEventListener('click',()=>{ i++; show(); }); stage.appendChild(nx);
+      }});
+    }
+    show();
   }
 
   /* ============================================================
@@ -529,12 +566,13 @@
     if(page==='ueben')initTraining();
     initSearch(); initToggles();
   }
-  if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',init); else init();
-
   /* ---------- geteilte Helfer für die neuen Module (srs.js, exercises.js, kanji-write.js) ----------
-     Additiv: macht die intern definierten Helfer nutzbar, ohne sie zu duplizieren. */
+     Additiv: macht die intern definierten Helfer nutzbar, ohne sie zu duplizieren.
+     Vor init() gesetzt, damit Render-Code (z. B. Grammatik-Übungen) sie schon nutzen kann. */
   window.Katalog = {
     el, esc, ruby, rubyPair, norm, furiToRuby, kanaToRomaji, shuffle,
     conjugate, allForms, verbGroup, lsGet, lsSet
   };
+
+  if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',init); else init();
 })();
