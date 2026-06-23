@@ -818,4 +818,32 @@ window.GRAMMATIK_PLUS = {
       { typ: "mc", frage: "～ても bedeutet …", optionen: ["auch wenn", "weil", "wenn (dann immer)", "bevor"], richtig: 0, erkl: "„selbst wenn“." },
     ],
   },
+
+  "N は いくらですか": {
+    erklaerung_lang: "いくら fragt nach dem Preis: „Wie viel kostet …?“. Antwort: [Betrag]円です. 円 (Yen) liest man えん.",
+    uebungen: [
+      { typ: "mc", frage: "このとけいは＿ですか。（Preis erfragen）", optionen: ["いくら", "いつ", "どこ", "だれ"], richtig: 0, erkl: "Preis → いくら." },
+      { typ: "cloze", satz: "これは3000＿です。（Yen）", luecke: "円", erkl: "Preis: ～円です." },
+      { typ: "mc", frage: "いくら fragt nach …", optionen: ["dem Preis", "der Zeit", "dem Ort", "der Menge an Personen"], richtig: 0, erkl: "いくら = wie viel (Geld)." },
+    ],
+  },
+
+  "N1 と N2 と どちらが ～": {
+    erklaerung_lang: "Vergleich zweier Dinge: N1 と N2 と どちらが [Adj]ですか — „Welches von beiden ist …er?“ In der Antwort steht のほうが ([X]のほうが [Adj]です).",
+    kontrast: [{ a: "どちらが (2)", b: "どれが (3+)", note: "どちら bei genau zwei; どれ/どの bei drei oder mehr." }],
+    uebungen: [
+      { typ: "mc", frage: "コーヒーと紅茶と＿がいいですか。（welches von zweien）", optionen: ["どちら", "どれ", "どこ", "なに"], richtig: 0, erkl: "Zwei → どちら." },
+      { typ: "cloze", satz: "電車の＿がバスより速いです。（Antwort: eher der Zug）", luecke: "ほう", erkl: "Antwort mit のほうが." },
+      { typ: "mc", frage: "Bei drei oder mehr Dingen fragt man …", optionen: ["どれが", "どちらが", "どんなが", "いくらが"], richtig: 0, erkl: "3+ → どれが." },
+    ],
+  },
+
+  "N1 は N2 が ～（Adj.）": {
+    erklaerung_lang: "Doppeltes Subjekt: N1 は (Thema) + N2 が (worauf sich die Eigenschaft bezieht) + Adjektiv. „Was N1 betrifft, ist N2 …“ — z. B. 東京は人が多いです (In Tokio gibt es viele Menschen).",
+    uebungen: [
+      { typ: "mc", frage: "東京は人＿多いです。", optionen: ["が", "を", "に", "へ"], richtig: 0, erkl: "Bezug der Eigenschaft → が." },
+      { typ: "cloze", satz: "日本は電車＿便利です。（praktisch）", luecke: "が", erkl: "N2 が + Adjektiv." },
+      { typ: "mc", frage: "Im Muster „N1 は N2 が Adj.“ markiert は …", optionen: ["das Thema", "das Objekt", "den Ort", "das Werkzeug"], richtig: 0, erkl: "は = Thema (N1)." },
+    ],
+  },
 };
