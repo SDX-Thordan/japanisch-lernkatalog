@@ -47,6 +47,12 @@ describe('GRAMMATIK_PLUS — Struktur', () => {
       });
     });
   });
+  it('jedes Grammatikmuster hat mindestens eine Übung (Abdeckung)', () => {
+    (W.GRAMMATIK || []).forEach((g) => {
+      const e = P[g.pattern];
+      expect(e && Array.isArray(e.uebungen) && e.uebungen.length >= 1, 'ohne Übung: ' + g.pattern).toBe(true);
+    });
+  });
   it('kontrast-Einträge haben a/b/note', () => {
     Object.entries(P).forEach(([pat, entry]) => {
       (entry.kontrast || []).forEach((k, i) => {
