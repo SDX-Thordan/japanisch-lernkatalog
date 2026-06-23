@@ -16,6 +16,15 @@
   var DEFAULT_EASE = 2.5;
   var MIN_EASE = 1.3;
 
+  /* ---------- Lernpfad/Gating-Konstanten (leicht justierbar) ---------- */
+  var MASTERY_REPS = 2;        // Item gilt als beherrscht ab so vielen erfolgreichen Reps
+  var WRITE_LEVEL_REPS = 2;    // ab diesem Erkennungs-Level müssen Kanji zusätzlich geschrieben werden
+  var LESSON_TEST_PASS = 0.8;  // Bestehensgrenze des Lektionstests
+  var LESSON_TEST_N = 10;      // Aufgaben pro Lektionstest
+  var MAX_GATED_LESSON = 20;   // L21–25 bleiben „Vorschau" (nicht ins Gating)
+  // Kanji-Stufe → Test-Lektion (Default: letzte Lektion des jeweiligen Stufenblocks)
+  var KANJI_LEVEL_LESSON = { 'A1.2': 6, 'A1.3': 9, 'A1.4': 12, 'A1.5': 14, 'A1.6': 17, 'A1.7': 20 };
+
   /* ---------- Storage-Backend (injizierbar) ---------- */
   function defaultBackend() {
     try {
@@ -42,10 +51,10 @@
 
   /* ---------- Store-Grundgerüst ---------- */
   function freshStore() {
-    return { v: VERSION, items: {}, daily: {}, stats: { streakDays: 0, lastActive: null, totalReviews: 0 } };
+    return { v: VERSION, items: {}, lessons: {}, daily: {}, stats: { streakDays: 0, lastActive: null, totalReviews: 0 } };
   }
   function defaultItem() {
-    return { ease: DEFAULT_EASE, interval: 0, due: null, last: null, reps: 0, lapses: 0, streak: 0, history: [] };
+    return { ease: DEFAULT_EASE, interval: 0, due: null, last: null, reps: 0, lapses: 0, streak: 0, writeReps: 0, lastWritten: null, history: [] };
   }
 
   var store = load();
@@ -63,6 +72,7 @@
     return {
       v: VERSION,
       items: s.items || {},
+      lessons: s.lessons || {},
       daily: s.daily || {},
       stats: {
         streakDays: (s.stats && s.stats.streakDays) || 0,
@@ -135,6 +145,37 @@
     store.stats.lastActive = today;
   }
 
+  // Korrektes Schreiben eines Kanji vermerken (vom KanjiVG-Widget bei vollständiger,
+  // strichkorrekter Vollendung aufgerufen). Erhöht writeReps; beeinflusst die Mastery.
+  function gradeWrite(id, ok, today) {
+    today = today || todayISO();
+    var item = store.items[id] || defaultItem();
+    if (ok) { item.writeReps = (item.writeReps || 0) + 1; item.lastWritten = today; }
+    store.items[id] = item;
+    save();
+    return item;
+  }
+
+  /* ---------- Mastery / Lektions-Zuordnung ---------- */
+  function kanjiLessonOf(level) { return KANJI_LEVEL_LESSON[level] || null; }
+  function itemLesson(type, data) {
+    if (type === 'kanji') return kanjiLessonOf(data.level);
+    return data.lesson;
+  }
+  // Item „beherrscht": genug erfolgreiche Reps; Kanji ab Schreib-Level zusätzlich korrekt geschrieben.
+  function isMastered(id) {
+    var it = store.items[id]; if (!it) return false;
+    if ((it.reps || 0) < MASTERY_REPS) return false;
+    if (typeOf(id) === 'kanji' && (it.reps || 0) >= WRITE_LEVEL_REPS && (it.writeReps || 0) < 1) return false;
+    return true;
+  }
+  // Kanji, das sein Schreib-Level erreicht hat, aber noch nicht korrekt geschrieben wurde.
+  function needsWriting(id) {
+    if (typeOf(id) !== 'kanji') return false;
+    var it = store.items[id]; if (!it) return false;
+    return (it.reps || 0) >= WRITE_LEVEL_REPS && (it.writeReps || 0) < 1;
+  }
+
   /* ---------- Fälligkeit ---------- */
   function isDue(id, today) {
     today = today || todayISO();
@@ -171,9 +212,15 @@
     var reviewLimit = opts.reviewLimit != null ? opts.reviewLimit : 15;
     var today = opts.today || todayISO();
     var includePreview = !!opts.includePreview;
+    var maxLesson = opts.maxLesson;
 
     var all = [];
     sources.forEach(function (s) { all = all.concat(registry(s, includePreview)); });
+
+    // Gating: nur Items aus freigeschalteten Lektionen (Default: kein Limit → rückwärtskompatibel).
+    if (maxLesson != null) {
+      all = all.filter(function (x) { var L = itemLesson(x.type, x.data); return L != null && L <= maxLesson; });
+    }
 
     var due = all.filter(function (x) { return isDue(x.id, today); })
       .sort(function (a, b) { return (store.items[a.id].due || '').localeCompare(store.items[b.id].due || ''); })
@@ -224,9 +271,24 @@
       if (br > ar) items[id] = bi;
       else if (br === ar && (bi.due || '') > (ai.due || '')) items[id] = bi;
     }
+    // Lektions-Status mergen: bestanden/freigeschaltet gewinnen, höherer Score gewinnt.
+    var lessons = {}, lid;
+    for (lid in (a.lessons || {})) lessons[lid] = a.lessons[lid];
+    for (lid in (b.lessons || {})) {
+      var bl = b.lessons[lid], al = lessons[lid];
+      if (!al) { lessons[lid] = bl; continue; }
+      var newer = (bl.testDate || '') > (al.testDate || '');
+      lessons[lid] = {
+        unlocked: !!(al.unlocked || bl.unlocked),
+        testPassed: !!(al.testPassed || bl.testPassed),
+        bestScore: Math.max(al.bestScore || 0, bl.bestScore || 0),
+        lastScore: newer ? bl.lastScore : al.lastScore,
+        testDate: newer ? bl.testDate : al.testDate,
+      };
+    }
     var as = a.stats || {}, bs = b.stats || {};
     return {
-      v: VERSION, items: items, daily: a.daily || b.daily || {},
+      v: VERSION, items: items, lessons: lessons, daily: a.daily || b.daily || {},
       stats: {
         streakDays: Math.max(as.streakDays || 0, bs.streakDays || 0),
         lastActive: (as.lastActive || '') > (bs.lastActive || '') ? as.lastActive : (bs.lastActive || as.lastActive || null),
@@ -266,6 +328,60 @@
     return out;
   }
 
+  /* ---------- Lernpfad: Kern, Fortschritt, Freischaltung, Tests ---------- */
+  // Kern-Items einer Lektion: Vokabeln + Grammatik (lesson) + zugeordnete Kanji (level→lesson).
+  function lessonCore(lesson) {
+    var out = [];
+    (window.VOKABULAR || []).forEach(function (v) { if (v.lesson === lesson) out.push({ id: srsId('vocab', v), type: 'vocab', data: v }); });
+    (window.GRAMMATIK || []).forEach(function (g) { if (g.lesson === lesson) out.push({ id: srsId('grammar', g), type: 'grammar', data: g }); });
+    (window.KANJI || []).forEach(function (k) { if (kanjiLessonOf(k.level) === lesson) out.push({ id: srsId('kanji', k), type: 'kanji', data: k }); });
+    return out;
+  }
+  function coreProgress(lesson) {
+    var core = lessonCore(lesson), mastered = 0;
+    core.forEach(function (c) { if (isMastered(c.id)) mastered++; });
+    return { mastered: mastered, total: core.length, fraction: core.length ? mastered / core.length : 1 };
+  }
+  function lessonRec(lesson) { store.lessons = store.lessons || {}; return store.lessons[lesson] || {}; }
+  function lessonState(lesson) {
+    var rec = lessonRec(lesson);
+    var unlocked = lesson <= 1 || !!lessonRec(lesson - 1).testPassed || !!rec.unlocked;
+    var cp = coreProgress(lesson);
+    return {
+      lesson: lesson, unlocked: unlocked, coreProgress: cp, coreMastered: cp.fraction >= 1,
+      testPassed: !!rec.testPassed, bestScore: rec.bestScore || 0, lastScore: rec.lastScore || 0, testDate: rec.testDate || null,
+    };
+  }
+  function maxUnlockedLesson() {
+    var L = 1;
+    for (var l = 1; l <= MAX_GATED_LESSON; l++) { if (lessonState(l).unlocked) L = l; else break; }
+    return L;
+  }
+  function canTakeTest(lesson) { var s = lessonState(lesson); return s.unlocked && s.coreMastered; }
+  function recordLessonTest(lesson, score, today) {
+    today = today || todayISO();
+    store.lessons = store.lessons || {};
+    var rec = store.lessons[lesson] || {};
+    rec.unlocked = true;
+    rec.lastScore = round2(score);
+    rec.bestScore = Math.max(rec.bestScore || 0, round2(score));
+    rec.testDate = today;
+    var passed = score >= LESSON_TEST_PASS;
+    if (passed) {
+      rec.testPassed = true;
+      if (lesson + 1 <= MAX_GATED_LESSON) { var nx = store.lessons[lesson + 1] || {}; nx.unlocked = true; store.lessons[lesson + 1] = nx; }
+    }
+    store.lessons[lesson] = rec;
+    save();
+    return { passed: passed, unlocked: passed && lesson + 1 <= MAX_GATED_LESSON };
+  }
+  function unlockAll() {
+    store.lessons = store.lessons || {};
+    for (var l = 1; l <= MAX_GATED_LESSON; l++) { var r = store.lessons[l] || {}; r.unlocked = true; store.lessons[l] = r; }
+    save();
+  }
+  function resetLessons() { store.lessons = {}; save(); }
+
   /* ---------- UI-Komfort: Download/Upload im Browser ---------- */
   function downloadBackup(filename) {
     filename = filename || 'katalog-fortschritt.json';
@@ -283,12 +399,18 @@
 
   window.SRS = {
     srsId: srsId, typeOf: typeOf,
-    get: get, ensure: ensure, grade: grade,
+    get: get, ensure: ensure, grade: grade, gradeWrite: gradeWrite,
     isDue: isDue, dueIds: dueIds,
     buildQueue: buildQueue, stats: stats,
+    // Lernpfad / Gating
+    isMastered: isMastered, needsWriting: needsWriting,
+    kanjiLessonOf: kanjiLessonOf, lessonCore: lessonCore, coreProgress: coreProgress,
+    lessonState: lessonState, maxUnlockedLesson: maxUnlockedLesson,
+    canTakeTest: canTakeTest, recordLessonTest: recordLessonTest,
+    unlockAll: unlockAll, resetLessons: resetLessons,
     exportJSON: exportJSON, importJSON: importJSON, downloadBackup: downloadBackup, reset: reset,
     snapshot: snapshot, forecast: forecast,
     _useStorage: useStorage,
-    __test: { sm2: sm2, mergeStore: mergeStore, addDays: addDays, todayISO: todayISO, registry: registry },
+    __test: { sm2: sm2, mergeStore: mergeStore, addDays: addDays, todayISO: todayISO, registry: registry, itemLesson: itemLesson },
   };
 })();

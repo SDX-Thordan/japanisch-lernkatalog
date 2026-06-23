@@ -559,10 +559,16 @@
       prog=document.getElementById('h-prog'), typeTag=document.getElementById('h-type'),
       done=document.getElementById('h-done'), startBtn=document.getElementById('h-start');
     let deck=[], total=0;
+    const lessonParam=parseInt(new URLSearchParams(location.search).get('lesson'),10);
+    const onlyLesson=isNaN(lessonParam)?null:lessonParam;
+    function lessonOf(c){ return c.type==='kanji'?window.SRS.kanjiLessonOf(c.data.level):c.data.lesson; }
     function refreshStats(){ const s=window.SRS.stats(); setText('h-streak',s.streakDays); setText('h-due',s.due); setText('h-learned',s.learned); }
     function start(){
       const previewOn=document.body.classList.contains('show-preview');
-      deck=window.SRS.buildQueue({sources:['kanji','vocab','grammar'],newLimit:clampInt('h-newlimit',5),reviewLimit:clampInt('h-revlimit',15),includePreview:previewOn});
+      // Gating: nur freigeschaltete Lektionen; mit ?lesson=L gezielt eine Lektion lernen.
+      const maxLesson=onlyLesson!=null?onlyLesson:window.SRS.maxUnlockedLesson();
+      deck=window.SRS.buildQueue({sources:['kanji','vocab','grammar'],newLimit:clampInt('h-newlimit',5),reviewLimit:clampInt('h-revlimit',15),includePreview:previewOn,maxLesson:maxLesson});
+      if(onlyLesson!=null)deck=deck.filter(c=>lessonOf(c)===onlyLesson);
       total=deck.length; setup.classList.add('hidden'); done.classList.add('hidden'); stage.classList.remove('hidden'); render();
     }
     function finishItem(grade){ const c=deck[0]; if(grade!=null&&c)window.SRS.grade(c.id,grade); deck.shift(); refreshStats(); render(); }
@@ -573,11 +579,36 @@
         const a=document.getElementById('h-again'); if(a)a.addEventListener('click',()=>{ done.classList.add('hidden'); setup.classList.remove('hidden'); refreshStats(); });
         return; }
       const c=deck[0], learned=total-deck.length;
-      prog.textContent='Aufgabe '+(learned+1)+' / '+total;
+      prog.textContent='Aufgabe '+(learned+1)+' / '+total+(onlyLesson!=null?' · Lektion '+onlyLesson:'');
       typeTag.textContent=({kanji:'漢字 Kanji',vocab:'語彙 Vokabel',grammar:'文法 Grammatik'}[c.type]||'')+(c.reason==='due'?' · Wiederholung':' · neu');
       typeTag.className='tag tr-type-'+c.type;
-      if(c.type==='grammar'&&window.Exercises&&window.SATZ_TEMPLATES&&window.SATZ_TEMPLATES[c.data.pattern])renderExerciseItem(c);
+      // Kanji, das sein Schreib-Level erreicht hat: erst korrekt schreiben.
+      if(c.type==='kanji'&&window.KanjiWrite&&window.SRS.needsWriting(c.id))renderWriteCard(c);
+      else if(c.type==='grammar'&&window.Exercises&&window.SATZ_TEMPLATES&&window.SATZ_TEMPLATES[c.data.pattern])renderExerciseItem(c);
       else renderFlashcard(c);
+    }
+    function renderWriteCard(c){
+      const k=c.data;
+      body.innerHTML='<div class="tr-card kw-card"><div class="kw-head"><span class="tr-big ja">'+esc(k.k)+'</span>'+
+        '<span class="tr-q">'+esc(k.meaning||'')+' — schreibe das Kanji in richtiger Strichreihenfolge</span></div>'+
+        '<div class="kw-stage"></div><div class="kw-msg" aria-live="polite"></div>'+
+        '<div class="tr-controls"><button class="btn h-kw-guide" type="button">Vorlage</button>'+
+        '<button class="btn h-kw-play" type="button">▶ Reihenfolge</button>'+
+        '<button class="btn h-kw-clear" type="button">Löschen</button>'+
+        '<button class="btn btn-again h-kw-again" type="button">↻ Später</button></div></div>';
+      const mount=body.querySelector('.kw-stage'), msg=body.querySelector('.kw-msg');
+      const size=Math.min(300,(stage.clientWidth||320)-40);
+      fetch('assets/kanjivg/'+window.KanjiWrite.cpFile(k.k)).then(r=>r.text()).then(svg=>{
+        const w=window.KanjiWrite.create(mount,{svgText:svg,size:size,
+          onProgress:(i,n)=>{ msg.textContent='Strich '+i+' / '+n; },
+          onComplete:()=>{ msg.textContent='✓ Richtig geschrieben!'; window.SRS.gradeWrite(c.id,true); refreshStats();
+            const nx=el('button','btn-primary h-next','Weiter →'); nx.type='button'; nx.addEventListener('click',()=>finishItem(1)); body.querySelector('.tr-controls').appendChild(nx); }});
+        body.querySelector('.h-kw-guide').addEventListener('click',()=>w.toggleGuide());
+        body.querySelector('.h-kw-play').addEventListener('click',()=>w.play());
+        body.querySelector('.h-kw-clear').addEventListener('click',()=>w.clear());
+      }).catch(()=>{ msg.textContent='SVG konnte nicht geladen werden.'; });
+      // „Später": ans Ende schieben, ohne Bewertung.
+      body.querySelector('.h-kw-again').addEventListener('click',()=>{ const c2=deck.shift(); deck.push(c2); render(); });
     }
     function renderFlashcard(c){
       const fc={t:c.type,d:c.data};
@@ -616,6 +647,16 @@
         '<span class="f-bar-n">'+d.count+'</span><span class="f-bar-d">'+d.date.slice(5)+'</span></div>').join('');
       setText('f-streak',s.streakDays); setText('f-learned',s.learned); setText('f-due',s.due); setText('f-reviews',s.totalReviews);
       const forecast=document.getElementById('f-forecast'); if(forecast)forecast.innerHTML=bars;
+      // Lernpfad-Fortschritt: Status + Kern-Fortschritt + Test-Score je Lektion.
+      const lp=document.getElementById('f-lessons');
+      if(lp){ let html='';
+        for(let L=1;L<=20;L++){ const st=window.SRS.lessonState(L);
+          const cls=st.testPassed?'lp-done':(st.unlocked?'lp-open':'lp-locked');
+          const pct=Math.round(st.coreProgress.fraction*100);
+          html+='<div class="lp-bar '+cls+'" title="Lektion '+L+' — beherrscht '+st.coreProgress.mastered+'/'+st.coreProgress.total+(st.testPassed?(', Test '+Math.round(st.bestScore*100)+'%'):'')+'">'+
+            '<span class="lp-bar-fill" style="height:'+pct+'%"></span><span class="lp-bar-l">'+L+'</span>'+
+            (st.testPassed?'<span class="lp-bar-s">'+Math.round(st.bestScore*100)+'</span>':'')+'</div>'; }
+        lp.innerHTML=html; }
     }
     draw();
     const exp=document.getElementById('f-export'); if(exp)exp.addEventListener('click',()=>window.SRS.downloadBackup());
@@ -631,6 +672,80 @@
   /* ============================================================  SCHREIBEN (Kanji-Schreibübung)  */
   function initSchreiben(){
     if(window.KanjiWrite && typeof window.KanjiWrite.initPage==='function') window.KanjiWrite.initPage();
+  }
+
+  /* ============================================================  LERNPFAD (Freischalten + Lektionstests)  */
+  function initLernpfad(){
+    const root=document.getElementById('lp-root'); if(!root||!window.SRS||!window.Exercises)return;
+    let overlay=null;
+
+    function lessonCard(L){
+      const st=window.SRS.lessonState(L), cp=st.coreProgress, thema=(LESSON[L]||{}).thema||'';
+      const cls=st.testPassed?'lp-done':(st.unlocked?(st.coreMastered?'lp-test':'lp-open'):'lp-locked');
+      const badge=st.testPassed?'✅':(st.unlocked?(st.coreMastered?'🧪':'▶'):'🔒');
+      const card=el('article','lp-card '+cls);
+      let html='<div class="lp-top"><span class="lp-num">Lektion '+L+'</span><span class="lp-badge">'+badge+'</span></div>'+
+        '<div class="lp-thema">'+esc(thema)+'</div>';
+      if(!st.unlocked){ html+='<div class="lp-hint">🔒 Erst die vorige Lektion bestehen.</div>'; card.innerHTML=html; return card; }
+      html+='<div class="lp-core"><div class="lp-core-bar"><span style="width:'+Math.round(cp.fraction*100)+'%"></span></div>'+
+        '<span class="lp-core-n">beherrscht '+cp.mastered+' / '+cp.total+'</span></div><div class="lp-actions"></div>';
+      card.innerHTML=html;
+      const actions=card.querySelector('.lp-actions');
+      const learn=el('a','btn lp-learn',st.coreMastered?'Weiter üben':'Lektion lernen'); learn.href='heute.html?lesson='+L; actions.appendChild(learn);
+      if(st.coreMastered){ const t=el('button','btn-primary lp-test-btn',st.testPassed?'Test wiederholen':'Test starten'); t.type='button';
+        t.addEventListener('click',()=>openLessonTest(L)); actions.appendChild(t); }
+      else { actions.appendChild(el('span','lp-need','Erst alle Kern-Items beherrschen, dann Test.')); }
+      if(st.testPassed)actions.appendChild(el('span','lp-score','Bestes Ergebnis: '+Math.round(st.bestScore*100)+'%'));
+      return card;
+    }
+    function draw(){
+      const grid=el('div','lp-grid');
+      for(let L=1;L<=20;L++)grid.appendChild(lessonCard(L));
+      root.innerHTML=''; root.appendChild(grid);
+    }
+    function ensureOverlay(){
+      if(overlay)return overlay;
+      overlay=el('div','lp-overlay'); overlay.hidden=true;
+      overlay.innerHTML='<div class="lp-modal" role="dialog" aria-modal="true" aria-label="Lektionstest">'+
+        '<div class="lp-modal-head"><span class="lp-modal-title"></span><button class="drill-close lp-close" type="button" aria-label="Schließen">✕</button></div>'+
+        '<div class="lp-modal-top"><span class="lp-modal-prog"></span></div><div class="lp-modal-body"></div></div>';
+      document.body.appendChild(overlay);
+      overlay.querySelector('.lp-close').addEventListener('click',closeTest);
+      overlay.addEventListener('click',e=>{ if(e.target===overlay)closeTest(); });
+      return overlay;
+    }
+    function closeTest(){ if(overlay){ overlay.hidden=true; document.body.classList.remove('drill-open'); } }
+    function openLessonTest(L){
+      const ov=ensureOverlay();
+      const title=ov.querySelector('.lp-modal-title'), progEl=ov.querySelector('.lp-modal-prog'), bodyEl=ov.querySelector('.lp-modal-body');
+      title.textContent='Test · Lektion '+L;
+      const qs=window.Exercises.buildLessonTest(L); let i=0, correct=0; const n=qs.length;
+      ov.hidden=false; document.body.classList.add('drill-open');
+      function show(){
+        if(!n){ progEl.textContent=''; bodyEl.innerHTML='<div class="tr-done-in">Für diese Lektion gibt es noch keine Testaufgaben.</div>'; return; }
+        if(i>=n)return result();
+        progEl.textContent='Frage '+(i+1)+' / '+n;
+        bodyEl.innerHTML='<div class="lp-q"></div><div class="lp-q-next"></div>';
+        const mount=bodyEl.querySelector('.lp-q'), nextWrap=bodyEl.querySelector('.lp-q-next');
+        window.Exercises.renderExercise(qs[i],mount,{ onResult:res=>{ if(res)correct++;
+          const nx=el('button','btn-primary','Weiter →'); nx.type='button'; nx.addEventListener('click',()=>{ i++; show(); }); nextWrap.appendChild(nx); } });
+      }
+      function result(){
+        const score=n?correct/n:0, r=window.SRS.recordLessonTest(L,score), pct=Math.round(score*100);
+        progEl.textContent='';
+        bodyEl.innerHTML='<div class="lp-result '+(r.passed?'ok':'no')+'">'+(r.passed?'🎉 Bestanden!':'Leider nicht bestanden')+
+          '<div class="lp-result-score">'+correct+' / '+n+' richtig · '+pct+'%</div>'+
+          '<div class="lp-result-msg">'+(r.passed?(r.unlocked?'Lektion '+(L+1)+' ist jetzt freigeschaltet.':'Du hast alle Lektionen abgeschlossen! 🎌'):'Mindestens 80 % nötig — übe weiter und versuch es erneut.')+'</div></div>'+
+          '<button class="btn-primary lp-result-close" type="button">Weiter</button>';
+        bodyEl.querySelector('.lp-result-close').addEventListener('click',()=>{ closeTest(); draw(); });
+      }
+      show();
+    }
+
+    draw();
+    const ua=document.getElementById('lp-unlockall');
+    if(ua)ua.addEventListener('click',()=>{ if(window.confirm('Alle Lektionen freischalten? Der geführte Lernpfad ist dann komplett offen.')){ window.SRS.unlockAll(); draw(); } });
+    document.addEventListener('keydown',e=>{ if(overlay&&!overlay.hidden&&e.key==='Escape')closeTest(); });
   }
 
   /* ============================================================  INIT  */
@@ -650,6 +765,7 @@
     if(page==='heute')initHeute();
     if(page==='fortschritt')initFortschritt();
     if(page==='schreiben')initSchreiben();
+    if(page==='lernpfad')initLernpfad();
     initSearch(); initToggles();
   }
   /* ---------- geteilte Helfer für die neuen Module (srs.js, exercises.js, kanji-write.js) ----------

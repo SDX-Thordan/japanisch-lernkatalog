@@ -697,3 +697,52 @@ body.drill-open { overflow: hidden; }
 .kw-controls { display: flex; flex-wrap: wrap; gap: .5rem; justify-content: center; margin-top: 1rem; }
 .kw-credit { text-align: center; font-size: .78rem; color: var(--faint); margin-top: 1.2rem; }
 .kw-credit a { color: var(--muted); }
+
+/* ===== Lernpfad (Freischalten + Lektionstests) ===== */
+.lp-toolbar { display: flex; flex-wrap: wrap; gap: .6rem; align-items: center; margin-bottom: 1.2rem; }
+.lp-unlockall { margin-left: auto; }
+.lp-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: .9rem; }
+.lp-card { background: var(--surface); border: 1px solid var(--border); border-radius: 14px; padding: 1rem 1.1rem; box-shadow: var(--shadow); display: flex; flex-direction: column; gap: .55rem; }
+.lp-card.lp-locked { opacity: .6; background: var(--surface-2); }
+.lp-card.lp-test { border-color: var(--accent); }
+.lp-card.lp-done { border-color: var(--good); }
+.lp-top { display: flex; align-items: center; justify-content: space-between; }
+.lp-num { font-weight: 800; color: var(--ink); }
+.lp-badge { font-size: 1.15rem; }
+.lp-thema { color: var(--muted); font-size: .9rem; min-height: 2.4em; }
+.lp-hint { color: var(--faint); font-size: .85rem; }
+.lp-core { display: flex; flex-direction: column; gap: .25rem; }
+.lp-core-bar { height: 8px; background: var(--chip); border-radius: 999px; overflow: hidden; }
+.lp-core-bar > span { display: block; height: 100%; background: linear-gradient(90deg, var(--accent), var(--accent-d)); }
+.lp-card.lp-done .lp-core-bar > span { background: var(--good); }
+.lp-core-n { font-size: .78rem; color: var(--muted); font-weight: 700; }
+.lp-actions { display: flex; flex-wrap: wrap; gap: .5rem; align-items: center; margin-top: .25rem; }
+.lp-need { font-size: .78rem; color: var(--faint); }
+.lp-score { font-size: .8rem; color: var(--good); font-weight: 700; }
+
+/* Test-Modal (nutzt das drill-overlay-Muster) */
+.lp-overlay { position: fixed; inset: 0; z-index: 100; background: rgba(32,36,43,.55); backdrop-filter: blur(3px); display: flex; align-items: center; justify-content: center; padding: 1rem; }
+.lp-overlay[hidden] { display: none; }
+.lp-modal { background: var(--surface); border-radius: 16px; box-shadow: 0 12px 48px rgba(20,15,5,.3); width: 100%; max-width: 600px; max-height: 92vh; overflow-y: auto; display: flex; flex-direction: column; }
+.lp-modal-head { display: flex; align-items: center; gap: .8rem; padding: 1.1rem 1.3rem .8rem; border-bottom: 1px solid var(--border-2); position: sticky; top: 0; background: var(--surface); }
+.lp-modal-title { font-weight: 800; color: var(--accent-d); }
+.lp-modal-top { padding: .8rem 1.3rem 0; }
+.lp-modal-prog { color: var(--muted); font-size: .85rem; font-weight: 700; }
+.lp-modal-body { padding: 1rem 1.3rem 1.4rem; min-height: 180px; }
+.lp-q-next { margin-top: 1rem; display: flex; justify-content: flex-end; }
+.lp-result { text-align: center; font-size: 1.2rem; line-height: 1.7; padding: 1rem 0; }
+.lp-result.ok { color: var(--good); }
+.lp-result.no { color: var(--accent-d); }
+.lp-result-score { font-size: 1rem; color: var(--ink); font-weight: 700; margin-top: .3rem; }
+.lp-result-msg { font-size: .92rem; color: var(--muted); margin-top: .4rem; }
+.lp-result-close { display: block; margin: 1rem auto 0; }
+
+/* Lernpfad-Leiste auf der Fortschritt-Seite */
+.lp-lessons { display: flex; align-items: flex-end; gap: .35rem; height: 8rem; padding-top: .5rem; }
+.lp-bar { flex: 1; position: relative; display: flex; flex-direction: column; justify-content: flex-end; align-items: center; height: 100%; background: var(--surface-2); border-radius: 5px 5px 0 0; min-width: 0; }
+.lp-bar-fill { width: 100%; min-height: 2px; background: var(--chip); border-radius: 5px 5px 0 0; }
+.lp-bar.lp-open .lp-bar-fill { background: linear-gradient(var(--accent), var(--accent-d)); }
+.lp-bar.lp-done .lp-bar-fill { background: var(--good); }
+.lp-bar.lp-locked { opacity: .5; }
+.lp-bar-l { font-size: .68rem; color: var(--muted); margin-top: .2rem; }
+.lp-bar-s { position: absolute; top: -1.1rem; font-size: .62rem; font-weight: 700; color: var(--good); }

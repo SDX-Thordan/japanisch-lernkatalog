@@ -36,3 +36,11 @@ test('Fortschritt: Export-Button vorhanden, Forecast gerendert', async ({ page }
   await expect(page.locator('#f-export')).toBeVisible();
   await expect(page.locator('#f-forecast .f-bar')).toHaveCount(7);
 });
+
+test('Lernpfad zeigt Lektionskarten; L1 offen, L2 gesperrt', async ({ page }) => {
+  await page.goto('/lernpfad.html');
+  await expect(page.locator('.lp-card')).toHaveCount(20);
+  await expect(page.locator('.lp-card').first()).not.toHaveClass(/lp-locked/);
+  await expect(page.locator('.lp-card').nth(1)).toHaveClass(/lp-locked/);
+  await expect(page.locator('#lp-unlockall')).toBeVisible();
+});
