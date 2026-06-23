@@ -550,6 +550,89 @@
       (g.erklaerung?'<p class="gp-erk">'+esc(g.erklaerung)+'</p>':'')+(ex?'<ul class="gp-ex">'+ex+'</ul>':'');
   }
 
+  /* ============================================================  HEUTE (Tagesaufgabe)  */
+  function setText(id,v){ const e=document.getElementById(id); if(e)e.textContent=v; }
+  function clampInt(id,dflt){ const e=document.getElementById(id); let n=e?parseInt(e.value,10):dflt; if(isNaN(n)||n<0)n=dflt; return n; }
+  function initHeute(){
+    const stage=document.getElementById('h-stage'); if(!stage||!window.SRS)return;
+    const setup=document.getElementById('h-setup'), body=document.getElementById('h-body'),
+      prog=document.getElementById('h-prog'), typeTag=document.getElementById('h-type'),
+      done=document.getElementById('h-done'), startBtn=document.getElementById('h-start');
+    let deck=[], total=0;
+    function refreshStats(){ const s=window.SRS.stats(); setText('h-streak',s.streakDays); setText('h-due',s.due); setText('h-learned',s.learned); }
+    function start(){
+      const previewOn=document.body.classList.contains('show-preview');
+      deck=window.SRS.buildQueue({sources:['kanji','vocab','grammar'],newLimit:clampInt('h-newlimit',5),reviewLimit:clampInt('h-revlimit',15),includePreview:previewOn});
+      total=deck.length; setup.classList.add('hidden'); done.classList.add('hidden'); stage.classList.remove('hidden'); render();
+    }
+    function finishItem(grade){ const c=deck[0]; if(grade!=null&&c)window.SRS.grade(c.id,grade); deck.shift(); refreshStats(); render(); }
+    function render(){
+      if(!deck.length){ stage.classList.add('hidden'); done.classList.remove('hidden');
+        done.innerHTML=(total?'<div class="tr-done-in">🎉 Tagesrunde geschafft!<br>'+total+' Aufgaben erledigt.</div>':'<div class="tr-done-in">Für heute ist alles erledigt. 🎌</div>')+
+          '<button class="btn-primary" id="h-again" type="button">↻ Noch eine Runde</button>';
+        const a=document.getElementById('h-again'); if(a)a.addEventListener('click',()=>{ done.classList.add('hidden'); setup.classList.remove('hidden'); refreshStats(); });
+        return; }
+      const c=deck[0], learned=total-deck.length;
+      prog.textContent='Aufgabe '+(learned+1)+' / '+total;
+      typeTag.textContent=({kanji:'漢字 Kanji',vocab:'語彙 Vokabel',grammar:'文法 Grammatik'}[c.type]||'')+(c.reason==='due'?' · Wiederholung':' · neu');
+      typeTag.className='tag tr-type-'+c.type;
+      if(c.type==='grammar'&&window.Exercises&&window.SATZ_TEMPLATES&&window.SATZ_TEMPLATES[c.data.pattern])renderExerciseItem(c);
+      else renderFlashcard(c);
+    }
+    function renderFlashcard(c){
+      const fc={t:c.type,d:c.data};
+      body.innerHTML='<div class="tr-card"><div class="tr-front">'+frontHtml(fc)+'</div><div class="tr-back hidden">'+backHtml(fc)+'</div>'+
+        '<div class="tr-controls"><button class="btn-primary h-reveal" type="button">Aufdecken <span class="kbd">Leertaste</span></button>'+
+        '<button class="btn btn-again h-again2 hidden" type="button">↻ Nochmal</button>'+
+        '<button class="btn btn-next h-good hidden" type="button">Gewusst →</button></div></div>';
+      const back=body.querySelector('.tr-back'), reveal=body.querySelector('.h-reveal'), again=body.querySelector('.h-again2'), good=body.querySelector('.h-good');
+      reveal.addEventListener('click',()=>{ back.classList.remove('hidden'); reveal.classList.add('hidden'); again.classList.remove('hidden'); good.classList.remove('hidden'); });
+      good.addEventListener('click',()=>finishItem(1));
+      again.addEventListener('click',()=>{ const c2=deck.shift(); window.SRS.grade(c2.id,0); deck.push(c2); refreshStats(); render(); });
+    }
+    function renderExerciseItem(c){
+      const tpls=window.SATZ_TEMPLATES[c.data.pattern], tpl=tpls[Math.floor(Math.random()*tpls.length)];
+      const ex=window.Exercises.fromTemplate(tpl,{});
+      body.innerHTML='<div class="tr-card"><div class="h-ex-pat ja">'+esc(c.data.pattern)+'</div><div class="h-ex"></div><div class="h-next-wrap"></div></div>';
+      const mount=body.querySelector('.h-ex'), nextWrap=body.querySelector('.h-next-wrap');
+      window.Exercises.renderExercise(ex,mount,{ onResult:()=>{ const nx=el('button','btn-primary h-next','Weiter →'); nx.type='button';
+        nx.addEventListener('click',()=>finishItem(null)); nextWrap.appendChild(nx); } });
+    }
+    document.addEventListener('keydown',e=>{ if(stage.classList.contains('hidden'))return; if(e.code!=='Space')return;
+      const reveal=body.querySelector('.h-reveal'), good=body.querySelector('.h-good');
+      if(reveal&&!reveal.classList.contains('hidden')){ e.preventDefault(); reveal.click(); }
+      else if(good&&!good.classList.contains('hidden')){ e.preventDefault(); good.click(); } });
+    if(startBtn)startBtn.addEventListener('click',start);
+    refreshStats();
+  }
+
+  /* ============================================================  FORTSCHRITT (Statistik + Sicherung)  */
+  function initFortschritt(){
+    const root=document.getElementById('f-root'); if(!root||!window.SRS)return;
+    function draw(){
+      const s=window.SRS.stats(), snap=window.SRS.snapshot(), fc=window.SRS.forecast(undefined,7);
+      const maxC=Math.max(1,...fc.map(d=>d.count));
+      const bars=fc.map(d=>'<div class="f-bar"><div class="f-bar-fill" style="height:'+Math.round(d.count/maxC*100)+'%"></div>'+
+        '<span class="f-bar-n">'+d.count+'</span><span class="f-bar-d">'+d.date.slice(5)+'</span></div>').join('');
+      setText('f-streak',s.streakDays); setText('f-learned',s.learned); setText('f-due',s.due); setText('f-reviews',s.totalReviews);
+      const forecast=document.getElementById('f-forecast'); if(forecast)forecast.innerHTML=bars;
+    }
+    draw();
+    const exp=document.getElementById('f-export'); if(exp)exp.addEventListener('click',()=>window.SRS.downloadBackup());
+    const imp=document.getElementById('f-import'); const file=document.getElementById('f-file');
+    if(imp&&file){ imp.addEventListener('click',()=>file.click());
+      file.addEventListener('change',()=>{ const f=file.files&&file.files[0]; if(!f)return; const r=new FileReader();
+        r.onload=()=>{ const res=window.SRS.importJSON(String(r.result),{merge:true}); const msg=document.getElementById('f-msg');
+          if(msg)msg.textContent=res.ok?'✓ Fortschritt importiert (zusammengeführt).':'✗ Datei ungültig oder falsche Version.'; draw(); }; r.readAsText(f); }); }
+    const rst=document.getElementById('f-reset'); if(rst)rst.addEventListener('click',()=>{
+      if(window.confirm('Wirklich den gesamten Fortschritt löschen? Tipp: vorher exportieren.')){ window.SRS.reset(); const msg=document.getElementById('f-msg'); if(msg)msg.textContent='Fortschritt zurückgesetzt.'; draw(); } });
+  }
+
+  /* ============================================================  SCHREIBEN (Kanji-Schreibübung)  */
+  function initSchreiben(){
+    if(window.KanjiWrite && typeof window.KanjiWrite.initPage==='function') window.KanjiWrite.initPage();
+  }
+
   /* ============================================================  INIT  */
   function init(){
     const page=document.body.dataset.page;
@@ -564,6 +647,9 @@
       applyFilter();
     }
     if(page==='ueben')initTraining();
+    if(page==='heute')initHeute();
+    if(page==='fortschritt')initFortschritt();
+    if(page==='schreiben')initSchreiben();
     initSearch(); initToggles();
   }
   /* ---------- geteilte Helfer für die neuen Module (srs.js, exercises.js, kanji-write.js) ----------

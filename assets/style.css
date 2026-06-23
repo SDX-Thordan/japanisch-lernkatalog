@@ -657,3 +657,29 @@ body.drill-open { overflow: hidden; }
 .ex-answer { font-family: var(--font-ja-sans); font-size: 1.3rem; margin: .6rem 0; }
 .ex-answer.hidden, .ex-rate.hidden, .ex-reveal.hidden { display: none; }
 .ex-rate { display: flex; gap: .6rem; margin-top: .6rem; }
+
+/* ============================================================
+   Heute (Tagesaufgabe) + Fortschritt (Statistik/Sicherung)
+   ============================================================ */
+.heute-stats { display: flex; flex-wrap: wrap; gap: .8rem; margin: 0 0 1.4rem; }
+.hstat { flex: 1 1 8rem; background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: .9rem 1rem; box-shadow: var(--shadow); text-align: center; }
+.hstat-n { display: block; font-size: 1.8rem; font-weight: 800; color: var(--accent); line-height: 1; }
+.hstat-l { display: block; margin-top: .3rem; font-size: .8rem; color: var(--muted); }
+
+.h-ex-pat { font-family: var(--font-ja-sans); font-weight: 700; color: var(--indigo); margin-bottom: .8rem; }
+.h-next { margin-top: .9rem; }
+
+.f-forecast { display: flex; align-items: flex-end; gap: .5rem; height: 9rem; padding-top: .5rem; }
+.f-bar { flex: 1; display: flex; flex-direction: column; justify-content: flex-end; align-items: center; height: 100%; }
+.f-bar-fill { width: 70%; min-height: 2px; background: linear-gradient(var(--accent), var(--accent-d)); border-radius: 5px 5px 0 0; }
+.f-bar-n { font-size: .8rem; font-weight: 700; color: var(--ink); margin-top: .25rem; }
+.f-bar-d { font-size: .68rem; color: var(--muted); }
+
+.f-actions { display: flex; flex-wrap: wrap; gap: .6rem; align-items: center; }
+.f-danger { color: var(--accent-d); border-color: var(--accent); }
+.f-danger:hover { background: var(--accent); color: #fff; }
+.f-msg { margin-top: .7rem; font-weight: 600; color: var(--good); min-height: 1.2em; }
+
+/* Hervorgehobene „Heute"-Navkarte auf der Übersicht */
+.navcard-hl { border-color: var(--accent); background: linear-gradient(180deg, #fff, #fdf3f0); }
+.navcard-hl .nc-jp { color: var(--accent); }

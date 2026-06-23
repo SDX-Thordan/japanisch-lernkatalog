@@ -1,0 +1,78 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Heute · 今日 — Japanisch A1.7 Lern-Katalog</title>
+<link rel="stylesheet" href="assets/style.css">
+</head>
+<body data-page="heute">
+
+<header class="topbar">
+  <div class="topbar-inner">
+    <a class="brand" href="index.html"><span class="jp">日本語</span><span class="lv">A1.7 Katalog</span></a>
+    <nav class="nav">
+      <a href="index.html">Übersicht</a>
+      <a href="heute.html" class="active">Heute</a>
+      <a href="grammatik.html">Grammatik</a>
+      <a href="vokabular.html">Vokabular</a>
+      <a href="kanji.html">Kanji</a>
+      <a href="schreiben.html">Schreiben</a>
+      <a href="verben.html">Verben</a>
+      <a href="ueben.html">Üben</a>
+      <a href="fortschritt.html">Fortschritt</a>
+    </nav>
+  </div>
+</header>
+
+<main>
+  <div class="page-intro">
+    <span class="kicker">今日 · Tägliche Aufgabe</span>
+    <h1>Heute <span class="jp">今日</span></h1>
+    <p>Deine gemischte Tagesrunde aus fälligen Wiederholungen und neuen Inhalten — Kanji,
+       Vokabeln und Grammatik. Der Fortschritt wird laufend gespeichert (im Browser).</p>
+  </div>
+
+  <div class="heute-stats">
+    <div class="hstat"><span class="hstat-n" id="h-streak">0</span><span class="hstat-l">🔥 Streak (Tage)</span></div>
+    <div class="hstat"><span class="hstat-n" id="h-due">0</span><span class="hstat-l">fällig</span></div>
+    <div class="hstat"><span class="hstat-n" id="h-learned">0</span><span class="hstat-l">gelernt gesamt</span></div>
+  </div>
+
+  <div class="trainer-setup" id="h-setup">
+    <div class="src-pick">
+      <span class="src-label">Heute:</span>
+      <label>Neu <input type="number" id="h-newlimit" value="5" min="0" max="30" style="width:3.2rem"></label>
+      <label>Wiederholung <input type="number" id="h-revlimit" value="15" min="0" max="60" style="width:3.2rem"></label>
+    </div>
+    <div class="setup-actions">
+      <button class="toggle toggle-preview" id="toggle-preview" type="button" aria-pressed="false"><span class="dot"></span>L21–25</button>
+      <button class="btn-primary" id="h-start" type="button">▶ Heutige Aufgabe starten</button>
+    </div>
+  </div>
+
+  <div class="trainer hidden" id="h-stage">
+    <div class="tr-top"><span class="tag" id="h-type"></span><span class="tr-prog" id="h-prog"></span></div>
+    <div id="h-body"></div>
+  </div>
+
+  <div class="tr-done hidden" id="h-done"></div>
+</main>
+
+<footer>
+  <span class="jp">日本語 A1.7</span> · Lern-Katalog — Tastatur: <span class="kbd">Leertaste</span> deckt auf bzw. springt weiter.
+</footer>
+
+<script src="assets/data/kanji.js"></script>
+<script src="assets/data/vokabular.js"></script>
+<script src="assets/data/grammatik.js"></script>
+<script src="assets/data/grammatik_extra.js"></script>
+<script src="assets/data/grammatik_furigana.js"></script>
+<script src="assets/data/grammatik_plus.js"></script>
+<script src="assets/data/vokabular_tags.js"></script>
+<script src="assets/data/saetze.js"></script>
+<script src="assets/srs.js"></script>
+<script src="assets/exercises.js"></script>
+<script src="assets/app.js"></script>
+</body>
+</html>

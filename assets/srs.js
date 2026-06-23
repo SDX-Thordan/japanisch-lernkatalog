@@ -248,6 +248,24 @@
 
   function reset() { store = freshStore(); save(); }
 
+  // Flache Kopie für Auswertungen (Fortschritts-Seite).
+  function snapshot() { return JSON.parse(JSON.stringify(store)); }
+
+  // Fälligkeits-Vorschau: [{date, count}] für die nächsten `days` Tage ab today.
+  function forecast(today, days) {
+    today = today || todayISO(); days = days || 7;
+    var out = [];
+    for (var i = 0; i < days; i++) {
+      var d = addDays(today, i), n = 0;
+      Object.keys(store.items).forEach(function (id) {
+        var due = store.items[id].due;
+        if (due && (i === 0 ? due <= d : due === d)) n++;
+      });
+      out.push({ date: d, count: n });
+    }
+    return out;
+  }
+
   /* ---------- UI-Komfort: Download/Upload im Browser ---------- */
   function downloadBackup(filename) {
     filename = filename || 'katalog-fortschritt.json';
@@ -269,6 +287,7 @@
     isDue: isDue, dueIds: dueIds,
     buildQueue: buildQueue, stats: stats,
     exportJSON: exportJSON, importJSON: importJSON, downloadBackup: downloadBackup, reset: reset,
+    snapshot: snapshot, forecast: forecast,
     _useStorage: useStorage,
     __test: { sm2: sm2, mergeStore: mergeStore, addDays: addDays, todayISO: todayISO, registry: registry },
   };
