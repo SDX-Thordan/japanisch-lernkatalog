@@ -27,11 +27,13 @@ test('Heute ist reine Wiederholung (frischer Stand → nichts fällig)', async (
   await expect(page.locator('#h-done')).toContainText('nichts fällig');
 });
 
-test('Lernpfad „Lektion lernen": geführter Kurs startet mit Phase „Vokabeln"', async ({ page }) => {
+test('Lernpfad „Lektion lernen": geführter Kurs startet sofort mit Phase „Vokabeln"', async ({ page }) => {
   await page.goto('/heute.html?lesson=1');
-  await page.click('#h-start');
+  // Kurs startet automatisch (kein Klick auf „Wiederholung starten"): Setup verborgen, Bühne sichtbar.
+  await expect(page.locator('#h-setup')).toBeHidden();
   await expect(page.locator('#h-stage')).toBeVisible();
   await expect(page.locator('#h-prog')).toContainText('Vokabeln');
+  await expect(page.locator('.page-intro h1')).toContainText('Lektion 1 lernen');
 });
 
 test('Grammatik: ein „Üben"-Knopf öffnet die kombinierte Session', async ({ page }) => {
