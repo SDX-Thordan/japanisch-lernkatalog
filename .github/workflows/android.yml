@@ -5,6 +5,8 @@ on:
     branches: [ main, 'claude/**' ]
   pull_request:
     branches: [ main ]
+  release:
+    types: [ published ]
   workflow_dispatch:
 
 jobs:
@@ -28,6 +30,8 @@ jobs:
   build:
     needs: test
     runs-on: ubuntu-latest
+    permissions:
+      contents: write   # für das Hochladen der APK ans GitHub-Release
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -55,10 +59,27 @@ jobs:
       - name: Synchronisieren
         run: npx cap sync android
 
-      - name: Version setzen (hochzählend → Update ohne Neuinstallation)
+      - name: Version bestimmen (Semver aus package.json; bei Release == Tag)
+        id: ver
+        run: |
+          PKG_VERSION=$(node -p "require('./package.json').version")
+          if [ "${GITHUB_EVENT_NAME}" = "release" ]; then
+            TAG="${GITHUB_REF_NAME#v}"   # vX.Y.Z → X.Y.Z
+            if [ "$TAG" != "$PKG_VERSION" ]; then
+              echo "::error::Release-Tag ($TAG) ≠ package.json version ($PKG_VERSION). Bitte Version bumpen, version:gen ausführen, committen und Tag passend setzen."
+              exit 1
+            fi
+            VERSION_NAME="$PKG_VERSION"
+          else
+            VERSION_NAME="${PKG_VERSION}-dev.${GITHUB_RUN_NUMBER}"
+          fi
+          echo "version_name=$VERSION_NAME" >> "$GITHUB_OUTPUT"
+          echo "Version: $VERSION_NAME (versionCode ${GITHUB_RUN_NUMBER})"
+
+      - name: Version in build.gradle setzen (versionCode hochzählend → Update ohne Neuinstallation)
         run: |
           sed -i -E "s/versionCode [0-9]+/versionCode ${GITHUB_RUN_NUMBER}/" android/app/build.gradle
-          sed -i -E "s/versionName \"[^\"]*\"/versionName \"1.${GITHUB_RUN_NUMBER}\"/" android/app/build.gradle
+          sed -i -E "s/versionName \"[^\"]*\"/versionName \"${{ steps.ver.outputs.version_name }}\"/" android/app/build.gradle
           grep -E "versionCode|versionName" android/app/build.gradle
 
       - name: Signierte Release-APK bauen
@@ -76,9 +97,24 @@ jobs:
           BT=$(ls -d "$ANDROID_HOME"/build-tools/* | sort | tail -1)
           "$BT/apksigner" verify --print-certs "$APK" | head -3 || true
 
+      - name: APK versioniert benennen
+        id: apk
+        run: |
+          SRC=android/app/build/outputs/apk/release/app-release.apk
+          DEST="go-nihongo-${{ steps.ver.outputs.version_name }}.apk"
+          cp "$SRC" "$DEST"
+          echo "path=$DEST" >> "$GITHUB_OUTPUT"
+
       - name: Release-APK als Artefakt hochladen
         uses: actions/upload-artifact@v4
         with:
           name: go-nihongo-release-apk
-          path: android/app/build/outputs/apk/release/app-release.apk
+          path: ${{ steps.apk.outputs.path }}
           if-no-files-found: error
+
+      - name: APK ans GitHub-Release hängen (nur bei Release)
+        if: github.event_name == 'release'
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.event.release.tag_name }}
+          files: ${{ steps.apk.outputs.path }}

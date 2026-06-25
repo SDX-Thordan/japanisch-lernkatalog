@@ -8,6 +8,8 @@ test('Übersicht lädt mit gruppierter Tab-Navigation', async ({ page }) => {
   await expect(page.locator('.nav-group-label', { hasText: 'Nachschlagen' })).toBeVisible();
   // „Freies Üben" als eigener Nachschlagen-Punkt
   await expect(page.locator('.nav-tab .nav-label', { hasText: 'Freies Üben' })).toBeVisible();
+  // Version im Footer (aus assets/version.js)
+  await expect(page.locator('footer .app-version')).toHaveText(/^Version v\d+\.\d+\.\d+/);
 });
 
 test('Mobile: untere Tab-Leiste sichtbar, obere ausgeblendet', async ({ page }) => {

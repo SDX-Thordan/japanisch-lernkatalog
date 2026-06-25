@@ -1078,10 +1078,18 @@
     draw();
   }
 
+  /* ---------- Versionsanzeige im Footer (Quelle: assets/version.js → window.APP_VERSION) ---------- */
+  function renderFooterVersion(){
+    const v=window.APP_VERSION; if(!v)return;
+    const f=document.querySelector('footer'); if(!f||f.querySelector('.app-version'))return;
+    f.appendChild(el('span','app-version','Version v'+esc(v)));
+  }
+
   /* ============================================================  INIT  */
   function init(){
     const page=document.body.dataset.page;
     renderNav(page);
+    renderFooterVersion();
     const content=document.getElementById('content');
     if(content){
       if(page==='kanji')renderKanji(content);

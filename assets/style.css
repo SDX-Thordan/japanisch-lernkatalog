@@ -468,6 +468,7 @@ footer {
   border-top: 1px solid var(--border);
 }
 footer .jp { font-family: var(--font-ja); }
+.app-version { display: block; margin-top: .6rem; font-size: .76rem; color: var(--faint); letter-spacing: .02em; }
 
 .empty { text-align: center; color: var(--muted); padding: 3rem 1rem; font-style: italic; }
 .hidden { display: none !important; }
