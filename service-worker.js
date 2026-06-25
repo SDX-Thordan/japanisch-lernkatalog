@@ -1,8 +1,12 @@
-/* Service Worker — Offline-Cache (cache-first) für den Lern-Katalog.
-   Cacht App-Shell, Daten und KanjiVG-SVGs, damit die App (auch als PWA) offline läuft.
+/* Service Worker — Offline-Cache für den Lern-Katalog.
+   Strategie:
+   - Navigationen (HTML) + Branding (manifest, App-Icons): NETWORK-FIRST mit Cache-Fallback,
+     damit App-Version & Logo online stets aktuell sind (kein „eingefrorenes" altes Icon mehr),
+     offline aber weiterhin laufen.
+   - Übrige statische Assets (JS/CSS/Daten/Font/KanjiVG-SVG): CACHE-FIRST (schnell, offline).
    Cache-Version bei inhaltlichen Änderungen erhöhen. */
 'use strict';
-var CACHE = 'katalog-v7';
+var CACHE = 'katalog-v8';
 
 var ASSETS = [
   './', 'index.html', 'heute.html', 'lernpfad.html', 'listen.html', 'grammatik.html', 'vokabular.html', 'kanji.html',
@@ -28,20 +32,45 @@ self.addEventListener('activate', function (e) {
   }).then(function () { return self.clients.claim(); }));
 });
 
+// Branding (Manifest + App-Icons): muss online frisch sein, damit das Logo nicht aus einem
+// alten Cache „klebt". Apple-Touch-Icon eingeschlossen.
+function isBranding(url) {
+  return url.pathname.endsWith('/manifest.webmanifest') ||
+    url.pathname.endsWith('/apple-touch-icon.png') ||
+    /\/assets\/icons\/icon-(192|512|maskable-512)\.png$/.test(url.pathname);
+}
+
+function putInCache(req, res) {
+  if (res && res.status === 200 && res.type === 'basic') {
+    var copy = res.clone();
+    caches.open(CACHE).then(function (c) { c.put(req, copy); });
+  }
+  return res;
+}
+
 self.addEventListener('fetch', function (e) {
   var req = e.request;
   if (req.method !== 'GET') return;
+  var url = new URL(req.url);
+  var sameOrigin = url.origin === self.location.origin;
+  var networkFirst = sameOrigin && (req.mode === 'navigate' || isBranding(url));
+
+  if (networkFirst) {
+    // Netz zuerst (frisch), bei Fehler aus dem Cache (offline); Navigation fällt auf index.html zurück.
+    e.respondWith(
+      fetch(req).then(function (res) { return putInCache(req, res); }).catch(function () {
+        return caches.match(req).then(function (hit) { return hit || caches.match('index.html'); });
+      })
+    );
+    return;
+  }
+
+  // Sonst: Cache zuerst (statische Assets), bei Bedarf nachladen & cachen.
   e.respondWith(
     caches.match(req).then(function (hit) {
       if (hit) return hit;
-      return fetch(req).then(function (res) {
-        // erfolgreiche GETs (z. B. KanjiVG-SVGs) zur Laufzeit cachen
-        if (res && res.status === 200 && res.type === 'basic') {
-          var copy = res.clone();
-          caches.open(CACHE).then(function (c) { c.put(req, copy); });
-        }
-        return res;
-      }).catch(function () { return caches.match('index.html'); });
+      return fetch(req).then(function (res) { return putInCache(req, res); })
+        .catch(function () { return caches.match('index.html'); });
     })
   );
 });
