@@ -44,3 +44,15 @@ test('Lernpfad zeigt Lektionskarten; L1 offen, L2 gesperrt', async ({ page }) =>
   await expect(page.locator('.lp-card').nth(1)).toHaveClass(/lp-locked/);
   await expect(page.locator('#lp-unlockall')).toBeVisible();
 });
+
+test('Listen: Liste anlegen und auf Vokabular „+" vorhanden', async ({ page }) => {
+  await page.goto('/listen.html');
+  await page.fill('#lst-create-name', 'E2E-Liste');
+  await page.click('#lst-create');
+  await expect(page.locator('.lst-name')).toHaveText('E2E-Liste');
+  // Branding & kein Vorschau-Toggle mehr
+  await expect(page.locator('.brand-name')).toHaveText('Go! Nihongo');
+  await page.goto('/vokabular.html');
+  await expect(page.locator('#toggle-preview')).toHaveCount(0);
+  await expect(page.locator('.v-add').first()).toBeVisible();
+});
