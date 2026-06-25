@@ -70,7 +70,18 @@ jobs:
         run: npx cap add android
 
       - name: App-Icon & Splash aus resources/ erzeugen (@capacitor/assets)
-        run: npx @capacitor/assets generate --android
+        run: |
+          set -eo pipefail
+          # Quell-Bilder müssen vorhanden sein — sonst erzeugt @capacitor/assets stillschweigend nichts.
+          for f in icon-only icon-foreground icon-background; do
+            test -f "resources/$f.png" || { echo "::error::resources/$f.png fehlt — Launcher-Icon kann nicht erzeugt werden"; exit 1; }
+          done
+          # WICHTIG: --assetPath resources. Ohne das sucht das Tool im Default-Ordner „assets" (= unser
+          # Web-Verzeichnis) und macht nichts → die APK behält das Capacitor-Standard-Icon.
+          npx @capacitor/assets generate --android --assetPath resources | tee /tmp/assets-gen.log
+          # Absichern: es muss tatsächlich generiert worden sein (kein stiller No-Op mehr).
+          grep -qiE "generated" /tmp/assets-gen.log || { echo "::error::@capacitor/assets hat keine Icons erzeugt"; exit 1; }
+          test -f android/app/src/main/res/mipmap-anydpi-v26/ic_launcher.xml
 
       - name: Synchronisieren
         run: npx cap sync android

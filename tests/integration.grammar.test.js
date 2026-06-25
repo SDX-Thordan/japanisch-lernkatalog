@@ -40,9 +40,13 @@ describe('Grammatik-Seite', () => {
     btn.dispatchEvent(new win.Event('click', { bubbles: true }));
     const ov = win.document.querySelector('.drill-overlay');
     expect(ov && ov.hidden === false).toBe(true);
-    const hasEx = !!ov.querySelector('.drill-ex .ex-opt');
+    // Session läuft (Fortschritt gesetzt) und der sichtbare Block hat Inhalt — egal welcher Aufgabentyp.
+    expect(ov.querySelector('.drill-prog').textContent).toContain('Aufgabe');
+    const exHost = ov.querySelector('.drill-ex');
+    const trBox = ov.querySelector('.drill-tr');
+    const exShown = !!(exHost && !exHost.classList.contains('hidden') && exHost.children.length > 0);
     const promptEl = ov.querySelector('.drill-prompt');
-    const hasTr = !!(promptEl && promptEl.textContent.length > 0);
-    expect(hasEx || hasTr).toBe(true);
+    const trShown = !!(trBox && !trBox.classList.contains('hidden') && promptEl && promptEl.textContent.length > 0);
+    expect(exShown || trShown).toBe(true);
   });
 });
