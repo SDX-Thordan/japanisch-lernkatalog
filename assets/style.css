@@ -549,6 +549,15 @@ table.conj-table tbody tr:last-child th, table.conj-table tbody tr:last-child td
 .tr-back .tr-mean { font-size: 1.3rem; font-weight: 700; margin-bottom: .5rem; }
 .tr-back .tr-sub { font-family: var(--font-ja-sans); color: var(--indigo); font-size: 1.08rem; margin-bottom: .2rem; }
 .tr-back .tr-tag { color: var(--muted); font-size: .85rem; }
+/* Beispielsatz + Nutzungs-Notiz zu einer Vokabel */
+.v-bsp { margin-top: .7rem; padding-top: .6rem; border-top: 1px dashed var(--border); text-align: left; }
+.v-bsp-jp { font-family: var(--font-ja-sans); font-size: 1.1rem; color: var(--ink); }
+.v-bsp-r { font-size: .8rem; color: var(--faint); margin-top: .1rem; }
+.v-bsp-de { font-size: .92rem; color: var(--muted); margin-top: .15rem; }
+.v-note { font-size: .85rem; color: var(--indigo); margin-top: .35rem; }
+.v-bsp-inline { font-size: .82rem; color: var(--muted); margin-top: .25rem; }
+.v-bsp-inline .ja { font-family: var(--font-ja-sans); color: var(--ink); }
+.v-bsp-inline .v-note { color: var(--indigo); }
 .tr-back .readings { margin: .4rem 0; }
 .tr-back .kc-examples { border-top: 1px dashed var(--border); padding-top: .5rem; margin-top: .5rem; display: flex; flex-direction: column; gap: .3rem; }
 .tr-back .ex { font-size: .92rem; display: flex; flex-wrap: wrap; gap: .35rem; }
