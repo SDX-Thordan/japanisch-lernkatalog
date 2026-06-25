@@ -49,6 +49,20 @@ jobs:
 
       - run: npm ci
 
+      - name: Version bestimmen (Release-Tag ist maßgeblich) & in package.json schreiben
+        id: ver
+        run: |
+          if [ "${GITHUB_EVENT_NAME}" = "release" ]; then
+            VERSION_NAME="${GITHUB_REF_NAME#v}"            # vX.Y.Z → X.Y.Z (Tag = Quelle der Wahrheit)
+          else
+            PKG_VERSION=$(node -p "require('./package.json').version")
+            VERSION_NAME="${PKG_VERSION}-dev.${GITHUB_RUN_NUMBER}"
+          fi
+          # In package.json schreiben, damit build:www → assets/version.js (Footer) dieselbe Version zeigt.
+          node -e "const f='package.json',p=require('./'+f);p.version='${VERSION_NAME}';require('fs').writeFileSync(f,JSON.stringify(p,null,2)+'\n')"
+          echo "version_name=$VERSION_NAME" >> "$GITHUB_OUTPUT"
+          echo "Version: $VERSION_NAME (versionCode ${GITHUB_RUN_NUMBER})"
+
       - name: Web-Assets nach www/ stagen
         run: npm run build:www
 
@@ -60,23 +74,6 @@ jobs:
 
       - name: Synchronisieren
         run: npx cap sync android
-
-      - name: Version bestimmen (Semver aus package.json; bei Release == Tag)
-        id: ver
-        run: |
-          PKG_VERSION=$(node -p "require('./package.json').version")
-          if [ "${GITHUB_EVENT_NAME}" = "release" ]; then
-            TAG="${GITHUB_REF_NAME#v}"   # vX.Y.Z → X.Y.Z
-            if [ "$TAG" != "$PKG_VERSION" ]; then
-              echo "::error::Release-Tag ($TAG) ≠ package.json version ($PKG_VERSION). Bitte Version bumpen, version:gen ausführen, committen und Tag passend setzen."
-              exit 1
-            fi
-            VERSION_NAME="$PKG_VERSION"
-          else
-            VERSION_NAME="${PKG_VERSION}-dev.${GITHUB_RUN_NUMBER}"
-          fi
-          echo "version_name=$VERSION_NAME" >> "$GITHUB_OUTPUT"
-          echo "Version: $VERSION_NAME (versionCode ${GITHUB_RUN_NUMBER})"
 
       - name: Version in build.gradle setzen (versionCode hochzählend → Update ohne Neuinstallation)
         run: |
