@@ -16,8 +16,10 @@ export function repoPath(rel) {
 
 // Erzeugt eine JSDOM-Umgebung und lädt die angegebenen Skript-Dateien (relativ zum Repo-Root)
 // nacheinander in der Reihenfolge der Liste. `html` erlaubt eigenes Markup (z. B. data-page).
-export function loadScripts(relPaths, { html = '<!DOCTYPE html><html><body></body></html>' } = {}) {
-  const dom = new JSDOM(html, { runScripts: 'dangerously', pretendToBeVisual: true });
+export function loadScripts(relPaths, { html = '<!DOCTYPE html><html><body></body></html>', url } = {}) {
+  const opts = { runScripts: 'dangerously', pretendToBeVisual: true };
+  if (url) opts.url = url;
+  const dom = new JSDOM(html, opts);
   const { window } = dom;
   for (const rel of relPaths) {
     const code = readFileSync(repoPath(rel), 'utf8');

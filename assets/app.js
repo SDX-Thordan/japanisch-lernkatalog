@@ -878,6 +878,20 @@
       else if(good&&!good.classList.contains('hidden')){ e.preventDefault(); good.click(); } });
     if(startBtn)startBtn.addEventListener('click',start);
     refreshStats();
+    // Lernpfad-Modus (?lesson=L): Seite als geführten Lektionskurs darstellen und sofort starten,
+    // damit „Lektion lernen" nicht wie die Wiederholungsseite aussieht.
+    if(onlyLesson!=null){
+      const intro=document.querySelector('.page-intro');
+      if(intro){
+        const k=intro.querySelector('.kicker'); if(k)k.textContent='学習 · Geführter Kurs';
+        const h=intro.querySelector('h1'); if(h)h.innerHTML='Lektion '+onlyLesson+' lernen <span class="jp">学習</span>';
+        const p=intro.querySelector('p'); if(p)p.innerHTML='Geführter Kurs der Lektion '+onlyLesson+
+          ': erst <b>Vokabeln</b>, dann <b>Grammatik</b>, <b>Beispiele</b>, <b>Kanji</b> und nochmal Beispiele. '+
+          'Es kommen nur <b>neue</b> Inhalte — die <a href="heute.html">Wiederholung</a> läuft separat.';
+      }
+      const srcPick=setup&&setup.querySelector('.src-pick'); if(srcPick)srcPick.classList.add('hidden');
+      start();
+    }
   }
 
   /* ============================================================  FORTSCHRITT (Statistik + Sicherung)  */

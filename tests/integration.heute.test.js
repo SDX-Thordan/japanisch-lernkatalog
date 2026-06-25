@@ -8,20 +8,23 @@ function fakeStorage() {
 }
 
 const BODY = `<!DOCTYPE html><html><body data-page="heute">
+  <div class="page-intro"><span class="kicker"></span><h1>Heute</h1><p></p></div>
   <span id="h-streak"></span><span id="h-due"></span><span id="h-learned"></span>
-  <div id="h-setup"><input id="h-revlimit" value="30"><button id="h-start"></button></div>
+  <div id="h-setup"><div class="src-pick"><input id="h-revlimit" value="30"></div><button id="h-start"></button></div>
   <div id="h-stage" class="hidden"><span id="h-type"></span><span id="h-prog"></span><div id="h-body"></div></div>
   <div id="h-done" class="hidden"></div>
 </body></html>`;
 
+const SCRIPTS = [
+  'assets/data/kanji.js', 'assets/data/vokabular.js', 'assets/data/grammatik.js',
+  'assets/data/grammatik_extra.js', 'assets/data/grammatik_furigana.js', 'assets/data/grammatik_plus.js',
+  'assets/data/vokabular_tags.js', 'assets/data/saetze.js',
+  'assets/srs.js', 'assets/exercises.js', 'assets/app.js',
+];
+
 let win;
 beforeEach(() => {
-  win = loadScripts([
-    'assets/data/kanji.js', 'assets/data/vokabular.js', 'assets/data/grammatik.js',
-    'assets/data/grammatik_extra.js', 'assets/data/grammatik_furigana.js', 'assets/data/grammatik_plus.js',
-    'assets/data/vokabular_tags.js', 'assets/data/saetze.js',
-    'assets/srs.js', 'assets/exercises.js', 'assets/app.js',
-  ], { html: BODY });
+  win = loadScripts(SCRIPTS, { html: BODY });
   win.SRS._useStorage(fakeStorage());
   win.Math.random = () => 0; // deterministisch
 });
@@ -69,5 +72,31 @@ describe('Heute (Wiederholung)', () => {
     }
     expect(win.document.getElementById('h-done').classList.contains('hidden')).toBe(false);
     expect(win.document.getElementById('h-done').textContent).toContain('geschafft');
+  });
+});
+
+describe('Heute im Lernpfad-Modus (?lesson=L)', () => {
+  // init() ist an DOMContentLoaded gebunden (JSDOM feuert das asynchron) → kurz auf den Tick warten.
+  function tick() { return new Promise((r) => setTimeout(r, 0)); }
+  function lessonWin() {
+    const w = loadScripts(SCRIPTS, { html: BODY, url: 'https://example.test/heute.html?lesson=1' });
+    w.SRS._useStorage(fakeStorage());
+    w.Math.random = () => 0;
+    return w;
+  }
+
+  it('startet den geführten Kurs sofort — ohne erst die Wiederholungs-Maske zu zeigen', async () => {
+    const w = lessonWin();
+    await tick();
+    // Kein Klick nötig: das Setup ist sofort verborgen, die Bühne sichtbar.
+    expect(w.document.getElementById('h-setup').classList.contains('hidden')).toBe(true);
+    expect(w.document.getElementById('h-stage').classList.contains('hidden')).toBe(false);
+    // Erste Phase ist „Vokabeln" und der Fortschritt nennt die Lektion (nur neue Items).
+    expect(w.document.getElementById('h-prog').textContent).toContain('Vokabeln');
+    expect(w.document.getElementById('h-prog').textContent).toContain('Lektion 1');
+    // Seite ist als Kurs umbeschriftet, nicht als Wiederholung.
+    expect(w.document.querySelector('.page-intro h1').textContent).toContain('Lektion 1 lernen');
+    // Die Wiederholungs-Steuerung (max. Aufgaben) ist im Kurs-Modus ausgeblendet.
+    expect(w.document.querySelector('.src-pick').classList.contains('hidden')).toBe(true);
   });
 });
