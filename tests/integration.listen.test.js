@@ -14,7 +14,7 @@ const BODY = `<!DOCTYPE html><html><body data-page="listen">
 
 let win;
 beforeEach(() => {
-  win = loadScripts(['assets/data/vokabular.js', 'assets/srs.js', 'assets/app.js'], { html: BODY });
+  win = loadScripts(['assets/data/vokabular.js', 'assets/data/vokabular_beispiele.js', 'assets/srs.js', 'assets/app.js'], { html: BODY });
   win.SRS._useStorage(fakeStorage());
   win.prompt = () => 'Umbenannt';
   win.confirm = () => true;
@@ -47,5 +47,22 @@ describe('Listen-Seite', () => {
     // Aufdecken zeigt die Rückseite
     click(ov.querySelector('.lt-reveal'));
     expect(ov.querySelector('.lt-back').classList.contains('hidden')).toBe(false);
+  });
+
+  it('Listen-Wörter: Klick auf die Zeile klappt die erweiterte Bedeutung auf', () => {
+    const l = win.SRS.createList('Beispiel-Liste');
+    win.SRS.addToList(l.id, win.VOKABULAR.slice(0, 5).map((v) => win.SRS.srsId('vocab', v)));
+    win.document.getElementById('lst-create-name').value = 'x';
+    click(win.document.getElementById('lst-create')); // draw()
+    // „Wörter"-Box öffnen → buildItems rendert die Zeilen.
+    click(win.document.querySelector('.lst-show'));
+    const row = win.document.querySelector('.lst-item[data-ext]');
+    expect(row).toBeTruthy();
+    expect(row.querySelector('.lst-de').textContent.trim().length).toBeGreaterThan(0); // einfache Übersetzung sichtbar
+    expect(row.querySelector('.v-ext')).toBeTruthy();
+    expect(row.classList.contains('expanded')).toBe(false);
+    click(row);
+    expect(row.classList.contains('expanded')).toBe(true);
+    // Klick auf den Entfernen-Button klappt NICHT auf (sondern entfernt).
   });
 });
