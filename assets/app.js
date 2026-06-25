@@ -305,9 +305,12 @@
     const tr=el('tr','item'); tr.dataset.filter=String(w.lesson);
     tr.dataset.type=vocabType(w.pos);
     tr.dataset.search=norm([w.kanji,w.kana,w.romaji,w.de,w.pos].join(' '));
+    const bsp=(window.VOKABULAR_BEISPIELE||{})[w.kana+'|'+w.lesson];
     tr.innerHTML='<td class="vocab-jp">'+scoreBadgeHtml('v:'+w.kana+'|'+w.lesson)+esc(written)+'</td><td>'+
       (showKana?'<span class="vocab-reading">'+esc(w.kana)+'</span>':'')+'</td>'+
-      '<td class="de hideable">'+esc(w.de)+'</td><td><span class="pos">'+esc(w.pos)+'</span></td>'+
+      '<td class="de hideable">'+esc(w.de)+
+        (bsp?'<div class="v-bsp-inline"><span class="ja">'+esc(bsp.jp)+'</span> — '+esc(bsp.de)+(bsp.note?'<span class="v-note"> · '+esc(bsp.note)+'</span>':'')+'</div>':'')+
+      '</td><td><span class="pos">'+esc(w.pos)+'</span></td>'+
       (listsOn?'<td class="vocab-add"><button class="v-add" type="button" title="Zu Liste hinzufügen" data-vid="v:'+esc(w.kana)+'|'+w.lesson+'" data-word="'+esc(written)+'">＋</button></td>':'');
     return tr;
   }
@@ -741,9 +744,14 @@
         (kunr?'<div class="reading-row"><span class="lbl kun">訓</span><span class="vals">'+esc(kunr)+'</span></div>':'')+'</div>'+
         (ex?'<div class="kc-examples">'+ex+'</div>':''); }
     if(c.t==='vocab'){ const v=c.d; const written=(v.kanji&&v.kanji.length)?v.kanji:v.kana;
+      const bsp=(window.VOKABULAR_BEISPIELE||{})[v.kana+'|'+v.lesson];
       return '<div class="tr-answer-jp ja">'+ruby(written,v.kana)+'</div>'+
       '<div class="tr-mean">'+esc(v.de)+'</div>'+
-      '<div class="tr-tag"><span class="pos">'+esc(v.pos)+'</span> · Lektion '+v.lesson+'</div>'; }
+      '<div class="tr-tag"><span class="pos">'+esc(v.pos)+'</span> · Lektion '+v.lesson+'</div>'+
+      (bsp?'<div class="v-bsp"><div class="v-bsp-jp ja">'+esc(bsp.jp)+'</div>'+
+        (bsp.r?'<div class="v-bsp-r">'+esc(bsp.r)+'</div>':'')+
+        '<div class="v-bsp-de">'+esc(bsp.de)+'</div>'+
+        (bsp.note?'<div class="v-note">'+esc(bsp.note)+'</div>':'')+'</div>':''); }
     const g=c.d, ex=(g.beispiele||[]).slice(0,2).map(b=>'<li><span class="ex-jp">'+furiToRuby(b.jp)+'</span>'+
       '<span class="ex-trans">'+esc(b.de)+'</span></li>').join('');
     return '<div class="tr-mean">'+esc(g.title||'')+' <span class="tag">L'+g.lesson+'</span></div>'+

@@ -6,7 +6,7 @@
    - Übrige statische Assets (JS/CSS/Daten/Font/KanjiVG-SVG): CACHE-FIRST (schnell, offline).
    Cache-Version bei inhaltlichen Änderungen erhöhen. */
 'use strict';
-var CACHE = 'katalog-v10';
+var CACHE = 'katalog-v11';
 
 var ASSETS = [
   './', 'index.html', 'heute.html', 'lernpfad.html', 'listen.html', 'grammatik.html', 'vokabular.html', 'kanji.html',
@@ -14,7 +14,7 @@ var ASSETS = [
   'assets/style.css', 'assets/app.js', 'assets/srs.js', 'assets/exercises.js', 'assets/kanji-write.js', 'assets/version.js',
   'assets/data/kanji.js', 'assets/data/vokabular.js', 'assets/data/grammatik.js',
   'assets/data/grammatik_extra.js', 'assets/data/grammatik_furigana.js', 'assets/data/grammatik_plus.js',
-  'assets/data/vokabular_tags.js', 'assets/data/saetze.js',
+  'assets/data/vokabular_tags.js', 'assets/data/saetze.js', 'assets/data/vokabular_beispiele.js',
   'manifest.webmanifest', 'assets/icons/material/material-icons-outlined.woff2',
   'assets/icons/icon-192.png', 'assets/icons/icon-512.png', 'assets/icons/icon-maskable-512.png'
 ];
