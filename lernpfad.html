@@ -1,0 +1,66 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Lernpfad · 学習 — Go! Nihongo</title>
+<link rel="stylesheet" href="assets/style.css">
+<link rel="icon" href="assets/icons/icon-192.png">
+<link rel="manifest" href="manifest.webmanifest">
+<meta name="theme-color" content="#b23a2e">
+<link rel="apple-touch-icon" href="assets/icons/icon-192.png">
+</head>
+<body data-page="lernpfad">
+
+<header class="topbar">
+  <div class="topbar-inner">
+    <a class="brand" href="index.html"><img class="brand-logo" src="assets/icons/icon-192.png" alt="" width="30" height="30"><span class="brand-name">Go! Nihongo</span></a>
+    <nav class="nav">
+      <a href="index.html">Start</a>
+      <a href="heute.html">Heute</a>
+      <a href="lernpfad.html" class="active">Lernpfad</a>
+      <a href="ueben.html">Üben</a>
+      <a href="listen.html">Listen</a>
+      <a href="vokabular.html">Vokabular</a>
+      <a href="grammatik.html">Grammatik</a>
+      <a href="kanji.html">Kanji</a>
+      <a href="verben.html">Verben</a>
+      <a href="schreiben.html">Schreiben</a>
+      <a href="fortschritt.html">Fortschritt</a>
+    </nav>
+  </div>
+</header>
+
+<main>
+  <div class="page-intro">
+    <span class="kicker">学習 · Geführter Lernpfad</span>
+    <h1>Lernpfad <span class="jp">学習</span></h1>
+    <p>Spiel die Lektionen nacheinander frei: Erst alle Kern-Items einer Lektion <b>beherrschen</b>
+       (Vokabeln, Grammatik &amp; Kanji — Kanji ab einem gewissen Level auch <b>korrekt schreiben</b>),
+       dann den <b>Lektionstest bestehen</b> (≥ 80 %). Danach öffnet sich die nächste Lektion.</p>
+  </div>
+
+  <div class="lp-toolbar">
+    <button class="btn lp-unlockall" id="lp-unlockall" type="button">Alle Lektionen freischalten</button>
+  </div>
+
+  <div id="lp-root"></div>
+</main>
+
+<footer>
+  <span class="brand-name">Go! Nihongo</span> · Lern-Katalog — Lernpfad: freispielen &amp; Lektionstests.
+</footer>
+
+<script src="assets/data/kanji.js"></script>
+<script src="assets/data/vokabular.js"></script>
+<script src="assets/data/grammatik.js"></script>
+<script src="assets/data/grammatik_extra.js"></script>
+<script src="assets/data/grammatik_furigana.js"></script>
+<script src="assets/data/grammatik_plus.js"></script>
+<script src="assets/data/vokabular_tags.js"></script>
+<script src="assets/data/saetze.js"></script>
+<script src="assets/srs.js"></script>
+<script src="assets/exercises.js"></script>
+<script src="assets/app.js"></script>
+</body>
+</html>

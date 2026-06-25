@@ -1,5 +1,5 @@
 /* ============================================================
-   日本語 A1.7 — Lern-Katalog · app.js
+   Go! Nihongo · app.js
    Rendering + Suche/Filter + Lesungen-Schalter + Karteikarten
    + Verb-Konjugator + Verben-Seite + Trainings-Modus.
    Reine Vanilla-JS, offline lauffähig (file://), keine Abhängigkeiten.
@@ -137,28 +137,36 @@
   /* ============================================================  VOKABULAR  */
   function renderVocab(content){
     const data=window.VOKABULAR||[], byLesson={};
+    const listsOn=!!window.SRS;
     data.forEach(w=>{(byLesson[w.lesson]=byLesson[w.lesson]||[]).push(w);});
     Object.keys(byLesson).map(Number).sort((a,b)=>a-b).forEach(L=>{
       const arr=byLesson[L];
       const group=el('section','group'); group.dataset.group=String(L);
-      group.appendChild(groupHead('Lektion '+L,(L>20?'🔒 Vorschau · ':'')+((LESSON[L]||{}).thema||''),arr.length));
+      const head=groupHead('Lektion '+L,(LESSON[L]||{}).thema||'',arr.length);
+      if(listsOn){ const b=el('button','v-add-lesson','＋ Lektion → Liste'); b.type='button'; b.dataset.lesson=String(L); head.appendChild(b); }
+      group.appendChild(head);
       const wrap=el('div','table-wrap'), table=el('table','vocab');
-      table.innerHTML='<thead><tr><th>Japanisch</th><th>Lesung</th><th>Bedeutung</th><th>Wortart</th></tr></thead>';
-      const tb=el('tbody'); arr.forEach(w=>tb.appendChild(vocabRow(w))); table.appendChild(tb);
+      table.innerHTML='<thead><tr><th>Japanisch</th><th>Lesung</th><th>Bedeutung</th><th>Wortart</th>'+(listsOn?'<th></th>':'')+'</tr></thead>';
+      const tb=el('tbody'); arr.forEach(w=>tb.appendChild(vocabRow(w,listsOn))); table.appendChild(tb);
       wrap.appendChild(table); group.appendChild(wrap); content.appendChild(group);
     });
     buildChips(Object.keys(byLesson).map(Number).sort((a,b)=>a-b), L=>'L'+L);
     buildTypeChips();
+    if(listsOn){ content.addEventListener('click',e=>{
+      const a=e.target.closest('.v-add'); if(a){ e.stopPropagation(); openListPicker([a.dataset.vid],a.dataset.word); return; }
+      const al=e.target.closest('.v-add-lesson'); if(al){ const L=+al.dataset.lesson; const ids=(window.VOKABULAR||[]).filter(v=>v.lesson===L).map(v=>'v:'+v.kana+'|'+v.lesson); openListPicker(ids,'Lektion '+L); return; }
+    }); }
   }
-  function vocabRow(w){
+  function vocabRow(w,listsOn){
     const written=(w.kanji&&w.kanji.length)?w.kanji:w.kana;
     const showKana=(w.kanji&&w.kanji.length&&w.kanji!==w.kana);
-    const tr=el('tr','item'); tr.dataset.filter=String(w.lesson); tr.dataset.preview=w.lesson>20?'1':'0';
+    const tr=el('tr','item'); tr.dataset.filter=String(w.lesson);
     tr.dataset.type=vocabType(w.pos);
     tr.dataset.search=norm([w.kanji,w.kana,w.romaji,w.de,w.pos].join(' '));
     tr.innerHTML='<td class="vocab-jp">'+esc(written)+'</td><td>'+
       (showKana?'<span class="vocab-reading">'+esc(w.kana)+'</span>':'')+'</td>'+
-      '<td class="de hideable">'+esc(w.de)+'</td><td><span class="pos">'+esc(w.pos)+'</span></td>';
+      '<td class="de hideable">'+esc(w.de)+'</td><td><span class="pos">'+esc(w.pos)+'</span></td>'+
+      (listsOn?'<td class="vocab-add"><button class="v-add" type="button" title="Zu Liste hinzufügen" data-vid="v:'+esc(w.kana)+'|'+w.lesson+'" data-word="'+esc(written)+'">＋</button></td>':'');
     return tr;
   }
   // Ordnet eine Wortart einer Filter-Kategorie zu.
@@ -178,7 +186,7 @@
     Object.keys(byLesson).map(Number).sort((a,b)=>a-b).forEach(L=>{
       const arr=byLesson[L];
       const group=el('section','group'); group.dataset.group=String(L);
-      group.appendChild(groupHead('Lektion '+L,(L>20?'🔒 Vorschau · ':'')+((LESSON[L]||{}).thema||''),arr.length));
+      group.appendChild(groupHead('Lektion '+L,(LESSON[L]||{}).thema||'',arr.length));
       arr.forEach(g=>group.appendChild(grammarCard(g,L)));
       content.appendChild(group);
     });
@@ -200,7 +208,7 @@
     const ex=all.map(b=>'<li><span class="ex-jp">'+furiToRuby(b.jp)+'</span>'+
       (b.de?'<span class="ex-trans hideable">'+esc(b.de)+'</span>':'')+'</li>').join('');
     const drillable=all.filter(b=>b.jp&&b.de);
-    const card=el('article','gp item collapsible collapsed'); card.dataset.filter=String(L); card.dataset.preview=L>20?'1':'0';
+    const card=el('article','gp item collapsible collapsed'); card.dataset.filter=String(L);
     card.dataset.search=norm([g.pattern,g.title,g.bildung,g.erklaerung,all.map(b=>b.jp+' '+(b.r||'')+' '+b.de).join(' ')].join(' '));
     card.innerHTML=
       '<div class="gp-head card-toggle"><span class="gp-pattern">'+esc(g.pattern)+'</span>'+
@@ -417,7 +425,7 @@
         '</th><td class="ja">'+rubyPair(disp[key],kana[key])+'</td></tr>';
     }).join('');
     const gname={1:'Gruppe I',2:'Gruppe II',3:'Gruppe III'}[g];
-    const card=el('article','verb-card item collapsible collapsed'); card.dataset.filter=String(g); card.dataset.preview=v.lesson>20?'1':'0';
+    const card=el('article','verb-card item collapsible collapsed'); card.dataset.filter=String(g);
     card.dataset.search=norm([v.kana,v.kanji,v.romaji,v.de,Object.keys(kana).map(k=>kana[k]+' '+kanaToRomaji(kana[k])).join(' ')].join(' '));
     card.innerHTML=
       '<div class="vc-head card-toggle"><span class="vc-dict ja">'+rubyPair(disp.dict,kana.dict)+'</span>'+
@@ -435,7 +443,7 @@
   }
   function buildChips(values,labelFn){
     const box=document.getElementById('filters'); if(!box)return;
-    const mk=(val,label)=>{ const prev=(val!=='all'&&!isNaN(+val)&&+val>20); const c=el('button','chip'+(val==='all'?' on':'')+(prev?' chip-preview':'')); c.textContent=label; c.dataset.val=val;
+    const mk=(val,label)=>{ const c=el('button','chip'+(val==='all'?' on':'')); c.textContent=label; c.dataset.val=val;
       c.addEventListener('click',()=>{ activeFilter=val; box.querySelectorAll('.chip').forEach(x=>x.classList.toggle('on',x.dataset.val===val)); applyFilter(); }); return c; };
     box.appendChild(mk('all','Alle'));
     values.forEach(v=>box.appendChild(mk(String(v),labelFn(v))));
@@ -450,12 +458,10 @@
   }
   function applyFilter(){
     const q=norm(query.trim()); let shown=0;
-    const previewOn=document.body.classList.contains('show-preview');
     document.body.classList.toggle('searching',q.length>0);
     items.forEach(it=>{ const okF=activeFilter==='all'||it.dataset.filter===activeFilter; const okQ=!q||(it.dataset.search||'').indexOf(q)!==-1;
-      const okP=previewOn||it.dataset.preview!=='1';
       const okT=activeType==='all'||it.dataset.type===activeType;
-      const vis=okF&&okQ&&okP&&okT; it.classList.toggle('hidden',!vis); if(vis)shown++; });
+      const vis=okF&&okQ&&okT; it.classList.toggle('hidden',!vis); if(vis)shown++; });
     groups.forEach(g=>{ const n=g.querySelectorAll('.item:not(.hidden)').length; g.classList.toggle('hidden',n===0);
       const gc=g.querySelector('.gcount'); if(gc)gc.textContent=n; });
     const c=document.getElementById('count'); if(c)c.textContent='Zeige '+shown+' von '+items.length+' Einträgen';
@@ -479,11 +485,6 @@
     const cBtn=document.getElementById('toggle-cards'); setPressed(cBtn,cardsOn);
     if(cBtn)cBtn.addEventListener('click',()=>{ const on=body.classList.toggle('cards-mode'); setPressed(cBtn,on); lsSet('katalog_cards',on?'on':'off');
       if(on)document.querySelectorAll('.hideable.revealed').forEach(e=>e.classList.remove('revealed')); });
-    // Vorschau L21–25 (Standard: AUS) — applyFilter() läuft VOR dem Speichern, falls localStorage blockiert ist
-    const previewOn=lsGet('katalog_preview')==='on';
-    body.classList.toggle('show-preview',previewOn);
-    const pBtn=document.getElementById('toggle-preview'); setPressed(pBtn,previewOn);
-    if(pBtn)pBtn.addEventListener('click',()=>{ const on=body.classList.toggle('show-preview'); setPressed(pBtn,on); applyFilter(); lsSet('katalog_preview',on?'on':'off'); });
     document.addEventListener('click',e=>{ if(!body.classList.contains('cards-mode'))return; const h=e.target.closest('.hideable'); if(h)h.classList.toggle('revealed'); });
     applyFilter();
   }
@@ -499,10 +500,10 @@
     if(!cardBox)return;
     let deck=[], total=0;
     const on=id=>{ const e=document.getElementById(id); return e?e.checked:true; };
-    function pool(){ const p=[]; const prev=document.body.classList.contains('show-preview');
+    function pool(){ const p=[];
       if(on('src-kanji'))(window.KANJI||[]).forEach(k=>p.push({t:'kanji',d:k}));
-      if(on('src-vocab'))(window.VOKABULAR||[]).forEach(v=>{ if(prev||v.lesson<=20)p.push({t:'vocab',d:v}); });
-      if(on('src-grammar'))(window.GRAMMATIK||[]).forEach(g=>{ if(prev||g.lesson<=20)p.push({t:'grammar',d:g}); });
+      if(on('src-vocab'))(window.VOKABULAR||[]).forEach(v=>p.push({t:'vocab',d:v}));
+      if(on('src-grammar'))(window.GRAMMATIK||[]).forEach(g=>p.push({t:'grammar',d:g}));
       return p; }
     function start(){ const p=pool(); deck=p.length?shuffle(p.slice()).slice(0,10):[]; total=deck.length;
       done.classList.add('hidden'); cardBox.classList.remove('hidden'); render(); }
@@ -559,10 +560,15 @@
       prog=document.getElementById('h-prog'), typeTag=document.getElementById('h-type'),
       done=document.getElementById('h-done'), startBtn=document.getElementById('h-start');
     let deck=[], total=0;
+    const lessonParam=parseInt(new URLSearchParams(location.search).get('lesson'),10);
+    const onlyLesson=isNaN(lessonParam)?null:lessonParam;
+    function lessonOf(c){ return c.type==='kanji'?window.SRS.kanjiLessonOf(c.data.level):c.data.lesson; }
     function refreshStats(){ const s=window.SRS.stats(); setText('h-streak',s.streakDays); setText('h-due',s.due); setText('h-learned',s.learned); }
     function start(){
-      const previewOn=document.body.classList.contains('show-preview');
-      deck=window.SRS.buildQueue({sources:['kanji','vocab','grammar'],newLimit:clampInt('h-newlimit',5),reviewLimit:clampInt('h-revlimit',15),includePreview:previewOn});
+      // Gating: nur freigeschaltete Lektionen; mit ?lesson=L gezielt eine Lektion lernen.
+      const maxLesson=onlyLesson!=null?onlyLesson:window.SRS.maxUnlockedLesson();
+      deck=window.SRS.buildQueue({sources:['kanji','vocab','grammar'],newLimit:clampInt('h-newlimit',5),reviewLimit:clampInt('h-revlimit',15),maxLesson:maxLesson});
+      if(onlyLesson!=null)deck=deck.filter(c=>lessonOf(c)===onlyLesson);
       total=deck.length; setup.classList.add('hidden'); done.classList.add('hidden'); stage.classList.remove('hidden'); render();
     }
     function finishItem(grade){ const c=deck[0]; if(grade!=null&&c)window.SRS.grade(c.id,grade); deck.shift(); refreshStats(); render(); }
@@ -573,11 +579,36 @@
         const a=document.getElementById('h-again'); if(a)a.addEventListener('click',()=>{ done.classList.add('hidden'); setup.classList.remove('hidden'); refreshStats(); });
         return; }
       const c=deck[0], learned=total-deck.length;
-      prog.textContent='Aufgabe '+(learned+1)+' / '+total;
+      prog.textContent='Aufgabe '+(learned+1)+' / '+total+(onlyLesson!=null?' · Lektion '+onlyLesson:'');
       typeTag.textContent=({kanji:'漢字 Kanji',vocab:'語彙 Vokabel',grammar:'文法 Grammatik'}[c.type]||'')+(c.reason==='due'?' · Wiederholung':' · neu');
       typeTag.className='tag tr-type-'+c.type;
-      if(c.type==='grammar'&&window.Exercises&&window.SATZ_TEMPLATES&&window.SATZ_TEMPLATES[c.data.pattern])renderExerciseItem(c);
+      // Kanji, das sein Schreib-Level erreicht hat: erst korrekt schreiben.
+      if(c.type==='kanji'&&window.KanjiWrite&&window.SRS.needsWriting(c.id))renderWriteCard(c);
+      else if(c.type==='grammar'&&window.Exercises&&window.SATZ_TEMPLATES&&window.SATZ_TEMPLATES[c.data.pattern])renderExerciseItem(c);
       else renderFlashcard(c);
+    }
+    function renderWriteCard(c){
+      const k=c.data;
+      body.innerHTML='<div class="tr-card kw-card"><div class="kw-head"><span class="tr-big ja">'+esc(k.k)+'</span>'+
+        '<span class="tr-q">'+esc(k.meaning||'')+' — schreibe das Kanji in richtiger Strichreihenfolge</span></div>'+
+        '<div class="kw-stage"></div><div class="kw-msg" aria-live="polite"></div>'+
+        '<div class="tr-controls"><button class="btn h-kw-guide" type="button">Vorlage</button>'+
+        '<button class="btn h-kw-play" type="button">▶ Reihenfolge</button>'+
+        '<button class="btn h-kw-clear" type="button">Löschen</button>'+
+        '<button class="btn btn-again h-kw-again" type="button">↻ Später</button></div></div>';
+      const mount=body.querySelector('.kw-stage'), msg=body.querySelector('.kw-msg');
+      const size=Math.min(300,(stage.clientWidth||320)-40);
+      fetch('assets/kanjivg/'+window.KanjiWrite.cpFile(k.k)).then(r=>r.text()).then(svg=>{
+        const w=window.KanjiWrite.create(mount,{svgText:svg,size:size,
+          onProgress:(i,n)=>{ msg.textContent='Strich '+i+' / '+n; },
+          onComplete:()=>{ msg.textContent='✓ Richtig geschrieben!'; window.SRS.gradeWrite(c.id,true); refreshStats();
+            const nx=el('button','btn-primary h-next','Weiter →'); nx.type='button'; nx.addEventListener('click',()=>finishItem(1)); body.querySelector('.tr-controls').appendChild(nx); }});
+        body.querySelector('.h-kw-guide').addEventListener('click',()=>w.toggleGuide());
+        body.querySelector('.h-kw-play').addEventListener('click',()=>w.play());
+        body.querySelector('.h-kw-clear').addEventListener('click',()=>w.clear());
+      }).catch(()=>{ msg.textContent='SVG konnte nicht geladen werden.'; });
+      // „Später": ans Ende schieben, ohne Bewertung.
+      body.querySelector('.h-kw-again').addEventListener('click',()=>{ const c2=deck.shift(); deck.push(c2); render(); });
     }
     function renderFlashcard(c){
       const fc={t:c.type,d:c.data};
@@ -616,6 +647,16 @@
         '<span class="f-bar-n">'+d.count+'</span><span class="f-bar-d">'+d.date.slice(5)+'</span></div>').join('');
       setText('f-streak',s.streakDays); setText('f-learned',s.learned); setText('f-due',s.due); setText('f-reviews',s.totalReviews);
       const forecast=document.getElementById('f-forecast'); if(forecast)forecast.innerHTML=bars;
+      // Lernpfad-Fortschritt: Status + Kern-Fortschritt + Test-Score je Lektion.
+      const lp=document.getElementById('f-lessons');
+      if(lp){ let html='';
+        for(let L=1;L<=25;L++){ const st=window.SRS.lessonState(L);
+          const cls=st.testPassed?'lp-done':(st.unlocked?'lp-open':'lp-locked');
+          const pct=Math.round(st.coreProgress.fraction*100);
+          html+='<div class="lp-bar '+cls+'" title="Lektion '+L+' — beherrscht '+st.coreProgress.mastered+'/'+st.coreProgress.total+(st.testPassed?(', Test '+Math.round(st.bestScore*100)+'%'):'')+'">'+
+            '<span class="lp-bar-fill" style="height:'+pct+'%"></span><span class="lp-bar-l">'+L+'</span>'+
+            (st.testPassed?'<span class="lp-bar-s">'+Math.round(st.bestScore*100)+'</span>':'')+'</div>'; }
+        lp.innerHTML=html; }
     }
     draw();
     const exp=document.getElementById('f-export'); if(exp)exp.addEventListener('click',()=>window.SRS.downloadBackup());
@@ -631,6 +672,212 @@
   /* ============================================================  SCHREIBEN (Kanji-Schreibübung)  */
   function initSchreiben(){
     if(window.KanjiWrite && typeof window.KanjiWrite.initPage==='function') window.KanjiWrite.initPage();
+  }
+
+  /* ============================================================  LERNPFAD (Freischalten + Lektionstests)  */
+  function initLernpfad(){
+    const root=document.getElementById('lp-root'); if(!root||!window.SRS||!window.Exercises)return;
+    let overlay=null;
+
+    function lessonCard(L){
+      const st=window.SRS.lessonState(L), cp=st.coreProgress, thema=(LESSON[L]||{}).thema||'';
+      const cls=st.testPassed?'lp-done':(st.unlocked?(st.coreMastered?'lp-test':'lp-open'):'lp-locked');
+      const badge=st.testPassed?'✅':(st.unlocked?(st.coreMastered?'🧪':'▶'):'🔒');
+      const card=el('article','lp-card '+cls);
+      let html='<div class="lp-top"><span class="lp-num">Lektion '+L+'</span><span class="lp-badge">'+badge+'</span></div>'+
+        '<div class="lp-thema">'+esc(thema)+'</div>';
+      if(!st.unlocked){ html+='<div class="lp-hint">🔒 Erst die vorige Lektion bestehen.</div>'; card.innerHTML=html; return card; }
+      html+='<div class="lp-core"><div class="lp-core-bar"><span style="width:'+Math.round(cp.fraction*100)+'%"></span></div>'+
+        '<span class="lp-core-n">beherrscht '+cp.mastered+' / '+cp.total+'</span></div><div class="lp-actions"></div>';
+      card.innerHTML=html;
+      const actions=card.querySelector('.lp-actions');
+      const learn=el('a','btn lp-learn',st.coreMastered?'Weiter üben':'Lektion lernen'); learn.href='heute.html?lesson='+L; actions.appendChild(learn);
+      if(st.coreMastered){ const t=el('button','btn-primary lp-test-btn',st.testPassed?'Test wiederholen':'Test starten'); t.type='button';
+        t.addEventListener('click',()=>openLessonTest(L)); actions.appendChild(t); }
+      else { actions.appendChild(el('span','lp-need','Erst alle Kern-Items beherrschen, dann Test.')); }
+      if(st.testPassed)actions.appendChild(el('span','lp-score','Bestes Ergebnis: '+Math.round(st.bestScore*100)+'%'));
+      return card;
+    }
+    function draw(){
+      const grid=el('div','lp-grid');
+      for(let L=1;L<=25;L++)grid.appendChild(lessonCard(L));
+      root.innerHTML=''; root.appendChild(grid);
+    }
+    function ensureOverlay(){
+      if(overlay)return overlay;
+      overlay=el('div','lp-overlay'); overlay.hidden=true;
+      overlay.innerHTML='<div class="lp-modal" role="dialog" aria-modal="true" aria-label="Lektionstest">'+
+        '<div class="lp-modal-head"><span class="lp-modal-title"></span><button class="drill-close lp-close" type="button" aria-label="Schließen">✕</button></div>'+
+        '<div class="lp-modal-top"><span class="lp-modal-prog"></span></div><div class="lp-modal-body"></div></div>';
+      document.body.appendChild(overlay);
+      overlay.querySelector('.lp-close').addEventListener('click',closeTest);
+      overlay.addEventListener('click',e=>{ if(e.target===overlay)closeTest(); });
+      return overlay;
+    }
+    function closeTest(){ if(overlay){ overlay.hidden=true; document.body.classList.remove('drill-open'); } }
+    function openLessonTest(L){
+      const ov=ensureOverlay();
+      const title=ov.querySelector('.lp-modal-title'), progEl=ov.querySelector('.lp-modal-prog'), bodyEl=ov.querySelector('.lp-modal-body');
+      title.textContent='Test · Lektion '+L;
+      const qs=window.Exercises.buildLessonTest(L); let i=0, correct=0; const n=qs.length;
+      ov.hidden=false; document.body.classList.add('drill-open');
+      function show(){
+        if(!n){ progEl.textContent=''; bodyEl.innerHTML='<div class="tr-done-in">Für diese Lektion gibt es noch keine Testaufgaben.</div>'; return; }
+        if(i>=n)return result();
+        progEl.textContent='Frage '+(i+1)+' / '+n;
+        bodyEl.innerHTML='<div class="lp-q"></div><div class="lp-q-next"></div>';
+        const mount=bodyEl.querySelector('.lp-q'), nextWrap=bodyEl.querySelector('.lp-q-next');
+        window.Exercises.renderExercise(qs[i],mount,{ onResult:res=>{ if(res)correct++;
+          const nx=el('button','btn-primary','Weiter →'); nx.type='button'; nx.addEventListener('click',()=>{ i++; show(); }); nextWrap.appendChild(nx); } });
+      }
+      function result(){
+        const score=n?correct/n:0, r=window.SRS.recordLessonTest(L,score), pct=Math.round(score*100);
+        progEl.textContent='';
+        bodyEl.innerHTML='<div class="lp-result '+(r.passed?'ok':'no')+'">'+(r.passed?'🎉 Bestanden!':'Leider nicht bestanden')+
+          '<div class="lp-result-score">'+correct+' / '+n+' richtig · '+pct+'%</div>'+
+          '<div class="lp-result-msg">'+(r.passed?(r.unlocked?'Lektion '+(L+1)+' ist jetzt freigeschaltet.':'Du hast alle Lektionen abgeschlossen! 🎌'):'Mindestens 80 % nötig — übe weiter und versuch es erneut.')+'</div></div>'+
+          '<button class="btn-primary lp-result-close" type="button">Weiter</button>';
+        bodyEl.querySelector('.lp-result-close').addEventListener('click',()=>{ closeTest(); draw(); });
+      }
+      show();
+    }
+
+    draw();
+    const ua=document.getElementById('lp-unlockall');
+    if(ua)ua.addEventListener('click',()=>{ if(window.confirm('Alle Lektionen freischalten? Der geführte Lernpfad ist dann komplett offen.')){ window.SRS.unlockAll(); draw(); } });
+    document.addEventListener('keydown',e=>{ if(overlay&&!overlay.hidden&&e.key==='Escape')closeTest(); });
+  }
+
+  /* ============================================================  LISTEN-PICKER (geteilt: Vokabular-Seite)  */
+  let picker=null;
+  function ensurePicker(){
+    if(picker)return picker;
+    const ov=el('div','pick-overlay'); ov.hidden=true;
+    ov.innerHTML='<div class="pick-modal" role="dialog" aria-modal="true" aria-label="Zu Liste hinzufügen">'+
+      '<div class="pick-head"><span class="pick-title"></span><button class="drill-close pick-close" type="button" aria-label="Schließen">✕</button></div>'+
+      '<div class="pick-existing"></div>'+
+      '<div class="pick-new"><input class="pick-name" type="text" placeholder="Neue Liste …" aria-label="Neue Liste"><button class="btn-primary pick-add" type="button">Anlegen &amp; hinzufügen</button></div>'+
+      '<div class="pick-msg" role="status"></div></div>';
+    document.body.appendChild(ov);
+    ov.addEventListener('click',e=>{ if(e.target===ov)ov.hidden=true; });
+    ov.querySelector('.pick-close').addEventListener('click',()=>{ ov.hidden=true; });
+    picker={ ov, title:ov.querySelector('.pick-title'), existing:ov.querySelector('.pick-existing'),
+      name:ov.querySelector('.pick-name'), add:ov.querySelector('.pick-add'), msg:ov.querySelector('.pick-msg') };
+    return picker;
+  }
+  // Öffnet den Picker, um die gegebenen Vokabel-IDs zu einer (neuen) Liste hinzuzufügen.
+  function openListPicker(ids, label){
+    if(!window.SRS)return;
+    const p=ensurePicker();
+    p.title.textContent='„'+label+'" zu Liste hinzufügen';
+    p.msg.textContent=''; p.name.value='';
+    function addTo(id,name){ window.SRS.addToList(id,ids); p.msg.textContent='✓ '+ids.length+' zu „'+name+'" hinzugefügt.'; renderExisting(); }
+    function renderExisting(){
+      const ls=window.SRS.lists();
+      p.existing.innerHTML = ls.length ? '<div class="pick-lbl">Vorhandene Listen</div>' : '<div class="pick-lbl">Noch keine Liste — leg unten eine an.</div>';
+      ls.forEach(l=>{ const b=el('button','pick-list','<span>'+esc(l.name)+'</span><span class="pick-n">'+l.items.length+'</span>'); b.type='button';
+        b.addEventListener('click',()=>addTo(l.id,l.name)); p.existing.appendChild(b); });
+    }
+    renderExisting();
+    p.add.onclick=()=>{ const nm=(p.name.value||'').trim(); if(!nm){ p.name.focus(); return; } const l=window.SRS.createList(nm); addTo(l.id,l.name); p.name.value=''; };
+    p.ov.hidden=false;
+  }
+
+  /* ============================================================  LISTEN (persönliche Vokabellisten)  */
+  function initListen(){
+    const root=document.getElementById('lst-root'); if(!root||!window.SRS)return;
+    const nameInp=document.getElementById('lst-create-name'), createBtn=document.getElementById('lst-create');
+
+    function vocabFront(v){ const w=(v.kanji&&v.kanji.length)?v.kanji:v.kana; return ruby(w,v.kana); }
+    function draw(){
+      const ls=window.SRS.lists();
+      root.innerHTML='';
+      if(!ls.length){ root.appendChild(el('p','lst-empty','Noch keine Liste. Lege oben eine an oder füge auf der <a href="vokabular.html">Vokabular-Seite</a> Wörter hinzu.')); return; }
+      ls.forEach(l=>{
+        const items=window.SRS.listItems(l.id);
+        const card=el('article','lst-card');
+        card.innerHTML='<div class="lst-head"><span class="lst-name">'+esc(l.name)+'</span><span class="lst-count">'+items.length+' Wörter</span></div>'+
+          '<div class="lst-actions"></div><div class="lst-items hidden"></div>';
+        const actions=card.querySelector('.lst-actions');
+        const train=el('button','btn-primary lst-train','▶ Trainieren'); train.type='button'; train.disabled=!items.length;
+        train.addEventListener('click',()=>openTrainer(l));
+        const show=el('button','btn lst-show',(items.length?'Wörter ('+items.length+')':'Wörter')); show.type='button';
+        const itemsBox=card.querySelector('.lst-items');
+        show.addEventListener('click',()=>{ itemsBox.classList.toggle('hidden'); if(!itemsBox.dataset.built){ buildItems(itemsBox,l,items); itemsBox.dataset.built='1'; } });
+        const ren=el('button','btn lst-ren','✎ Umbenennen'); ren.type='button';
+        ren.addEventListener('click',()=>{ const nn=window.prompt('Liste umbenennen:',l.name); if(nn&&nn.trim()){ window.SRS.renameList(l.id,nn.trim()); draw(); } });
+        const del=el('button','btn lst-del','🗑 Löschen'); del.type='button';
+        del.addEventListener('click',()=>{ if(window.confirm('Liste „'+l.name+'" löschen? (Vokabeln selbst bleiben erhalten.)')){ window.SRS.deleteList(l.id); draw(); } });
+        actions.appendChild(train); actions.appendChild(show); actions.appendChild(ren); actions.appendChild(del);
+        root.appendChild(card);
+      });
+    }
+    function buildItems(box,l,items){
+      box.innerHTML='';
+      items.forEach(o=>{ const row=el('div','lst-item');
+        row.innerHTML='<span class="lst-jp ja">'+vocabFront(o.data)+'</span><span class="lst-de">'+esc(o.data.de)+'</span>';
+        const rm=el('button','lst-rm','✕'); rm.type='button'; rm.title='Aus Liste entfernen';
+        rm.addEventListener('click',()=>{ window.SRS.removeFromList(l.id,[o.id]); draw(); });
+        row.appendChild(rm); box.appendChild(row); });
+    }
+
+    /* ----- Trainer (Karteikarten, Richtung de↔jp) ----- */
+    let tov=null, dir='jp2de';
+    function ensureTrainer(){
+      if(tov)return tov;
+      tov=el('div','lt-overlay'); tov.hidden=true;
+      tov.innerHTML='<div class="lt-modal" role="dialog" aria-modal="true" aria-label="Liste trainieren">'+
+        '<div class="lt-head"><span class="lt-title"></span>'+
+          '<button class="lt-dir btn" type="button"></button>'+
+          '<button class="drill-close lt-close" type="button" aria-label="Schließen">✕</button></div>'+
+        '<div class="lt-top"><span class="lt-prog"></span></div>'+
+        '<div class="lt-card"><div class="lt-front"></div><div class="lt-back hidden"></div>'+
+          '<div class="lt-controls"><button class="btn-primary lt-reveal" type="button">Aufdecken <span class="kbd">Leertaste</span></button>'+
+          '<button class="btn btn-again lt-again hidden" type="button">↻ Nochmal</button>'+
+          '<button class="btn btn-next lt-good hidden" type="button">Gewusst →</button></div></div>'+
+        '<div class="lt-done hidden"></div></div>';
+      document.body.appendChild(tov);
+      tov.querySelector('.lt-close').addEventListener('click',()=>{ tov.hidden=true; });
+      tov.addEventListener('click',e=>{ if(e.target===tov)tov.hidden=true; });
+      document.addEventListener('keydown',e=>{ if(tov.hidden)return;
+        if(e.key==='Escape'){ tov.hidden=true; return; }
+        if(e.code==='Space'){ e.preventDefault(); const good=tov.querySelector('.lt-good'), rev=tov.querySelector('.lt-reveal');
+          if(good&&!good.classList.contains('hidden'))good.click(); else if(rev&&!rev.classList.contains('hidden'))rev.click(); } });
+      return tov;
+    }
+    function openTrainer(l){
+      const ov=ensureTrainer();
+      const q=s=>ov.querySelector(s);
+      const title=q('.lt-title'), dirBtn=q('.lt-dir'), prog=q('.lt-prog'),
+        card=q('.lt-card'), front=q('.lt-front'), back=q('.lt-back'), done=q('.lt-done'),
+        reveal=q('.lt-reveal'), again=q('.lt-again'), good=q('.lt-good');
+      title.textContent=l.name;
+      let deck=[], total=0;
+      function dirLabel(){ return dir==='jp2de'?'日本語 → Deutsch':'Deutsch → 日本語'; }
+      function start(){ const items=window.SRS.listItems(l.id); deck=shuffle(items.slice()); total=deck.length; done.classList.add('hidden'); card.classList.remove('hidden'); render(); }
+      function render(){
+        if(!deck.length){ card.classList.add('hidden'); done.classList.remove('hidden');
+          done.innerHTML=total?'<div class="tr-done-in">🎉 Geschafft!<br>Alle '+total+' Karten durch.</div><button class="btn-primary lt-restart" type="button">↻ Nochmal</button>':'<div class="tr-done-in">Diese Liste ist leer.</div>';
+          const rs=done.querySelector('.lt-restart'); if(rs)rs.addEventListener('click',start); return; }
+        const learned=total-deck.length; prog.textContent='Karte '+(learned+1)+' / '+total;
+        const o=deck[0], v=o.data;
+        const jp='<div class="lt-jp ja">'+vocabFront(v)+'</div>', de='<div class="lt-de">'+esc(v.de)+'</div>';
+        const reading='<div class="lt-reading ja">'+esc(v.kana)+'</div>';
+        if(dir==='jp2de'){ front.innerHTML=jp; back.innerHTML=de+reading; }
+        else { front.innerHTML=de; back.innerHTML=jp+reading; }
+        back.classList.add('hidden'); reveal.classList.remove('hidden'); again.classList.add('hidden'); good.classList.add('hidden');
+      }
+      reveal.onclick=()=>{ back.classList.remove('hidden'); reveal.classList.add('hidden'); again.classList.remove('hidden'); good.classList.remove('hidden'); };
+      good.onclick=()=>{ const o=deck.shift(); if(window.SRS.get(o.id)||true)window.SRS.grade(o.id,1); render(); };
+      again.onclick=()=>{ const o=deck.shift(); window.SRS.grade(o.id,0); deck.push(o); render(); };
+      dirBtn.textContent=dirLabel();
+      dirBtn.onclick=()=>{ dir=dir==='jp2de'?'de2jp':'jp2de'; dirBtn.textContent=dirLabel(); start(); };
+      ov.hidden=false; start();
+    }
+
+    if(createBtn)createBtn.addEventListener('click',()=>{ const nm=(nameInp.value||'').trim(); if(!nm){ nameInp.focus(); return; } window.SRS.createList(nm); nameInp.value=''; draw(); });
+    if(nameInp)nameInp.addEventListener('keydown',e=>{ if(e.key==='Enter'&&createBtn)createBtn.click(); });
+    draw();
   }
 
   /* ============================================================  INIT  */
@@ -650,6 +897,8 @@
     if(page==='heute')initHeute();
     if(page==='fortschritt')initFortschritt();
     if(page==='schreiben')initSchreiben();
+    if(page==='listen')initListen();
+    if(page==='lernpfad')initLernpfad();
     initSearch(); initToggles();
   }
   /* ---------- geteilte Helfer für die neuen Module (srs.js, exercises.js, kanji-write.js) ----------

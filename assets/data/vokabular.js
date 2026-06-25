@@ -925,5 +925,62 @@ window.VOKABULAR = [
   {"kanji":"","kana":"いっしょうけんめい","romaji":"isshōkenmei","de":"mit aller Kraft, eifrig","pos":"Adv.","lesson":25},
   {"kanji":"必ず","kana":"かならず","romaji":"kanarazu","de":"unbedingt, bestimmt","pos":"Adv.","lesson":25},
   {"kanji":"","kana":"もし","romaji":"moshi","de":"falls, wenn (+ たら)","pos":"Adv.","lesson":25},
-  {"kanji":"田舎","kana":"いなか","romaji":"inaka","de":"das Land, die Heimat (ländlich)","pos":"N.","lesson":25}
+  {"kanji":"田舎","kana":"いなか","romaji":"inaka","de":"das Land, die Heimat (ländlich)","pos":"N.","lesson":25},
+
+  /* ===== Ergänzungen (Minna no Nihongo-Abgleich) ===== */
+  /* L12 — Vergleich */
+  {"kanji":"方","kana":"ほう","romaji":"hō","de":"die Seite; (die) …-ere (im Vergleich: ～のほうが)","pos":"N.","lesson":12},
+
+  /* L21 — Meinung & Vermutung */
+  {"kanji":"残業します","kana":"ざんぎょうします","romaji":"zangyō shimasu","de":"Überstunden machen","pos":"V. III","lesson":21},
+  {"kanji":"出張します","kana":"しゅっちょうします","romaji":"shutchō shimasu","de":"eine Geschäftsreise machen","pos":"V. III","lesson":21},
+  {"kanji":"役に立ちます","kana":"やくにたちます","romaji":"yaku ni tachimasu","de":"nützlich sein","pos":"V. I","lesson":21},
+  {"kanji":"夢","kana":"ゆめ","romaji":"yume","de":"der Traum","pos":"N.","lesson":21},
+  {"kanji":"","kana":"ニュース","romaji":"nyūsu","de":"die Nachrichten","pos":"N.","lesson":21},
+  {"kanji":"","kana":"スピーチ","romaji":"supīchi","de":"die Rede, die Ansprache","pos":"N.","lesson":21},
+  {"kanji":"天気予報","kana":"てんきよほう","romaji":"tenki yohō","de":"die Wettervorhersage","pos":"N.","lesson":21},
+  {"kanji":"","kana":"アルバイト","romaji":"arubaito","de":"der Nebenjob","pos":"N.","lesson":21},
+  {"kanji":"","kana":"デザイン","romaji":"dezain","de":"das Design","pos":"N.","lesson":21},
+  {"kanji":"大統領","kana":"だいとうりょう","romaji":"daitōryō","de":"der Präsident","pos":"N.","lesson":21},
+
+  /* L22 — Kleidung & Relativsätze */
+  {"kanji":"","kana":"ズボン","romaji":"zubon","de":"die Hose","pos":"N.","lesson":22},
+  {"kanji":"","kana":"スーツ","romaji":"sūtsu","de":"der Anzug","pos":"N.","lesson":22},
+  {"kanji":"手袋","kana":"てぶくろ","romaji":"tebukuro","de":"die Handschuhe","pos":"N.","lesson":22},
+  {"kanji":"","kana":"めがね","romaji":"megane","de":"die Brille","pos":"N.","lesson":22},
+  {"kanji":"かけます","kana":"かけます","romaji":"kakemasu","de":"aufsetzen (Brille: めがねを～)","pos":"V. II","lesson":22},
+  {"kanji":"約束","kana":"やくそく","romaji":"yakusoku","de":"die Verabredung, das Versprechen","pos":"N.","lesson":22},
+  {"kanji":"用事","kana":"ようじ","romaji":"yōji","de":"die (zu erledigende) Angelegenheit","pos":"N.","lesson":22},
+  {"kanji":"髪","kana":"かみ","romaji":"kami","de":"das Haar","pos":"N.","lesson":22},
+  {"kanji":"長い","kana":"ながい","romaji":"nagai","de":"lang","pos":"い-Adj.","lesson":22},
+
+  /* L23 — Wegbeschreibung */
+  {"kanji":"信号","kana":"しんごう","romaji":"shingō","de":"die Ampel","pos":"N.","lesson":23},
+  {"kanji":"角","kana":"かど","romaji":"kado","de":"die Ecke","pos":"N.","lesson":23},
+  {"kanji":"橋","kana":"はし","romaji":"hashi","de":"die Brücke","pos":"N.","lesson":23},
+  {"kanji":"曲がります","kana":"まがります","romaji":"magarimasu","de":"abbiegen (～を／～に)","pos":"V. I","lesson":23},
+  {"kanji":"渡ります","kana":"わたります","romaji":"watarimasu","de":"überqueren (～を)","pos":"V. I","lesson":23},
+  {"kanji":"押します","kana":"おします","romaji":"oshimasu","de":"drücken, schieben","pos":"V. I","lesson":23},
+  {"kanji":"気をつけます","kana":"きをつけます","romaji":"ki o tsukemasu","de":"aufpassen, vorsichtig sein","pos":"V. II","lesson":23},
+  {"kanji":"質問","kana":"しつもん","romaji":"shitsumon","de":"die Frage","pos":"N.","lesson":23},
+  {"kanji":"出します","kana":"だします","romaji":"dashimasu","de":"herausnehmen, abgeben, aufgeben (Post)","pos":"V. I","lesson":23},
+
+  /* L24 — Geben & Bekommen von Gefälligkeiten */
+  {"kanji":"手伝います","kana":"てつだいます","romaji":"tetsudaimasu","de":"helfen","pos":"V. I","lesson":24},
+  {"kanji":"直します","kana":"なおします","romaji":"naoshimasu","de":"reparieren, korrigieren","pos":"V. I","lesson":24},
+  {"kanji":"貸します","kana":"かします","romaji":"kashimasu","de":"verleihen, ausleihen (an jdn.)","pos":"V. I","lesson":24},
+  {"kanji":"お弁当","kana":"おべんとう","romaji":"obentō","de":"die Lunchbox, das (mitgenommene) Essen","pos":"N.","lesson":24},
+  {"kanji":"お土産","kana":"おみやげ","romaji":"omiyage","de":"das Mitbringsel, Souvenir","pos":"N.","lesson":24},
+  {"kanji":"親","kana":"おや","romaji":"oya","de":"die Eltern","pos":"N.","lesson":24},
+  {"kanji":"","kana":"おじさん","romaji":"ojisan","de":"der Onkel; älterer Mann","pos":"N.","lesson":24},
+  {"kanji":"","kana":"おばさん","romaji":"obasan","de":"die Tante; ältere Frau","pos":"N.","lesson":24},
+
+  /* L25 — Bedingung (たら／ても) */
+  {"kanji":"用意します","kana":"よういします","romaji":"yōi shimasu","de":"vorbereiten","pos":"V. III","lesson":25},
+  {"kanji":"連絡します","kana":"れんらくします","romaji":"renraku shimasu","de":"Kontakt aufnehmen, Bescheid geben","pos":"V. III","lesson":25},
+  {"kanji":"出席します","kana":"しゅっせきします","romaji":"shusseki shimasu","de":"teilnehmen (an ～に)","pos":"V. III","lesson":25},
+  {"kanji":"戻ります","kana":"もどります","romaji":"modorimasu","de":"zurückkehren, zurückkommen","pos":"V. I","lesson":25},
+  {"kanji":"過ぎます","kana":"すぎます","romaji":"sugimasu","de":"vergehen, vorbeigehen","pos":"V. II","lesson":25},
+  {"kanji":"","kana":"べつべつに","romaji":"betsubetsu ni","de":"getrennt (z. B. bezahlen)","pos":"Adv.","lesson":25},
+  {"kanji":"","kana":"ずっと","romaji":"zutto","de":"die ganze Zeit; bei Weitem","pos":"Adv.","lesson":25}
 ];

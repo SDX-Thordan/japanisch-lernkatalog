@@ -209,9 +209,61 @@
     mount.appendChild(ans); mount.appendChild(reveal); mount.appendChild(rate);
   }
 
+  /* ---------- Lektionstest: Aufgaben aus den Kern-Items einer Lektion ---------- */
+  function uniqueSample(arr, n) {
+    var seen = {}, out = [];
+    shuffle(arr.slice()).forEach(function (x) { if (x != null && !seen[x]) { seen[x] = 1; out.push(x); } });
+    return out.slice(0, n);
+  }
+  // Multiple-Choice „Was bedeutet <X>?" — Frage japanisch, Optionen = Bedeutungen.
+  function meaningMC(promptJa, correct, pool) {
+    var distract = uniqueSample((pool || []).filter(function (m) { return m && m !== correct; }), 3);
+    var optionen = shuffle([correct].concat(distract));
+    return { typ: 'mc', frage: promptJa, optionen: optionen, richtig: optionen.indexOf(correct), erkl: promptJa + ' = ' + correct };
+  }
+  function vocabMC(v, core) {
+    var prompt = (v.kanji && v.kanji.length) ? v.kanji : v.kana;
+    var pool = (core || []).filter(function (c) { return c.type === 'vocab'; }).map(function (c) { return c.data.de; });
+    if (pool.length < 4) pool = pool.concat((window.VOKABULAR || []).map(function (x) { return x.de; }));
+    return meaningMC(prompt, v.de, pool);
+  }
+  function kanjiMC(k, core) {
+    var pool = (core || []).filter(function (c) { return c.type === 'kanji'; }).map(function (c) { return c.data.meaning; });
+    if (pool.length < 4) pool = pool.concat((window.KANJI || []).map(function (x) { return x.meaning; }));
+    return meaningMC(k.k, k.meaning, pool);
+  }
+  // Grammatik-Aufgabe: GRAMMATIK_PLUS-Übungen bevorzugt (mc/cloze), sonst Übersetzen (Selbstkontrolle).
+  function grammarQuestion(g) {
+    var plus = (window.GRAMMATIK_PLUS || {})[g.pattern];
+    if (plus && plus.uebungen && plus.uebungen.length) {
+      var ex = {}, u = randPick(plus.uebungen), key;
+      for (key in u) ex[key] = u[key];
+      delete ex.srsId; // Testmodus: kein SRS-Seiteneffekt
+      return ex;
+    }
+    var b = (g.beispiele || [])[0];
+    if (b && b.jp && b.de) return { typ: 'translate', prompt: b.de, jp: b.jp, de: b.de };
+    return null;
+  }
+  // Zusammenstellung von n Aufgaben aus den Kern-Items der Lektion (über SRS.lessonCore).
+  function buildLessonTest(lesson, n) {
+    n = n || 10;
+    var core = (window.SRS && window.SRS.lessonCore) ? window.SRS.lessonCore(lesson) : [];
+    var qs = [];
+    core.forEach(function (c) {
+      var ex = null;
+      if (c.type === 'grammar') ex = grammarQuestion(c.data);
+      else if (c.type === 'vocab') ex = vocabMC(c.data, core);
+      else if (c.type === 'kanji') ex = kanjiMC(c.data, core);
+      if (ex) qs.push(ex);
+    });
+    return shuffle(qs).slice(0, n);
+  }
+
   window.Exercises = {
     buildTagIndex: buildTagIndex, fillTemplate: fillTemplate, patternOf: patternOf,
     particleExercise: particleExercise, orderExercise: orderExercise, translateExercise: translateExercise,
     fromTemplate: fromTemplate, gradeAnswer: gradeAnswer, renderExercise: renderExercise,
+    meaningMC: meaningMC, buildLessonTest: buildLessonTest,
   };
 })();

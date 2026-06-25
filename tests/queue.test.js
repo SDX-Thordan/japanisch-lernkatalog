@@ -34,12 +34,12 @@ describe('buildQueue()', () => {
     expect(q.filter((x) => x.reason === 'new').length).toBe(2);
   });
 
-  it('Preview (Lektion > 20) standardmäßig ausgeschlossen, mit includePreview enthalten', () => {
-    const without = SRS.buildQueue({ sources: ['vocab'], newLimit: 9999, reviewLimit: 0, today: '2026-06-23' });
-    const withPrev = SRS.buildQueue({ sources: ['vocab'], newLimit: 9999, reviewLimit: 0, today: '2026-06-23', includePreview: true });
+  it('alle Lektionen sind aktiv (L21–25 enthalten); maxLesson gated', () => {
+    const all = SRS.buildQueue({ sources: ['vocab'], newLimit: 9999, reviewLimit: 0, today: '2026-06-23' });
     const lessons = (arr) => arr.map((x) => x.data.lesson);
-    expect(Math.max(...lessons(without))).toBeLessThanOrEqual(20);
-    expect(Math.max(...lessons(withPrev))).toBeGreaterThan(20);
+    expect(Math.max(...lessons(all))).toBeGreaterThan(20); // L21–25 dabei
+    const gated = SRS.buildQueue({ sources: ['vocab'], newLimit: 9999, reviewLimit: 0, today: '2026-06-23', maxLesson: 5 });
+    expect(Math.max(...lessons(gated))).toBeLessThanOrEqual(5);
   });
 
   it('verschränkt fällige und neue Items (nicht alle due am Stück)', () => {

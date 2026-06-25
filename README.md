@@ -1,6 +1,6 @@
-# 日本語 A1.7 — Lern-Katalog & Lern-App
+# Go! Nihongo
 
-Lern-App für Japanisch (Minna no Nihongo 初級 I, Lektion 1–20 · Stufe A1.2–A1.7).
+Lern-App für Japanisch (Minna no Nihongo 初級 I, Lektionen 1–25).
 Läuft als **Offline-Website / PWA** und als **Android-APK** — derselbe Code-Stand.
 
 ## Funktionen
@@ -44,11 +44,21 @@ testbar; `tests/helpers/load.js` lädt die Browser-Skripte in jsdom.
 Lokal: `python3 -m http.server` und `index.html` öffnen. Auf GitHub Pages installierbar
 (Manifest + Service Worker → voll offline).
 
-## Android-APK
+## Android-APK (signiertes Release)
 
 Die APK wird in **GitHub Actions** gebaut (`.github/workflows/android.yml`): Test-Gate →
-`build:www` → `cap add android` → `cap sync` → `gradlew assembleDebug`. Die fertige
-`app-debug.apk` liegt als Workflow-Artefakt zum Download bereit.
+`build:www` → `cap add android` → `cap sync` → **`gradlew assembleRelease`**, signiert mit dem
+festen Keystore `signing/go-nihongo.keystore`. Die fertige **`app-release.apk`** liegt als
+Workflow-Artefakt `go-nihongo-release-apk` zum Download bereit.
+
+**Updates ohne Neuinstallation:** Da die App eine stabile `applicationId`
+(`de.thordan.japanischkatalog`) und einen stabilen Signaturschlüssel hat und der `versionCode`
+bei jedem Build hochzählt (`GITHUB_RUN_NUMBER`), lässt sich eine neue APK direkt **über** die
+installierte Version legen — der Lernfortschritt im Gerät bleibt erhalten.
+
+> Hinweis: Der Release-Keystore liegt bewusst im Repo (Passwort im Workflow), damit der Build
+> ohne weitere Einrichtung reproduzierbar signiert. Für eine im Play Store veröffentlichte App
+> sollte der Schlüssel stattdessen geheim gehalten werden (z. B. GitHub-Secrets).
 
 Lokal (mit Android SDK):
 
@@ -56,8 +66,14 @@ Lokal (mit Android SDK):
 npm run build:www
 npx cap add android      # einmalig
 npx cap sync android
-cd android && ./gradlew assembleDebug
+cd android && ./gradlew assembleRelease \
+  -Pandroid.injected.signing.store.file="$PWD/../signing/go-nihongo.keystore" \
+  -Pandroid.injected.signing.store.password=gonihongo \
+  -Pandroid.injected.signing.key.alias=gonihongo \
+  -Pandroid.injected.signing.key.password=gonihongo
 ```
+
+App-Icons aus `assets/icons/logo.png` neu erzeugen: `node scripts/gen-icons.mjs`.
 
 ## Lizenz
 

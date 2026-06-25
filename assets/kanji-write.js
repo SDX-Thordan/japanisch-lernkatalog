@@ -191,7 +191,8 @@
       fetch('assets/kanjivg/' + cpFile(k.k)).then(function (r) { return r.text(); }).then(function (svg) {
         widget = create(stage, { svgText: svg, size: Math.min(320, root.clientWidth - 40),
           onProgress: function (i, n) { setMsg('Strich ' + i + ' / ' + n); },
-          onComplete: function () { setMsg('✓ Alle Striche geschrieben!'); } });
+          onComplete: function () { setMsg('✓ Alle Striche geschrieben!');
+            if (window.SRS && window.SRS.gradeWrite) window.SRS.gradeWrite('k:' + k.k, true); } });
       }).catch(function () { stage.innerHTML = '<p>SVG konnte nicht geladen werden.</p>'; });
     }
     function grade(g) {
