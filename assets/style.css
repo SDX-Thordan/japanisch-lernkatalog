@@ -68,17 +68,17 @@ body {
 }
 .brand {
   display: flex;
-  align-items: center;
-  gap: .5rem;
+  align-items: baseline;
+  gap: .04em;
   text-decoration: none;
   color: var(--ink);
   font-weight: 800;
   white-space: nowrap;
 }
 .brand-logo { width: 30px; height: 30px; border-radius: 8px; display: block; box-shadow: 0 1px 2px rgba(40,30,10,.12); }
-.brand-name { font-size: 1.05rem; letter-spacing: .01em; }
+.brand-name { font-size: 1.15rem; letter-spacing: -.01em; }
 .brand .jp { font-family: var(--font-ja); color: var(--accent); font-size: 1.25rem; }
-.brand-jp { display: inline-flex; align-items: center; justify-content: center; width: 32px; height: 32px; background: var(--accent); color: #fff; font-family: var(--font-ja); font-size: 1.15rem; font-weight: 700; border-radius: 9px; box-shadow: 0 1px 2px rgba(40,30,10,.18); }
+.brand-jp { font-family: var(--font-ja); color: var(--accent); font-size: 1.2rem; font-weight: 700; letter-spacing: .01em; }
 .section-label { font-size: .8rem; text-transform: uppercase; letter-spacing: .08em; color: var(--faint); font-weight: 800; margin: 1.6rem 0 .6rem; }
 .section-label:first-of-type { margin-top: .6rem; }
 
