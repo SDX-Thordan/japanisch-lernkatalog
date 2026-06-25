@@ -66,6 +66,15 @@ jobs:
       - name: Web-Assets nach www/ stagen
         run: npm run build:www
 
+      - name: OTA-Bundle + Manifest erzeugen (@capgo Live-Update, konstante Asset-Namen)
+        run: |
+          set -eo pipefail
+          # Web-Bundle (Inhalt von www/ auf Zip-Wurzel) — wird vom Updater nachgeladen & entpackt.
+          ( cd www && zip -qr ../www-bundle.zip . )
+          # Manifest mit der Version; konstante Namen → …/releases/latest/download/<asset> zeigt stets auf neu.
+          node -e "require('fs').writeFileSync('ota-manifest.json', JSON.stringify({version:'${{ steps.ver.outputs.version_name }}'})+'\n')"
+          ls -la www-bundle.zip ota-manifest.json
+
       - name: Android-Projekt erzeugen (Capacitor)
         run: npx cap add android
 
@@ -122,9 +131,12 @@ jobs:
           path: ${{ steps.apk.outputs.path }}
           if-no-files-found: error
 
-      - name: APK ans GitHub-Release hängen (nur bei Release)
+      - name: APK + OTA-Bundle ans GitHub-Release hängen (nur bei Release)
         if: github.event_name == 'release'
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ github.event.release.tag_name }}
-          files: ${{ steps.apk.outputs.path }}
+          files: |
+            ${{ steps.apk.outputs.path }}
+            www-bundle.zip
+            ota-manifest.json

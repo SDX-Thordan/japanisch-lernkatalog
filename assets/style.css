@@ -559,6 +559,13 @@ table.conj-table tbody tr:last-child th, table.conj-table tbody tr:last-child td
 .v-bsp-inline .ja { font-family: var(--font-ja-sans); color: var(--ink); }
 .v-bsp-inline .v-note { color: var(--indigo); }
 
+/* OTA-Update-Banner (nur Android) — oben über der App, schließbar. */
+.ota-bar { display: flex; align-items: center; gap: .7rem; flex-wrap: wrap;
+  background: var(--accent); color: #fff; padding: .55rem .9rem; font-size: .92rem; }
+.ota-bar .ota-msg { flex: 1; }
+.ota-bar .ota-go { flex: 0 0 auto; }
+.ota-bar .ota-x { background: transparent; border: 0; color: #fff; font-size: 1rem; cursor: pointer; padding: .2rem .4rem; }
+
 /* Erweiterte Bedeutung (Beispielsatz) — verdeckt, klappt per Klick auf die Zeile auf (wie Grammatik). */
 [data-ext] { cursor: pointer; }
 .v-more { display: inline-block; margin-left: .4rem; color: var(--accent); font-weight: 700; transition: transform .15s; transform: rotate(0deg); }

@@ -934,6 +934,20 @@
           if(msg)msg.textContent=res.ok?'✓ Fortschritt importiert (zusammengeführt).':'✗ Datei ungültig oder falsche Version.'; draw(); }; r.readAsText(f); }); }
     const rst=document.getElementById('f-reset'); if(rst)rst.addEventListener('click',()=>{
       if(window.confirm('Wirklich den gesamten Fortschritt löschen? Tipp: vorher exportieren.')){ window.SRS.reset(); const msg=document.getElementById('f-msg'); if(msg)msg.textContent='Fortschritt zurückgesetzt.'; draw(); } });
+    // App-Update (OTA): nur in der nativen App aktiv; im Browser Hinweis auf Auto-Update.
+    const upd=document.getElementById('f-update-check'), umsg=document.getElementById('f-update-msg');
+    if(upd){
+      if(!(window.OTA&&window.OTA.isNative&&window.OTA.isNative())){
+        upd.disabled=true; if(umsg)umsg.textContent='In dieser (Web-)Version aktualisiert sich die App automatisch beim Neuladen.';
+      } else {
+        upd.addEventListener('click',()=>{ if(umsg)umsg.textContent='Suche nach Updates …';
+          window.OTA.check().then(av=>{
+            if(!av){ if(umsg)umsg.textContent='Du hast bereits die neueste Version.'; return; }
+            const st=window.OTA.state(); if(umsg)umsg.textContent='Update auf v'+(st.version||'')+' wird geladen …';
+            return window.OTA.applyUpdate().catch(e=>{ if(umsg)umsg.textContent='Update fehlgeschlagen: '+(e&&e.message||e); });
+          }).catch(()=>{ if(umsg)umsg.textContent='Update-Prüfung fehlgeschlagen (offline?).'; }); });
+      }
+    }
   }
 
   /* ============================================================  SCHREIBEN (Kanji-Schreibübung)  */
@@ -1230,6 +1244,27 @@
     f.appendChild(el('span','app-version','Version v'+esc(v)));
   }
 
+  /* ---------- OTA-Update-Hinweis (nur Android; im Web No-Op, da window.OTA dort inaktiv) ----------
+     Zeigt einen schließbaren Banner „Update verfügbar" mit Button; angewendet wird nur auf Klick. */
+  function initOTA(){
+    if(!window.OTA||!document.body)return;
+    function render(st){
+      let bar=document.getElementById('ota-bar');
+      if(!st.available){ if(bar)bar.remove(); return; }
+      if(!bar){
+        bar=el('div','ota-bar'); bar.id='ota-bar';
+        document.body.insertBefore(bar,document.body.firstChild);
+      }
+      bar.innerHTML='<span class="ota-msg">Update auf <b>v'+esc(st.version||'')+'</b> verfügbar.</span>'+
+        '<button class="btn-primary ota-go" type="button">'+(st.busy?'Wird geladen …':'Jetzt aktualisieren')+'</button>'+
+        '<button class="ota-x" type="button" aria-label="Später">✕</button>';
+      const go=bar.querySelector('.ota-go'); if(go){ go.disabled=!!st.busy;
+        go.addEventListener('click',()=>{ window.OTA.applyUpdate().catch(()=>{}); }); }
+      const x=bar.querySelector('.ota-x'); if(x)x.addEventListener('click',()=>bar.remove());
+    }
+    window.OTA.onChange(render);
+  }
+
   /* ============================================================  INIT  */
   function init(){
     const page=document.body.dataset.page;
@@ -1253,7 +1288,7 @@
     if(page==='schreiben')initSchreiben();
     if(page==='listen')initListen();
     if(page==='lernpfad')initLernpfad();
-    initSearch(); initToggles();
+    initSearch(); initToggles(); initOTA();
   }
   /* ---------- geteilte Helfer für die neuen Module (srs.js, exercises.js, kanji-write.js) ----------
      Additiv: macht die intern definierten Helfer nutzbar, ohne sie zu duplizieren.

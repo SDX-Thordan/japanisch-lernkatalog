@@ -18,9 +18,12 @@
     "@capacitor/android": "^6.1.2",
     "@capacitor/assets": "^3.0.5",
     "@capacitor/cli": "^6.1.2",
-    "@capacitor/core": "^6.1.2",
     "@playwright/test": "^1.48.0",
     "jsdom": "^25.0.1",
     "vitest": "^2.1.4"
+  },
+  "dependencies": {
+    "@capacitor/core": "^6.2.1",
+    "@capgo/capacitor-updater": "^6.45.10"
   }
 }
