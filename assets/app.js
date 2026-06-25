@@ -294,22 +294,29 @@
     });
     buildChips(Object.keys(byLesson).map(Number).sort((a,b)=>a-b), L=>'L'+L);
     buildTypeChips();
-    if(listsOn){ content.addEventListener('click',e=>{
-      const a=e.target.closest('.v-add'); if(a){ e.stopPropagation(); openListPicker([a.dataset.vid],a.dataset.word); return; }
-      const al=e.target.closest('.v-add-lesson'); if(al){ const L=+al.dataset.lesson; const ids=(window.VOKABULAR||[]).filter(v=>v.lesson===L).map(v=>'v:'+v.kana+'|'+v.lesson); openListPicker(ids,'Lektion '+L); return; }
-    }); }
+    content.addEventListener('click',e=>{
+      if(listsOn){
+        const a=e.target.closest('.v-add'); if(a){ e.stopPropagation(); openListPicker([a.dataset.vid],a.dataset.word); return; }
+        const al=e.target.closest('.v-add-lesson'); if(al){ const L=+al.dataset.lesson; const ids=(window.VOKABULAR||[]).filter(v=>v.lesson===L).map(v=>'v:'+v.kana+'|'+v.lesson); openListPicker(ids,'Lektion '+L); return; }
+      }
+      // Klick auf die Zeile klappt die erweiterte Bedeutung (Beispiel) auf/zu.
+      const row=e.target.closest('tr.item'); if(row&&row.dataset.ext)row.classList.toggle('expanded');
+    });
   }
   function vocabRow(w,listsOn){
     const written=(w.kanji&&w.kanji.length)?w.kanji:w.kana;
     const showKana=(w.kanji&&w.kanji.length&&w.kanji!==w.kana);
     const tr=el('tr','item'); tr.dataset.filter=String(w.lesson);
     tr.dataset.type=vocabType(w.pos);
-    tr.dataset.search=norm([w.kanji,w.kana,w.romaji,w.de,w.pos].join(' '));
     const bsp=(window.VOKABULAR_BEISPIELE||{})[w.kana+'|'+w.lesson];
+    tr.dataset.search=norm([w.kanji,w.kana,w.romaji,w.de,w.pos,(bsp?bsp.jp+' '+bsp.de+' '+(bsp.note||''):'')].join(' '));
+    // Erweiterte Bedeutung (Beispielsatz + Notiz) ist verdeckt und klappt per Klick auf die Zeile auf (wie Grammatik).
+    if(bsp)tr.dataset.ext='1';
+    const ext=bsp?'<span class="v-more" aria-hidden="true" title="Beispiel anzeigen">›</span>'+
+      '<div class="v-ext"><div class="v-bsp-inline"><span class="ja">'+esc(bsp.jp)+'</span> — '+esc(bsp.de)+(bsp.note?'<span class="v-note"> · '+esc(bsp.note)+'</span>':'')+'</div></div>':'';
     tr.innerHTML='<td class="vocab-jp">'+scoreBadgeHtml('v:'+w.kana+'|'+w.lesson)+esc(written)+'</td><td>'+
       (showKana?'<span class="vocab-reading">'+esc(w.kana)+'</span>':'')+'</td>'+
-      '<td class="de hideable">'+esc(w.de)+
-        (bsp?'<div class="v-bsp-inline"><span class="ja">'+esc(bsp.jp)+'</span> — '+esc(bsp.de)+(bsp.note?'<span class="v-note"> · '+esc(bsp.note)+'</span>':'')+'</div>':'')+
+      '<td class="de hideable">'+esc(w.de)+ext+
       '</td><td><span class="pos">'+esc(w.pos)+'</span></td>'+
       (listsOn?'<td class="vocab-add"><button class="v-add" type="button" title="Zu Liste hinzufügen" data-vid="v:'+esc(w.kana)+'|'+w.lesson+'" data-word="'+esc(written)+'">＋</button></td>':'');
     return tr;
@@ -1146,7 +1153,12 @@
     function buildItems(box,l,items){
       box.innerHTML='';
       items.forEach(o=>{ const row=el('div','lst-item');
-        row.innerHTML='<span class="lst-jp ja">'+vocabFront(o.data)+'</span><span class="lst-de">'+esc(o.data.de)+'</span>';
+        const bsp=(window.VOKABULAR_BEISPIELE||{})[o.data.kana+'|'+o.data.lesson];
+        // Erweiterte Bedeutung (Beispiel + Notiz) klappt per Klick auf die Zeile auf.
+        const ext=bsp?'<span class="v-more" aria-hidden="true" title="Beispiel anzeigen">›</span>'+
+          '<div class="v-ext"><div class="v-bsp-inline"><span class="ja">'+esc(bsp.jp)+'</span> — '+esc(bsp.de)+(bsp.note?'<span class="v-note"> · '+esc(bsp.note)+'</span>':'')+'</div></div>':'';
+        row.innerHTML='<span class="lst-jp ja">'+vocabFront(o.data)+'</span><span class="lst-de">'+esc(o.data.de)+ext+'</span>';
+        if(bsp){ row.dataset.ext='1'; row.addEventListener('click',e=>{ if(e.target.closest('.lst-rm'))return; row.classList.toggle('expanded'); }); }
         const rm=el('button','lst-rm','<span class="msi" aria-hidden="true">close</span>'); rm.type='button'; rm.title='Aus Liste entfernen';
         rm.addEventListener('click',()=>{ window.SRS.removeFromList(l.id,[o.id]); draw(); });
         row.appendChild(rm); box.appendChild(row); });

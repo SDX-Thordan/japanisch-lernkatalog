@@ -558,6 +558,13 @@ table.conj-table tbody tr:last-child th, table.conj-table tbody tr:last-child td
 .v-bsp-inline { font-size: .82rem; color: var(--muted); margin-top: .25rem; }
 .v-bsp-inline .ja { font-family: var(--font-ja-sans); color: var(--ink); }
 .v-bsp-inline .v-note { color: var(--indigo); }
+
+/* Erweiterte Bedeutung (Beispielsatz) — verdeckt, klappt per Klick auf die Zeile auf (wie Grammatik). */
+[data-ext] { cursor: pointer; }
+.v-more { display: inline-block; margin-left: .4rem; color: var(--accent); font-weight: 700; transition: transform .15s; transform: rotate(0deg); }
+[data-ext].expanded .v-more { transform: rotate(90deg); }
+.v-ext { max-height: 0; overflow: hidden; opacity: 0; transition: max-height .18s ease, opacity .18s ease; }
+[data-ext].expanded .v-ext, body.searching [data-ext] .v-ext { max-height: 12rem; opacity: 1; }
 .tr-back .readings { margin: .4rem 0; }
 .tr-back .kc-examples { border-top: 1px dashed var(--border); padding-top: .5rem; margin-top: .5rem; display: flex; flex-direction: column; gap: .3rem; }
 .tr-back .ex { font-size: .92rem; display: flex; flex-wrap: wrap; gap: .35rem; }

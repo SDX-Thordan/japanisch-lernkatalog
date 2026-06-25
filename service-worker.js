@@ -6,7 +6,7 @@
    - Übrige statische Assets (JS/CSS/Daten/Font/KanjiVG-SVG): CACHE-FIRST (schnell, offline).
    Cache-Version bei inhaltlichen Änderungen erhöhen. */
 'use strict';
-var CACHE = 'katalog-v11';
+var CACHE = 'katalog-v12';
 
 var ASSETS = [
   './', 'index.html', 'heute.html', 'lernpfad.html', 'listen.html', 'grammatik.html', 'vokabular.html', 'kanji.html',
