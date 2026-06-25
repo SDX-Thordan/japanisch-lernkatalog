@@ -1,5 +1,11 @@
 {
   "appId": "de.thordan.japanischkatalog",
   "appName": "Go! Nihongo",
-  "webDir": "www"
+  "webDir": "www",
+  "plugins": {
+    "CapacitorUpdater": {
+      "autoUpdate": false,
+      "appReadyTimeout": 10000
+    }
+  }
 }
