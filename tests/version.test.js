@@ -1,5 +1,5 @@
-// Versionsquelle: assets/version.js (window.APP_VERSION) muss zu package.json.version passen.
-// Verhindert Drift zwischen Footer-Anzeige, PWA und Android-versionName.
+// Versionsquelle: assets/version.js (self.APP_VERSION; self===window im Browser) muss zu
+// package.json.version passen. Verhindert Drift zwischen Footer, PWA und Android-versionName.
 import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { repoPath } from './helpers/load.js';
@@ -20,8 +20,7 @@ describe('Versionsquelle', () => {
     expect(versionJsValue()).toBe(v);
   });
 
-  it('window.APP_VERSION ist im Browser-Kontext gesetzt', () => {
-    // version.js ist eine reine window-Zuweisung; in jsdom über loadScripts prüfbar.
+  it('APP_VERSION ist gesetzt (self.APP_VERSION, im Browser = window.APP_VERSION)', () => {
     expect(versionJsValue()).toBeTruthy();
   });
 });
