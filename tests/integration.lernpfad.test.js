@@ -28,10 +28,10 @@ function click(elm) { elm.dispatchEvent(new win.Event('click', { bubbles: true }
 function cards() { return [...win.document.querySelectorAll('.lp-card')]; }
 
 describe('Lernpfad-Seite', () => {
-  it('rendert 20 Lektionskarten; L1 offen, L2 gesperrt', () => {
+  it('rendert 25 Lektionskarten; L1 offen, L2 gesperrt', () => {
     // init() hat beim Laden bereits mit dem Default-Store gezeichnet (L1 frei, Rest gesperrt).
     const c = cards();
-    expect(c.length).toBe(20);
+    expect(c.length).toBe(25);
     expect(c[0].classList.contains('lp-locked')).toBe(false);
     expect(c[1].classList.contains('lp-locked')).toBe(true);
     // L1 hat einen „Lektion lernen"-Link.

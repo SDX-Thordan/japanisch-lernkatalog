@@ -21,7 +21,7 @@
   var WRITE_LEVEL_REPS = 2;    // ab diesem Erkennungs-Level müssen Kanji zusätzlich geschrieben werden
   var LESSON_TEST_PASS = 0.8;  // Bestehensgrenze des Lektionstests
   var LESSON_TEST_N = 10;      // Aufgaben pro Lektionstest
-  var MAX_GATED_LESSON = 20;   // L21–25 bleiben „Vorschau" (nicht ins Gating)
+  var MAX_GATED_LESSON = 25;   // Lernpfad umfasst alle Lektionen L1–25
   // Kanji-Stufe → Test-Lektion (Default: letzte Lektion des jeweiligen Stufenblocks)
   var KANJI_LEVEL_LESSON = { 'A1.2': 6, 'A1.3': 9, 'A1.4': 12, 'A1.5': 14, 'A1.6': 17, 'A1.7': 20 };
 
@@ -188,18 +188,15 @@
   }
 
   /* ---------- Registries aus den Daten ---------- */
-  function registry(source, includePreview) {
+  // Alle Lektionen sind aktiv (L1–25); kein Vorschau-Filter mehr.
+  function registry(source) {
     var out = [];
     if (source === 'kanji') {
       (window.KANJI || []).forEach(function (k) { out.push({ id: srsId('kanji', k), type: 'kanji', data: k }); });
     } else if (source === 'vocab') {
-      (window.VOKABULAR || []).forEach(function (v) {
-        if (includePreview || v.lesson <= 20) out.push({ id: srsId('vocab', v), type: 'vocab', data: v });
-      });
+      (window.VOKABULAR || []).forEach(function (v) { out.push({ id: srsId('vocab', v), type: 'vocab', data: v }); });
     } else if (source === 'grammar') {
-      (window.GRAMMATIK || []).forEach(function (g) {
-        if (includePreview || g.lesson <= 20) out.push({ id: srsId('grammar', g), type: 'grammar', data: g });
-      });
+      (window.GRAMMATIK || []).forEach(function (g) { out.push({ id: srsId('grammar', g), type: 'grammar', data: g }); });
     }
     return out;
   }
@@ -211,11 +208,10 @@
     var newLimit = opts.newLimit != null ? opts.newLimit : 5;
     var reviewLimit = opts.reviewLimit != null ? opts.reviewLimit : 15;
     var today = opts.today || todayISO();
-    var includePreview = !!opts.includePreview;
     var maxLesson = opts.maxLesson;
 
     var all = [];
-    sources.forEach(function (s) { all = all.concat(registry(s, includePreview)); });
+    sources.forEach(function (s) { all = all.concat(registry(s)); });
 
     // Gating: nur Items aus freigeschalteten Lektionen (Default: kein Limit → rückwärtskompatibel).
     if (maxLesson != null) {

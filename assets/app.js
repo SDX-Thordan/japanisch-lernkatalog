@@ -153,7 +153,7 @@
   function vocabRow(w){
     const written=(w.kanji&&w.kanji.length)?w.kanji:w.kana;
     const showKana=(w.kanji&&w.kanji.length&&w.kanji!==w.kana);
-    const tr=el('tr','item'); tr.dataset.filter=String(w.lesson); tr.dataset.preview=w.lesson>20?'1':'0';
+    const tr=el('tr','item'); tr.dataset.filter=String(w.lesson);
     tr.dataset.type=vocabType(w.pos);
     tr.dataset.search=norm([w.kanji,w.kana,w.romaji,w.de,w.pos].join(' '));
     tr.innerHTML='<td class="vocab-jp">'+esc(written)+'</td><td>'+
@@ -200,7 +200,7 @@
     const ex=all.map(b=>'<li><span class="ex-jp">'+furiToRuby(b.jp)+'</span>'+
       (b.de?'<span class="ex-trans hideable">'+esc(b.de)+'</span>':'')+'</li>').join('');
     const drillable=all.filter(b=>b.jp&&b.de);
-    const card=el('article','gp item collapsible collapsed'); card.dataset.filter=String(L); card.dataset.preview=L>20?'1':'0';
+    const card=el('article','gp item collapsible collapsed'); card.dataset.filter=String(L);
     card.dataset.search=norm([g.pattern,g.title,g.bildung,g.erklaerung,all.map(b=>b.jp+' '+(b.r||'')+' '+b.de).join(' ')].join(' '));
     card.innerHTML=
       '<div class="gp-head card-toggle"><span class="gp-pattern">'+esc(g.pattern)+'</span>'+
@@ -417,7 +417,7 @@
         '</th><td class="ja">'+rubyPair(disp[key],kana[key])+'</td></tr>';
     }).join('');
     const gname={1:'Gruppe I',2:'Gruppe II',3:'Gruppe III'}[g];
-    const card=el('article','verb-card item collapsible collapsed'); card.dataset.filter=String(g); card.dataset.preview=v.lesson>20?'1':'0';
+    const card=el('article','verb-card item collapsible collapsed'); card.dataset.filter=String(g);
     card.dataset.search=norm([v.kana,v.kanji,v.romaji,v.de,Object.keys(kana).map(k=>kana[k]+' '+kanaToRomaji(kana[k])).join(' ')].join(' '));
     card.innerHTML=
       '<div class="vc-head card-toggle"><span class="vc-dict ja">'+rubyPair(disp.dict,kana.dict)+'</span>'+
@@ -435,7 +435,7 @@
   }
   function buildChips(values,labelFn){
     const box=document.getElementById('filters'); if(!box)return;
-    const mk=(val,label)=>{ const prev=(val!=='all'&&!isNaN(+val)&&+val>20); const c=el('button','chip'+(val==='all'?' on':'')+(prev?' chip-preview':'')); c.textContent=label; c.dataset.val=val;
+    const mk=(val,label)=>{ const c=el('button','chip'+(val==='all'?' on':'')); c.textContent=label; c.dataset.val=val;
       c.addEventListener('click',()=>{ activeFilter=val; box.querySelectorAll('.chip').forEach(x=>x.classList.toggle('on',x.dataset.val===val)); applyFilter(); }); return c; };
     box.appendChild(mk('all','Alle'));
     values.forEach(v=>box.appendChild(mk(String(v),labelFn(v))));
@@ -450,12 +450,10 @@
   }
   function applyFilter(){
     const q=norm(query.trim()); let shown=0;
-    const previewOn=document.body.classList.contains('show-preview');
     document.body.classList.toggle('searching',q.length>0);
     items.forEach(it=>{ const okF=activeFilter==='all'||it.dataset.filter===activeFilter; const okQ=!q||(it.dataset.search||'').indexOf(q)!==-1;
-      const okP=previewOn||it.dataset.preview!=='1';
       const okT=activeType==='all'||it.dataset.type===activeType;
-      const vis=okF&&okQ&&okP&&okT; it.classList.toggle('hidden',!vis); if(vis)shown++; });
+      const vis=okF&&okQ&&okT; it.classList.toggle('hidden',!vis); if(vis)shown++; });
     groups.forEach(g=>{ const n=g.querySelectorAll('.item:not(.hidden)').length; g.classList.toggle('hidden',n===0);
       const gc=g.querySelector('.gcount'); if(gc)gc.textContent=n; });
     const c=document.getElementById('count'); if(c)c.textContent='Zeige '+shown+' von '+items.length+' Einträgen';
@@ -479,11 +477,6 @@
     const cBtn=document.getElementById('toggle-cards'); setPressed(cBtn,cardsOn);
     if(cBtn)cBtn.addEventListener('click',()=>{ const on=body.classList.toggle('cards-mode'); setPressed(cBtn,on); lsSet('katalog_cards',on?'on':'off');
       if(on)document.querySelectorAll('.hideable.revealed').forEach(e=>e.classList.remove('revealed')); });
-    // Vorschau L21–25 (Standard: AUS) — applyFilter() läuft VOR dem Speichern, falls localStorage blockiert ist
-    const previewOn=lsGet('katalog_preview')==='on';
-    body.classList.toggle('show-preview',previewOn);
-    const pBtn=document.getElementById('toggle-preview'); setPressed(pBtn,previewOn);
-    if(pBtn)pBtn.addEventListener('click',()=>{ const on=body.classList.toggle('show-preview'); setPressed(pBtn,on); applyFilter(); lsSet('katalog_preview',on?'on':'off'); });
     document.addEventListener('click',e=>{ if(!body.classList.contains('cards-mode'))return; const h=e.target.closest('.hideable'); if(h)h.classList.toggle('revealed'); });
     applyFilter();
   }
@@ -499,10 +492,10 @@
     if(!cardBox)return;
     let deck=[], total=0;
     const on=id=>{ const e=document.getElementById(id); return e?e.checked:true; };
-    function pool(){ const p=[]; const prev=document.body.classList.contains('show-preview');
+    function pool(){ const p=[];
       if(on('src-kanji'))(window.KANJI||[]).forEach(k=>p.push({t:'kanji',d:k}));
-      if(on('src-vocab'))(window.VOKABULAR||[]).forEach(v=>{ if(prev||v.lesson<=20)p.push({t:'vocab',d:v}); });
-      if(on('src-grammar'))(window.GRAMMATIK||[]).forEach(g=>{ if(prev||g.lesson<=20)p.push({t:'grammar',d:g}); });
+      if(on('src-vocab'))(window.VOKABULAR||[]).forEach(v=>p.push({t:'vocab',d:v}));
+      if(on('src-grammar'))(window.GRAMMATIK||[]).forEach(g=>p.push({t:'grammar',d:g}));
       return p; }
     function start(){ const p=pool(); deck=p.length?shuffle(p.slice()).slice(0,10):[]; total=deck.length;
       done.classList.add('hidden'); cardBox.classList.remove('hidden'); render(); }
@@ -564,10 +557,9 @@
     function lessonOf(c){ return c.type==='kanji'?window.SRS.kanjiLessonOf(c.data.level):c.data.lesson; }
     function refreshStats(){ const s=window.SRS.stats(); setText('h-streak',s.streakDays); setText('h-due',s.due); setText('h-learned',s.learned); }
     function start(){
-      const previewOn=document.body.classList.contains('show-preview');
       // Gating: nur freigeschaltete Lektionen; mit ?lesson=L gezielt eine Lektion lernen.
       const maxLesson=onlyLesson!=null?onlyLesson:window.SRS.maxUnlockedLesson();
-      deck=window.SRS.buildQueue({sources:['kanji','vocab','grammar'],newLimit:clampInt('h-newlimit',5),reviewLimit:clampInt('h-revlimit',15),includePreview:previewOn,maxLesson:maxLesson});
+      deck=window.SRS.buildQueue({sources:['kanji','vocab','grammar'],newLimit:clampInt('h-newlimit',5),reviewLimit:clampInt('h-revlimit',15),maxLesson:maxLesson});
       if(onlyLesson!=null)deck=deck.filter(c=>lessonOf(c)===onlyLesson);
       total=deck.length; setup.classList.add('hidden'); done.classList.add('hidden'); stage.classList.remove('hidden'); render();
     }
@@ -650,7 +642,7 @@
       // Lernpfad-Fortschritt: Status + Kern-Fortschritt + Test-Score je Lektion.
       const lp=document.getElementById('f-lessons');
       if(lp){ let html='';
-        for(let L=1;L<=20;L++){ const st=window.SRS.lessonState(L);
+        for(let L=1;L<=25;L++){ const st=window.SRS.lessonState(L);
           const cls=st.testPassed?'lp-done':(st.unlocked?'lp-open':'lp-locked');
           const pct=Math.round(st.coreProgress.fraction*100);
           html+='<div class="lp-bar '+cls+'" title="Lektion '+L+' — beherrscht '+st.coreProgress.mastered+'/'+st.coreProgress.total+(st.testPassed?(', Test '+Math.round(st.bestScore*100)+'%'):'')+'">'+
@@ -700,7 +692,7 @@
     }
     function draw(){
       const grid=el('div','lp-grid');
-      for(let L=1;L<=20;L++)grid.appendChild(lessonCard(L));
+      for(let L=1;L<=25;L++)grid.appendChild(lessonCard(L));
       root.innerHTML=''; root.appendChild(grid);
     }
     function ensureOverlay(){

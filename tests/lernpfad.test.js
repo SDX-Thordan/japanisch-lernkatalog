@@ -102,8 +102,8 @@ describe('Freischalten: Kern beherrschen + Test bestehen', () => {
 
   it('unlockAll öffnet alle Lektionen des Pfads', () => {
     SRS.unlockAll();
-    expect(SRS.lessonState(20).unlocked).toBe(true);
-    expect(SRS.maxUnlockedLesson()).toBe(20);
+    expect(SRS.lessonState(25).unlocked).toBe(true);
+    expect(SRS.maxUnlockedLesson()).toBe(25);
   });
 });
 
