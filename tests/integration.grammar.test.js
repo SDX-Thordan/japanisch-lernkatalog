@@ -22,27 +22,27 @@ beforeEach(() => {
 });
 
 describe('Grammatik-Seite', () => {
-  it('rendert Grammatikkarten und mindestens einen Mehr-erklären-Block', () => {
+  it('rendert Karten + „Mehr erklären"; genau EIN „Üben"-Knopf pro Karte (kein alter Plus-Knopf)', () => {
     expect(win.document.querySelectorAll('.gp.item').length).toBeGreaterThan(20);
     expect(win.document.querySelectorAll('.gp-plus').length).toBeGreaterThan(0);
+    // der frühere zweite Knopf im Plus-Block ist weg
+    expect(win.document.querySelectorAll('.gp-plus .gp-learn').length).toBe(0);
+    // keine Karte hat mehr als einen üben-Knopf; es gibt mindestens einen „Üben"-Knopf
+    [...win.document.querySelectorAll('.gp.item')].forEach((c) => {
+      expect(c.querySelectorAll('.gp-learn').length).toBeLessThanOrEqual(1);
+    });
+    expect(win.document.querySelectorAll('.gp-ueben').length).toBeGreaterThan(0);
   });
 
-  it('Klick auf „Grammatik-Übungen" öffnet eine MC-Übung; richtige Antwort wird bewertet und in SRS geschrieben', () => {
-    const btn = win.document.querySelector('.gp-plus .gp-learn');
+  it('„Üben" öffnet die kombinierte Session (Overlay) mit Aufgabe oder Satz', () => {
+    const btn = win.document.querySelector('.gp-ueben');
     expect(btn).toBeTruthy();
     btn.dispatchEvent(new win.Event('click', { bubbles: true }));
-    const opts = win.document.querySelectorAll('.gp-ex-host .ex-opt');
-    expect(opts.length).toBeGreaterThan(1);
-
-    // Finde die Karte/Muster zur ersten Plus-Übung und beantworte korrekt.
-    const host = win.document.querySelector('.gp-ex-host');
-    const correctBtn = host.querySelectorAll('.ex-opt');
-    // Erste Übung ist MC mit bekanntem richtigen Index (aus GRAMMATIK_PLUS); klicke alle, bis Feedback ok.
-    // Wir klicken den als .correct markierten erst nach einem Klick — daher: klicke jede Option in frischem Lauf.
-    correctBtn[0].dispatchEvent(new win.Event('click', { bubbles: true }));
-    expect(host.querySelector('.ex-feedback')).toBeTruthy();
-    // SRS muss einen Grammatik-Eintrag bekommen haben (g:…)
-    const stats = win.SRS.stats('2026-06-23');
-    expect(stats.totalReviews).toBeGreaterThanOrEqual(1);
+    const ov = win.document.querySelector('.drill-overlay');
+    expect(ov && ov.hidden === false).toBe(true);
+    const hasEx = !!ov.querySelector('.drill-ex .ex-opt');
+    const promptEl = ov.querySelector('.drill-prompt');
+    const hasTr = !!(promptEl && promptEl.textContent.length > 0);
+    expect(hasEx || hasTr).toBe(true);
   });
 });

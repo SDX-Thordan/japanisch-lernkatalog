@@ -2,7 +2,7 @@
    Cacht App-Shell, Daten und KanjiVG-SVGs, damit die App (auch als PWA) offline läuft.
    Cache-Version bei inhaltlichen Änderungen erhöhen. */
 'use strict';
-var CACHE = 'katalog-v6';
+var CACHE = 'katalog-v7';
 
 var ASSETS = [
   './', 'index.html', 'heute.html', 'lernpfad.html', 'listen.html', 'grammatik.html', 'vokabular.html', 'kanji.html',

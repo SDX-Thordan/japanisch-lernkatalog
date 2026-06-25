@@ -604,6 +604,8 @@ body.drill-open { overflow: hidden; }
 .drill-dir .ja { font-family: var(--font-ja-sans); }
 .drill-prog { color: var(--muted); font-size: .85rem; font-weight: 700; white-space: nowrap; }
 .drill-card { min-height: 200px; display: flex; flex-direction: column; }
+.drill-ex { padding: .4rem 0 .2rem; }
+.drill-ex .drill-ex-next { margin-top: 1.1rem; }
 .drill-prompt-lbl, .drill-answer-lbl {
   font-size: .74rem; text-transform: uppercase; letter-spacing: .05em;
   color: var(--faint); font-weight: 700; margin-bottom: .35rem;

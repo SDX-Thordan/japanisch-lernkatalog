@@ -363,15 +363,17 @@
       (g.erklaerung?'<p class="gp-erk">'+esc(g.erklaerung)+'</p>':'')+
       (ex?'<ul class="gp-ex">'+ex+'</ul>':'')+
       '</div>';
-    if(drillable.length){
-      const btn=el('button','gp-learn','<span class="msi" aria-hidden="true">play_arrow</span> Diese Grammatik üben '+
-        '<span class="gp-learn-n">'+drillable.length+' Sätze · beide Richtungen</span>');
-      btn.type='button';
-      btn.addEventListener('click',()=>openGrammarDrill(g,drillable));
-      card.querySelector('.collapse-body').appendChild(btn);
-    }
     const plus=(window.GRAMMATIK_PLUS||{})[g.pattern];
     if(plus)card.querySelector('.collapse-body').appendChild(grammarPlusBlock(g,plus));
+    // EIN „Üben"-Knopf: kombiniert Aufgaben (inkl. generierte て/た/ない) + Satz-Übersetzungen.
+    const hasEx=!!VERB_FORM_PATTERNS[g.pattern]||!!(plus&&plus.uebungen&&plus.uebungen.length);
+    if((drillable.length||hasEx)&&window.Exercises){
+      const hint=(hasEx&&drillable.length)?'Aufgaben & Sätze':(hasEx?'Aufgaben':drillable.length+' Sätze · beide Richtungen');
+      const btn=el('button','gp-learn gp-ueben','<span class="msi" aria-hidden="true">play_arrow</span> Üben <span class="gp-learn-n">'+hint+'</span>');
+      btn.type='button';
+      btn.addEventListener('click',()=>openGrammarPractice(g));
+      card.querySelector('.collapse-body').appendChild(btn);
+    }
     return card;
   }
   // Additiver „Mehr erklären"-Block + Übungen (window.Exercises) für Muster mit GRAMMATIK_PLUS.
@@ -388,31 +390,16 @@
       plus.kontrast.forEach(k=>ul.appendChild(el('li',null,'<span class="ja">'+esc(k.a)+'</span> ↔ <span class="ja">'+esc(k.b)+'</span> — '+esc(k.note))));
       wrap.appendChild(ul);
     }
-    if(plus.uebungen&&plus.uebungen.length&&window.Exercises){
-      const btn=el('button','gp-learn','<span class="msi" aria-hidden="true">play_arrow</span> Grammatik-Übungen <span class="gp-learn-n">'+plus.uebungen.length+' Aufgaben</span>'); btn.type='button';
-      const host=el('div','gp-ex-host hidden');
-      btn.addEventListener('click',()=>{ host.classList.toggle('hidden');
-        if(!host.dataset.built){ buildPlusExercises(host,g.pattern,plus.uebungen); host.dataset.built='1'; } });
-      wrap.appendChild(btn); wrap.appendChild(host);
-    }
+    // Übungen werden nicht mehr hier gestartet, sondern über den EINEN „Üben"-Knopf der Karte
+    // (kombinierte Session: Aufgaben + Satz-Übersetzungen). Dieser Block bleibt rein erklärend.
     return wrap;
   }
-  function buildPlusExercises(host,pattern,uebungen){
-    // Verb-Form-Muster (て/た/ない): immer neue, aus echten Verben generierte Aufgaben statt der
-    // zwei statisch eingetippten. Fällt auf die statischen zurück, falls keine Verben verfügbar.
+  // Aufgaben zu einem Grammatik-Muster: für Verb-Formen (て/た/ない) aus echten Verben generiert,
+  // sonst die statischen GRAMMATIK_PLUS-Übungen. Liefert ein Array Exercises-kompatibler Objekte.
+  function structuredExercises(pattern,plus){
     const form=VERB_FORM_PATTERNS[pattern];
-    const gen=form?genVerbFormExercises(form,Math.max(6,(uebungen||[]).length)):null;
-    const list=(gen&&gen.length)?gen:(uebungen||[]);
-    let i=0; const stage=el('div','gp-ex-stage'); host.appendChild(stage);
-    function show(){
-      if(i>=list.length){ stage.innerHTML='<div class="gp-ex-done">✓ Alle Übungen erledigt.</div>'; return; }
-      const ex=Object.assign({},list[i],{srsId:'g:'+pattern});
-      window.Exercises.renderExercise(ex,stage,{ onResult:()=>{
-        const nx=el('button','btn btn-next gp-ex-next','Weiter →'); nx.type='button';
-        nx.addEventListener('click',()=>{ i++; show(); }); stage.appendChild(nx);
-      }});
-    }
-    show();
+    if(form){ const gen=genVerbFormExercises(form,6); if(gen.length)return gen; }
+    return (plus&&plus.uebungen)?plus.uebungen.slice():[];
   }
 
   /* ============================================================
@@ -432,14 +419,17 @@
         '<div class="drill-stage">'+
           '<div class="drill-top"><span class="drill-dir"></span><span class="drill-prog"></span></div>'+
           '<div class="drill-card">'+
-            '<div class="drill-prompt-lbl"></div>'+
-            '<div class="drill-prompt"></div>'+
-            '<div class="drill-answer hidden"><div class="drill-answer-lbl"></div><div class="drill-answer-txt"></div></div>'+
-            '<div class="drill-controls">'+
-              '<button class="btn-primary drill-reveal" type="button">Aufdecken <span class="kbd">Leertaste</span></button>'+
-              '<button class="btn btn-again drill-again hidden" type="button"><span class="msi" aria-hidden="true">refresh</span> Nochmal</button>'+
-              '<button class="btn btn-next drill-next hidden" type="button">Weiter →</button>'+
+            '<div class="drill-tr">'+
+              '<div class="drill-prompt-lbl"></div>'+
+              '<div class="drill-prompt"></div>'+
+              '<div class="drill-answer hidden"><div class="drill-answer-lbl"></div><div class="drill-answer-txt"></div></div>'+
+              '<div class="drill-controls">'+
+                '<button class="btn-primary drill-reveal" type="button">Aufdecken <span class="kbd">Leertaste</span></button>'+
+                '<button class="btn btn-again drill-again hidden" type="button"><span class="msi" aria-hidden="true">refresh</span> Nochmal</button>'+
+                '<button class="btn btn-next drill-next hidden" type="button">Weiter →</button>'+
+              '</div>'+
             '</div>'+
+            '<div class="drill-ex hidden"></div>'+
           '</div>'+
           '<div class="drill-done hidden"></div>'+
         '</div>'+
@@ -447,10 +437,11 @@
     document.body.appendChild(ov);
     const q=s=>ov.querySelector(s);
     drill={ ov, pattern:q('.drill-pattern'), title:q('.drill-title'), dir:q('.drill-dir'), prog:q('.drill-prog'),
-      card:q('.drill-card'), promptLbl:q('.drill-prompt-lbl'), prompt:q('.drill-prompt'),
+      card:q('.drill-card'), trBox:q('.drill-tr'), exHost:q('.drill-ex'),
+      promptLbl:q('.drill-prompt-lbl'), prompt:q('.drill-prompt'),
       answer:q('.drill-answer'), answerLbl:q('.drill-answer-lbl'), answerTxt:q('.drill-answer-txt'),
       reveal:q('.drill-reveal'), again:q('.drill-again'), next:q('.drill-next'), done:q('.drill-done'),
-      close:q('.drill-close'), deck:[], allCards:[], total:0 };
+      close:q('.drill-close'), deck:[], total:0, build:null };
     drill.reveal.addEventListener('click',drillReveal);
     drill.next.addEventListener('click',drillNext);
     drill.again.addEventListener('click',drillAgain);
@@ -462,41 +453,78 @@
   function drillKey(e){
     if(!drill||drill.ov.hidden)return;
     if(e.key==='Escape'){ closeDrill(); return; }
-    if(e.code==='Space'){ e.preventDefault();
+    const cur=drill.deck[0];
+    if(e.code==='Space' && cur && cur.kind==='tr'){ e.preventDefault();
       if(!drill.answer.classList.contains('hidden'))drillNext();
       else if(!drill.reveal.classList.contains('hidden'))drillReveal(); }
   }
-  function openGrammarDrill(g,examples){
+  // Generische Übungs-Session: build() liefert ein frisches Deck aus
+  // {kind:'tr',dir,b} (Satz übersetzen) und/oder {kind:'ex',ex,srsId} (Aufgabe via Exercises).
+  function openPracticeSession(opts){
     const d=ensureDrillDom();
-    d.pattern.textContent=g.pattern||'';
-    d.title.textContent=g.title||'';
-    const cards=[];
-    examples.forEach(b=>{ cards.push({dir:'jp2de',b}); cards.push({dir:'de2jp',b}); });
-    d.allCards=cards.slice();
-    d.deck=shuffle(cards); d.total=d.deck.length;
+    d.pattern.textContent=opts.pattern||'';
+    d.title.textContent=opts.title||'';
+    d.build=opts.build;
+    d.deck=shuffle(d.build()); d.total=d.deck.length;
     d.ov.hidden=false; document.body.classList.add('drill-open');
     drillRender();
   }
+  // Eine Grammatik üben: Form-/MC-Aufgaben (inkl. generierte て/た/ない) + Satz-Übersetzungen.
+  function openGrammarPractice(g){
+    const plus=(window.GRAMMATIK_PLUS||{})[g.pattern]||{};
+    const extra=(window.GRAMMATIK_EXTRA&&window.GRAMMATIK_EXTRA[g.pattern])||[];
+    const all=(g.beispiele||[]).concat(extra);
+    const drillable=all.filter(b=>b.jp&&b.de);
+    openPracticeSession({ pattern:g.pattern, title:g.title, build:()=>{
+      const items=[];
+      structuredExercises(g.pattern,plus).forEach(ex=>items.push({kind:'ex',ex:ex,srsId:'g:'+g.pattern}));
+      drillable.forEach(b=>{ items.push({kind:'tr',dir:'jp2de',b:b}); items.push({kind:'tr',dir:'de2jp',b:b}); });
+      return items;
+    }});
+  }
+  // Verbformen-Runde (て・た・ない) aus echten Verben — vom Hub & der Verben-Seite aus aufrufbar.
+  function openVerbFormPractice(){
+    openPracticeSession({ pattern:'動詞', title:'Verbformen て・た・ない', build:()=>{
+      const items=[];
+      [['te','V て-Form',4],['ta','V た-Form',3],['nai','V ない-Form',3]].forEach(grp=>{
+        genVerbFormExercises(grp[0],grp[2]).forEach(ex=>items.push({kind:'ex',ex:ex,srsId:'g:'+grp[1]}));
+      });
+      return items;
+    }});
+  }
   function closeDrill(){ if(!drill)return; drill.ov.hidden=true; document.body.classList.remove('drill-open'); }
-  function drillRestart(){ const d=drill; d.deck=shuffle(d.allCards.slice()); d.total=d.deck.length; drillRender(); }
+  function drillRestart(){ const d=drill; d.deck=shuffle(d.build?d.build():[]); d.total=d.deck.length; drillRender(); }
   function drillRender(){
     const d=drill;
     if(!d.deck.length){
       d.card.classList.add('hidden'); d.done.classList.remove('hidden');
       d.dir.textContent=''; d.prog.textContent='';
       if(d.total){
-        d.done.innerHTML='<div class="drill-done-in">Geschafft!<br>Alle '+d.total+' Übersetzungen sitzen.</div>'+
-          '<button class="btn-primary drill-restart" type="button"><span class="msi" aria-hidden="true">refresh</span> Nochmal üben</button>';
+        d.done.innerHTML='<div class="drill-done-in">Geschafft!<br>'+d.total+' Aufgaben erledigt.</div>'+
+          '<button class="btn-primary drill-restart" type="button"><span class="msi" aria-hidden="true">refresh</span> Weiter üben</button>';
         d.done.querySelector('.drill-restart').addEventListener('click',drillRestart);
       } else {
-        d.done.innerHTML='<div class="drill-done-in">Für diesen Punkt gibt es noch keine Beispielsätze zum Üben.</div>';
+        d.done.innerHTML='<div class="drill-done-in">Für diesen Punkt gibt es noch nichts zum Üben.</div>';
       }
       return;
     }
     d.done.classList.add('hidden'); d.card.classList.remove('hidden');
     const learned=d.total-d.deck.length;
-    d.prog.textContent='Satz '+(learned+1)+' / '+d.total;
-    const c=d.deck[0], b=c.b;
+    d.prog.textContent='Aufgabe '+(learned+1)+' / '+d.total;
+    const c=d.deck[0];
+    if(c.kind==='ex'){
+      d.trBox.classList.add('hidden'); d.exHost.classList.remove('hidden'); d.exHost.innerHTML='';
+      d.dir.textContent='Aufgabe';
+      const ex=Object.assign({},c.ex,{srsId:c.srsId});
+      window.Exercises.renderExercise(ex,d.exHost,{ onResult:()=>{
+        const nx=el('button','btn-primary drill-ex-next','Weiter →'); nx.type='button';
+        nx.addEventListener('click',drillNext); d.exHost.appendChild(nx);
+      }});
+      return;
+    }
+    // kind 'tr' — Satz übersetzen (Aufdecken/Selbstkontrolle)
+    d.exHost.classList.add('hidden'); d.trBox.classList.remove('hidden');
+    const b=c.b;
     const jpHtml='<div class="drill-jp ja">'+furiToRuby(b.jp)+'</div>';
     const deHtml='<div class="drill-de">'+esc(b.de)+'</div>';
     if(c.dir==='jp2de'){
@@ -975,10 +1003,19 @@
     const a=el('a','btn-primary page-ueben page-schreiben','<span class="msi" aria-hidden="true">draw</span> Schreiben üben');
     a.href='schreiben.html'; host.appendChild(a);
   }
-  // Freies-Üben-Hub (ueben.html): Quelle wählen → Zufallskarten dieser Quelle.
+  // Freies-Üben-Hub (ueben.html): Quelle wählen → Karteikarten bzw. Verbform-Aufgaben.
   function initUeben(){
     const root=document.getElementById('ueben-root'); if(!root)return;
-    root.addEventListener('click',e=>{ const b=e.target.closest('[data-src]'); if(b)openFreePractice(b.dataset.src); });
+    root.addEventListener('click',e=>{ const b=e.target.closest('[data-src]'); if(!b)return;
+      if(b.dataset.src==='verbforms')openVerbFormPractice(); else openFreePractice(b.dataset.src); });
+  }
+  // Verben-Seite: „Formen üben"-Knopf (generierte て/た/ない-Runde) in die Toolbar.
+  function addVerbenFormButton(){
+    if(!window.Exercises)return;
+    const host=document.querySelector('.toolbar .toolbar-row')||document.querySelector('.toolbar');
+    if(!host)return;
+    const b=el('button','btn-primary page-ueben','<span class="msi" aria-hidden="true">play_arrow</span> Formen üben'); b.type='button';
+    b.addEventListener('click',openVerbFormPractice); host.appendChild(b);
   }
 
   /* ============================================================  LISTEN (persönliche Vokabellisten)  */
@@ -1101,6 +1138,7 @@
       applyFilter();
     }
     if(page==='kanji')addKanjiSchreibenButton();
+    if(page==='verben')addVerbenFormButton();
     if(page==='ueben')initUeben();
     if(page==='heute')initHeute();
     if(page==='profil')initProfil();
