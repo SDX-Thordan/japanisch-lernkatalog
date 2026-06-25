@@ -54,28 +54,37 @@
   /* ---------- Material-Icon (selbst gehostete Outlined-Font, Ligaturen, offline) ---------- */
   function icon(name){ return '<span class="msi" aria-hidden="true">'+name+'</span>'; }
 
-  /* ---------- Streak als Sakura-Blüte (Inline-SVG, öffnet sich mit der Streak-Länge) ---------- */
-  // stage 0..4: Knospe → volle Blüte. Fünf Blütenblätter, deren Spreizung/Deckkraft mit der Stufe wächst.
-  function sakuraStage(streak){ streak=streak||0; if(streak<=0)return 0; if(streak<3)return 1; if(streak<7)return 2; if(streak<14)return 3; return 4; }
-  function sakuraSvg(streak){
-    const st=sakuraStage(streak);
-    const open=[0,0.18,0.45,0.72,1][st];           // Öffnungsgrad
-    const petalOp=st===0?0.25:1;
+  /* ---------- Sakura-Blüte (Inline-SVG): gewinnt mit dem Wert diskret Blütenblätter ---------- */
+  // Anzahl erfüllter Schwellen → 0..5 Blätter. Standard-Schwellen (Streak): 1,3,7,14,30 Tage.
+  const SAKURA_STREAK=[1,3,7,14,30];
+  function sakuraPetals(value,thresholds){
+    value=value||0; thresholds=thresholds||SAKURA_STREAK;
+    let n=0; for(let i=0;i<thresholds.length;i++){ if(value>=thresholds[i])n++; }
+    return Math.min(5,n);
+  }
+  // n=0 → grüne Knospe; n=1..5 → n Blütenblätter (gleichmäßig verteilt) + gelber Kern ab ≥1.
+  function sakuraSvg(value,thresholds,opts){
+    opts=opts||{};
+    const n=sakuraPetals(value,thresholds);
     const PINK='#e8889e', PINKD='#d96a86', CORE='#f6c84c';
-    // fünf Blütenblätter radial; „open" skaliert Abstand vom Zentrum + Größe
-    let petals='';
-    for(let i=0;i<5;i++){
-      const a=(-90+i*72)*Math.PI/180;
-      const d=6+open*7;                              // Abstand vom Zentrum
-      const cx=24+Math.cos(a)*d, cy=24+Math.sin(a)*d;
-      const r=4.5+open*5.5;
-      petals+='<g transform="translate('+cx.toFixed(1)+' '+cy.toFixed(1)+') rotate('+(i*72)+')">'+
-        '<path d="M0 '+(-r).toFixed(1)+' C '+(r*0.9).toFixed(1)+' '+(-r).toFixed(1)+', '+(r*0.9).toFixed(1)+' '+(r*0.6).toFixed(1)+', 0 '+(r*1.05).toFixed(1)+' C '+(-r*0.9).toFixed(1)+' '+(r*0.6).toFixed(1)+', '+(-r*0.9).toFixed(1)+' '+(-r).toFixed(1)+', 0 '+(-r).toFixed(1)+' Z" '+
-        'fill="'+PINK+'" stroke="'+PINKD+'" stroke-width="0.6" opacity="'+petalOp+'"/></g>';
+    const cls='sakura'+(opts.cls?' '+opts.cls:'')+' sakura-'+n;
+    if(n<=0){
+      return '<svg class="'+cls+'" viewBox="0 0 48 48" role="img" aria-label="Knospe (noch keine Blüte)">'+
+        '<path d="M24 27 v-9" stroke="#7c9a5e" stroke-width="2.4" stroke-linecap="round"/>'+
+        '<ellipse cx="24" cy="15" rx="5" ry="7.5" fill="#cdb7a6"/>'+
+        '<ellipse cx="24" cy="15" rx="2.4" ry="6" fill="#bda493"/></svg>';
     }
-    const core=st>=2?'<circle cx="24" cy="24" r="'+(2+open*2.2).toFixed(1)+'" fill="'+CORE+'"/>':'';
-    const bud=st===0?'<circle cx="24" cy="24" r="5" fill="#cdb7a6"/><path d="M24 19 v-6" stroke="#7c9a5e" stroke-width="2" stroke-linecap="round"/>':'';
-    return '<svg class="sakura sakura-'+st+'" viewBox="0 0 48 48" role="img" aria-label="Streak-Blüte Stufe '+st+'">'+bud+petals+core+'</svg>';
+    // n Blätter, sodass die volle Blüte (5) gleichmäßig wie eine echte Sakura aussieht.
+    const r=10;
+    let petals='';
+    for(let i=0;i<n;i++){
+      const ang=-90+i*(360/Math.max(n,1));
+      petals+='<g transform="translate(24 24) rotate('+ang.toFixed(1)+')">'+
+        '<path d="M0 '+(-r).toFixed(1)+' C '+(r*0.85).toFixed(1)+' '+(-r).toFixed(1)+', '+(r*0.85).toFixed(1)+' '+(r*0.55).toFixed(1)+', 0 '+(r*1.05).toFixed(1)+' C '+(-r*0.85).toFixed(1)+' '+(r*0.55).toFixed(1)+', '+(-r*0.85).toFixed(1)+' '+(-r).toFixed(1)+', 0 '+(-r).toFixed(1)+' Z" '+
+        'fill="'+PINK+'" stroke="'+PINKD+'" stroke-width="0.6"/></g>';
+    }
+    const core='<circle cx="24" cy="24" r="3.4" fill="'+CORE+'"/>';
+    return '<svg class="'+cls+'" viewBox="0 0 48 48" role="img" aria-label="Blüte: '+n+' von 5 Blütenblättern">'+petals+core+'</svg>';
   }
 
   /* ---------- Navigation (responsiv: oben gruppiert / unten Tab-Leiste) ---------- */
@@ -90,13 +99,14 @@
       {page:'kanji',href:'kanji.html',label:'Kanji',icon:'translate'},
       {page:'verben',href:'verben.html',label:'Verben',icon:'bolt'},
       {page:'schreiben',href:'schreiben.html',label:'Schreiben',icon:'draw'},
+      {page:'ueben',href:'ueben.html',label:'Freies Üben',icon:'school'},
     ]},
     {group:'Mein Bereich', items:[
       {page:'listen',href:'listen.html',label:'Listen',icon:'bookmarks'},
       {page:'profil',href:'profil.html',label:'Profil',icon:'person'},
     ]},
   ];
-  const REFERENCE_PAGES=['vokabular','grammatik','kanji','verben','schreiben'];
+  const REFERENCE_PAGES=['vokabular','grammatik','kanji','verben','schreiben','ueben'];
   // Untere App-Leiste: 5 Primärziele; „Nachschlagen" ist ein Hub (Einstieg Vokabular).
   const BOTTOM=[
     {page:'heute',href:'heute.html',label:'Heute',icon:'today'},
@@ -171,6 +181,45 @@
     return { dict, te:base+teEnd, ta:base+taEnd, nai:base+U2A[u]+'ない' };
   }
 
+  /* ---------- Generierte Verb-Form-Übungen (て/た/ない) aus echten Verben ---------- */
+  const VERB_FORM_PATTERNS={'V て-Form':'te','V た-Form':'ta','V ない-Form':'nai'};
+  const VERB_FORM_LABEL={te:'て-Form',ta:'た-Form',nai:'ない-Form'};
+  // Konjugierbare Verben für eine Form. Bevorzugt die freigeschalteten Lektionen (gelernt + neu);
+  // sind dort noch zu wenige (frühe Lektionen haben kaum Verben), wird auf alle Verben erweitert,
+  // damit immer echte, wiederkehrende Aufgaben entstehen (statt Rückfall auf die statischen).
+  function verbPool(form){
+    const conjugable=(window.VOKABULAR||[]).filter(v=>{
+      if(!/^V\./.test(v.pos)||verbGroup(v.pos)<=0)return false;
+      const c=conjugate(v.kana,verbGroup(v.pos)); return !!(c&&c[form]);
+    });
+    const max=(window.SRS&&window.SRS.maxUnlockedLesson)?window.SRS.maxUnlockedLesson():25;
+    const within=conjugable.filter(v=>v.lesson<=max);
+    return within.length>=4?within:conjugable;
+  }
+  // n Multiple-Choice-Aufgaben „<Verb> → ?（<Form>）" mit korrekter Form + plausiblen Distraktoren.
+  function genVerbFormExercises(form,n){
+    n=n||6;
+    const label=VERB_FORM_LABEL[form]||form;
+    const pool=verbPool(form);
+    if(!pool.length)return [];
+    const verbs=shuffle(pool.slice()).slice(0,n);
+    return verbs.map(v=>{
+      const g=verbGroup(v.pos), c=conjugate(v.kana,g), correct=c[form];
+      const stem=v.kana.slice(0,-2);
+      const naive=stem+({te:'て',ta:'た',nai:'ない'}[form]); // typischer Anfängerfehler (Gruppe-II-Regel überall)
+      const seen={}; seen[correct]=1; const distract=[];
+      shuffle([c.te,c.ta,c.nai,naive]).forEach(x=>{ if(x&&!seen[x]){ seen[x]=1; distract.push(x); } });
+      let guard=0;
+      while(distract.length<3&&guard<40){ guard++;
+        const o=pool[Math.floor(Math.random()*pool.length)], oc=conjugate(o.kana,verbGroup(o.pos)), x=oc&&oc[form];
+        if(x&&!seen[x]){ seen[x]=1; distract.push(x); } }
+      const optionen=shuffle([correct].concat(distract.slice(0,3)));
+      const prompt=(v.kanji&&v.kanji.length&&v.kanji!==v.kana)?v.kanji+'（'+v.kana+'）':v.kana;
+      return { typ:'mc', frage:prompt+' → ?（'+label+'）', optionen:optionen, richtig:optionen.indexOf(correct),
+        erkl:c.dict+' → '+correct+(v.de?' — '+v.de:'') };
+    });
+  }
+
   // Voller Formensatz für Anzeige.
   function allForms(masuForm, group){
     const w = cleanVerb(masuForm);
@@ -207,6 +256,8 @@
     const card=el('article','kanji-card item');
     card.dataset.filter=k.level;
     card.dataset.search=norm([k.k,on,kun,k.meaning,k.level,k.cls,(k.examples||[]).map(e=>e.w+' '+e.r+' '+e.m).join(' ')].join(' '));
+    const wr=(window.SRS&&window.SRS.get&&window.SRS.get('k:'+k.k))||null;
+    const writeReps=wr?(wr.writeReps||0):0;
     card.innerHTML=
       '<div class="kc-top"><div class="kanji-char">'+esc(k.k)+'</div>'+
       '<div class="kc-meta"><span class="tag">'+esc(k.level)+(k.cls?' · '+esc(k.cls):'')+'</span>'+
@@ -215,7 +266,12 @@
       '<div class="readings hideable">'+
         (on?'<div class="reading-row"><span class="lbl">音</span><span class="vals">'+esc(on)+'</span></div>':'')+
         (kun?'<div class="reading-row"><span class="lbl kun">訓</span><span class="vals">'+esc(kun)+'</span></div>':'')+'</div>'+
-      (exHtml?'<div class="kc-examples hideable">'+exHtml+'</div>':'');
+      (exHtml?'<div class="kc-examples hideable">'+exHtml+'</div>':'')+
+      '<div class="kc-foot">'+
+        '<span class="kc-writes" title="Schreiben geübt: '+writeReps+'×">'+sakuraSvg(writeReps,[1,2,3,4,5],{cls:'sakura-sm'})+
+          (writeReps>0?'<span class="kc-writes-n">'+writeReps+'×</span>':'')+'</span>'+
+        '<a class="kc-write" href="schreiben.html?kanji='+encodeURIComponent(k.k)+'" aria-label="Dieses Kanji schreiben üben" title="Schreiben üben"><span class="msi" aria-hidden="true">draw</span></a>'+
+      '</div>';
     return card;
   }
 
@@ -228,6 +284,7 @@
       const arr=byLesson[L];
       const group=el('section','group'); group.dataset.group=String(L);
       const head=groupHead('Lektion '+L,(LESSON[L]||{}).thema||'',arr.length);
+      if(window.SRS)head.appendChild(lessonRepsBadge(L,'vocab'));
       if(listsOn){ const b=el('button','v-add-lesson','＋ Lektion → Liste'); b.type='button'; b.dataset.lesson=String(L); head.appendChild(b); }
       group.appendChild(head);
       const wrap=el('div','table-wrap'), table=el('table','vocab');
@@ -271,7 +328,9 @@
     Object.keys(byLesson).map(Number).sort((a,b)=>a-b).forEach(L=>{
       const arr=byLesson[L];
       const group=el('section','group'); group.dataset.group=String(L);
-      group.appendChild(groupHead('Lektion '+L,(LESSON[L]||{}).thema||'',arr.length));
+      const head=groupHead('Lektion '+L,(LESSON[L]||{}).thema||'',arr.length);
+      if(window.SRS)head.appendChild(lessonRepsBadge(L,'grammar'));
+      group.appendChild(head);
       arr.forEach(g=>group.appendChild(grammarCard(g,L)));
       content.appendChild(group);
     });
@@ -339,10 +398,15 @@
     return wrap;
   }
   function buildPlusExercises(host,pattern,uebungen){
+    // Verb-Form-Muster (て/た/ない): immer neue, aus echten Verben generierte Aufgaben statt der
+    // zwei statisch eingetippten. Fällt auf die statischen zurück, falls keine Verben verfügbar.
+    const form=VERB_FORM_PATTERNS[pattern];
+    const gen=form?genVerbFormExercises(form,Math.max(6,(uebungen||[]).length)):null;
+    const list=(gen&&gen.length)?gen:(uebungen||[]);
     let i=0; const stage=el('div','gp-ex-stage'); host.appendChild(stage);
     function show(){
-      if(i>=uebungen.length){ stage.innerHTML='<div class="gp-ex-done">✓ Alle Übungen erledigt.</div>'; return; }
-      const ex=Object.assign({},uebungen[i],{srsId:'g:'+pattern});
+      if(i>=list.length){ stage.innerHTML='<div class="gp-ex-done">✓ Alle Übungen erledigt.</div>'; return; }
+      const ex=Object.assign({},list[i],{srsId:'g:'+pattern});
       window.Exercises.renderExercise(ex,stage,{ onResult:()=>{
         const nx=el('button','btn btn-next gp-ex-next','Weiter →'); nx.type='button';
         nx.addEventListener('click',()=>{ i++; show(); }); stage.appendChild(nx);
@@ -526,6 +590,21 @@
     h.innerHTML='<h2>'+esc(title)+'</h2>'+(theme?'<span class="theme">'+esc(theme)+'</span>':'')+'<span class="gcount">'+n+'</span>';
     return h;
   }
+  // Durchschnittliche Wiederholungen der Items einer Lektion (über alle Kern-Items, ungesehene zählen 0).
+  function lessonRepsAvg(L,type){
+    if(!(window.SRS&&window.SRS.lessonCore&&window.SRS.get))return 0;
+    const core=window.SRS.lessonCore(L).filter(c=>!type||c.type===type);
+    if(!core.length)return 0;
+    let sum=0; core.forEach(c=>{ const it=window.SRS.get(c.id); if(it)sum+=it.reps||0; });
+    return sum/core.length;
+  }
+  // Sakura-Wiederhol-Indikator je Lektion (Schwellen für Ø-Wiederholungen).
+  function lessonRepsBadge(L,type){
+    const avg=lessonRepsAvg(L,type);
+    const s=el('span','grp-flower',sakuraSvg(avg,[1,2,4,7,12],{cls:'sakura-sm'}));
+    s.title='Ø '+avg.toFixed(1)+' Wiederholungen';
+    return s;
+  }
   function buildChips(values,labelFn){
     const box=document.getElementById('filters'); if(!box)return;
     const mk=(val,label)=>{ const c=el('button','chip'+(val==='all'?' on':'')); c.textContent=label; c.dataset.val=val;
@@ -616,15 +695,20 @@
     function lessonOf(c){ return c.type==='kanji'?window.SRS.kanjiLessonOf(c.data.level):c.data.lesson; }
     function refreshStats(){ const s=window.SRS.stats(); setText('h-streak',s.streakDays); setText('h-due',s.due); setText('h-learned',s.learned); setHtml('h-streak-flower',sakuraSvg(s.streakDays)); }
     function start(){
-      // Gating: nur freigeschaltete Lektionen; mit ?lesson=L gezielt eine Lektion lernen.
+      // Gating: Wiederholungen aus allen freigeschalteten Lektionen; NEUE Items fokussiert auf die
+      // aktuelle Lektion (niedrigste, deren Kern noch nicht gemeistert ist) → füllt sichtbar den
+      // Lernpfad-Fortschritt. Mit ?lesson=L gezielt genau eine Lektion lernen.
       const maxLesson=onlyLesson!=null?onlyLesson:window.SRS.maxUnlockedLesson();
-      deck=window.SRS.buildQueue({sources:['kanji','vocab','grammar'],newLimit:clampInt('h-newlimit',5),reviewLimit:clampInt('h-revlimit',15),maxLesson:maxLesson});
+      const newLesson=onlyLesson!=null?onlyLesson:window.SRS.currentLesson();
+      deck=window.SRS.buildQueue({sources:['kanji','vocab','grammar'],newLimit:clampInt('h-newlimit',5),reviewLimit:clampInt('h-revlimit',15),maxLesson:maxLesson,newLesson:newLesson});
       if(onlyLesson!=null)deck=deck.filter(c=>lessonOf(c)===onlyLesson);
       total=deck.length; setup.classList.add('hidden'); done.classList.add('hidden'); stage.classList.remove('hidden'); render();
     }
     function finishItem(grade){ const c=deck[0]; if(grade!=null&&c)window.SRS.grade(c.id,grade); deck.shift(); refreshStats(); render(); }
     function render(){
       if(!deck.length){ stage.classList.add('hidden'); done.classList.remove('hidden');
+        // Tagesaufgabe abgeschlossen → Streak genau einmal pro Tag hochzählen (nicht bei Einzel-Bewertungen).
+        if(total>0){ window.SRS.completeDaily(); refreshStats(); }
         done.innerHTML=(total?'<div class="tr-done-in">Tagesrunde geschafft!<br>'+total+' Aufgaben erledigt.</div>':'<div class="tr-done-in">Für heute ist alles erledigt.</div>')+
           '<button class="btn-primary" id="h-again" type="button"><span class="msi" aria-hidden="true">refresh</span> Noch eine Runde</button>';
         const a=document.getElementById('h-again'); if(a)a.addEventListener('click',()=>{ done.classList.add('hidden'); setup.classList.remove('hidden'); refreshStats(); });
@@ -649,8 +733,9 @@
         '<button class="btn btn-again h-kw-again" type="button"><span class="msi" aria-hidden="true">refresh</span> Später</button></div></div>';
       const mount=body.querySelector('.kw-stage'), msg=body.querySelector('.kw-msg');
       const size=Math.min(300,(stage.clientWidth||320)-40);
+      const snap=((window.SRS.get(c.id)||{}).writeReps||0)<3;
       fetch('assets/kanjivg/'+window.KanjiWrite.cpFile(k.k)).then(r=>r.text()).then(svg=>{
-        const w=window.KanjiWrite.create(mount,{svgText:svg,size:size,
+        const w=window.KanjiWrite.create(mount,{svgText:svg,size:size,snap:snap,
           onProgress:(i,n)=>{ msg.textContent='Strich '+i+' / '+n; },
           onComplete:()=>{ msg.textContent='✓ Richtig geschrieben!'; window.SRS.gradeWrite(c.id,true); refreshStats();
             const nx=el('button','btn-primary h-next','Weiter →'); nx.type='button'; nx.addEventListener('click',()=>finishItem(1)); body.querySelector('.tr-controls').appendChild(nx); }});
@@ -883,13 +968,17 @@
     again.onclick=()=>{ grade(0); const c=deck.shift(); deck.push(c); render(); };
     ov.hidden=false; start();
   }
-  // „Üben"-Button auf den Nachschlage-Seiten (Vokabular/Grammatik/Kanji) für freies Zufalls-Üben.
-  function addFreeUebenButton(page){
-    const src={kanji:'kanji',vokabular:'vocab',grammatik:'grammar'}[page]; if(!src)return;
+  // Kanji-Seite: „Üben" = Schreiben üben (Strichreihenfolge), führt zur Schreib-Seite.
+  function addKanjiSchreibenButton(){
     const host=document.querySelector('.toolbar .toolbar-row')||document.querySelector('.toolbar');
     if(!host)return;
-    const b=el('button','btn-primary page-ueben','<span class="msi" aria-hidden="true">school</span> Üben'); b.type='button';
-    b.addEventListener('click',()=>openFreePractice(src)); host.appendChild(b);
+    const a=el('a','btn-primary page-ueben page-schreiben','<span class="msi" aria-hidden="true">draw</span> Schreiben üben');
+    a.href='schreiben.html'; host.appendChild(a);
+  }
+  // Freies-Üben-Hub (ueben.html): Quelle wählen → Zufallskarten dieser Quelle.
+  function initUeben(){
+    const root=document.getElementById('ueben-root'); if(!root)return;
+    root.addEventListener('click',e=>{ const b=e.target.closest('[data-src]'); if(b)openFreePractice(b.dataset.src); });
   }
 
   /* ============================================================  LISTEN (persönliche Vokabellisten)  */
@@ -989,10 +1078,18 @@
     draw();
   }
 
+  /* ---------- Versionsanzeige im Footer (Quelle: assets/version.js → window.APP_VERSION) ---------- */
+  function renderFooterVersion(){
+    const v=window.APP_VERSION; if(!v)return;
+    const f=document.querySelector('footer'); if(!f||f.querySelector('.app-version'))return;
+    f.appendChild(el('span','app-version','Version v'+esc(v)));
+  }
+
   /* ============================================================  INIT  */
   function init(){
     const page=document.body.dataset.page;
     renderNav(page);
+    renderFooterVersion();
     const content=document.getElementById('content');
     if(content){
       if(page==='kanji')renderKanji(content);
@@ -1003,7 +1100,8 @@
       groups=Array.prototype.slice.call(content.querySelectorAll('.group'));
       applyFilter();
     }
-    if(page==='kanji'||page==='vokabular'||page==='grammatik')addFreeUebenButton(page);
+    if(page==='kanji')addKanjiSchreibenButton();
+    if(page==='ueben')initUeben();
     if(page==='heute')initHeute();
     if(page==='profil')initProfil();
     if(page==='schreiben')initSchreiben();
@@ -1016,7 +1114,7 @@
      Vor init() gesetzt, damit Render-Code (z. B. Grammatik-Übungen) sie schon nutzen kann. */
   window.Katalog = {
     el, esc, ruby, rubyPair, norm, furiToRuby, kanaToRomaji, shuffle,
-    conjugate, allForms, verbGroup, lsGet, lsSet
+    conjugate, allForms, verbGroup, genVerbFormExercises, sakuraPetals, sakuraSvg, lsGet, lsSet
   };
 
   if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',init); else init();

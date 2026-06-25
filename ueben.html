@@ -1,0 +1,66 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Freies Üben · 練習 — Go! Nihongo</title>
+<link rel="stylesheet" href="assets/style.css">
+<link rel="icon" href="assets/icons/icon-192.png">
+<link rel="manifest" href="manifest.webmanifest">
+<meta name="theme-color" content="#b23a2e">
+<link rel="apple-touch-icon" href="assets/icons/icon-192.png">
+</head>
+<body data-page="ueben">
+
+<header class="topbar">
+  <div class="topbar-inner">
+    <a class="brand" href="index.html" aria-label="Go! Nihongo"><span class="brand-name">Go!</span><span class="brand-jp">日本語</span></a>
+    <nav id="topnav" class="nav" aria-label="Hauptnavigation"></nav>
+  </div>
+</header>
+
+<main>
+  <div class="page-intro">
+    <span class="kicker">練習 · Freies Üben</span>
+    <h1>Freies Üben <span class="jp">練習</span></h1>
+    <p>Karteikarten quer durch eine Quelle — ungated, jederzeit. Wähle, was du üben möchtest:
+       die Bewertung fließt wie üblich in deinen Lernstand (SRS) ein.</p>
+  </div>
+
+  <div class="ueben-pick" id="ueben-root">
+    <button class="navcard ueben-card" type="button" data-src="kanji">
+      <div class="nc-jp">漢字</div>
+      <h3>Kanji</h3>
+      <p>Bedeutung &amp; Lesungen verdeckt — aufdecken und bewerten.</p>
+      <span class="nc-count">Zufallskarten</span>
+    </button>
+    <button class="navcard ueben-card" type="button" data-src="vocab">
+      <div class="nc-jp">語彙</div>
+      <h3>Vokabeln</h3>
+      <p>Wortschatz quer durch alle Lektionen als Karteikarten.</p>
+      <span class="nc-count">Zufallskarten</span>
+    </button>
+    <button class="navcard ueben-card" type="button" data-src="grammar">
+      <div class="nc-jp">文法</div>
+      <h3>Grammatik</h3>
+      <p>Satzmuster wiederholen — Beispiel verdeckt, aufdecken.</p>
+      <span class="nc-count">Zufallskarten</span>
+    </button>
+  </div>
+</main>
+
+<footer>
+  <span class="brand-name">Go! Nihongo</span> · Lern-Katalog — freies Üben über eine Quelle, ohne Freischalt-Gating.
+</footer>
+
+<script src="assets/data/kanji.js"></script>
+<script src="assets/data/vokabular.js"></script>
+<script src="assets/data/grammatik.js"></script>
+<script src="assets/data/grammatik_extra.js"></script>
+<script src="assets/data/grammatik_furigana.js"></script>
+<script src="assets/data/grammatik_plus.js"></script>
+<script src="assets/srs.js"></script>
+<script src="assets/version.js"></script>
+<script src="assets/app.js"></script>
+</body>
+</html>

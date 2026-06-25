@@ -8,7 +8,8 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "e2e": "playwright test",
-    "build:www": "node scripts/build-www.mjs",
+    "version:gen": "node scripts/gen-version.mjs",
+    "build:www": "node scripts/gen-version.mjs && node scripts/build-www.mjs",
     "icons": "node scripts/gen-icons.mjs",
     "cap:sync": "npm run build:www && cap sync android"
   },

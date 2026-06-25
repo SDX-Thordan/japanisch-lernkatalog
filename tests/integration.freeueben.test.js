@@ -1,4 +1,4 @@
-// Freies Üben: „Üben"-Button auf Nachschlage-Seiten öffnet ein Karteikarten-Overlay.
+// Freies Üben (Hub-Seite ueben.html): Quelle wählen → Karteikarten-Overlay öffnet.
 import { describe, it, expect, beforeEach } from 'vitest';
 import { loadScripts } from './helpers/load.js';
 
@@ -7,15 +7,14 @@ function fakeStorage() {
   return { getItem: (k) => (k in d ? d[k] : null), setItem: (k, v) => { d[k] = String(v); }, removeItem: (k) => { delete d[k]; } };
 }
 
-const BODY = `<!DOCTYPE html><html><body data-page="vokabular">
+const BODY = `<!DOCTYPE html><html><body data-page="ueben">
   <header class="topbar"><div class="topbar-inner">
     <a class="brand"></a><nav id="topnav" class="nav"></nav>
   </div></header>
   <main>
-    <div class="toolbar"><div class="toolbar-row"><input id="search-input"></div>
-      <div class="chips" id="filters"></div><div class="chips" id="type-filters"></div></div>
-    <p class="count" id="count"></p>
-    <div id="content"></div>
+    <div class="ueben-pick" id="ueben-root">
+      <button class="navcard ueben-card" type="button" data-src="vocab"><h3>Vokabeln</h3></button>
+    </div>
   </main>
 </body></html>`;
 
@@ -27,11 +26,10 @@ beforeEach(() => {
 });
 function click(e) { e.dispatchEvent(new win.Event('click', { bubbles: true })); }
 
-describe('Freies Üben', () => {
-  it('zeigt einen „Üben"-Button und öffnet ein Karteikarten-Overlay', () => {
-    const btn = win.document.querySelector('.page-ueben');
+describe('Freies Üben (Hub)', () => {
+  it('Klick auf eine Quelle öffnet ein Karteikarten-Overlay', () => {
+    const btn = win.document.querySelector('[data-src="vocab"]');
     expect(btn).toBeTruthy();
-    expect(btn.textContent).toContain('Üben');
     click(btn);
     const ov = win.document.querySelector('.lt-overlay');
     expect(ov && !ov.hidden).toBe(true);

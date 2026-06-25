@@ -54,6 +54,13 @@ describe('buildQueue()', () => {
     expect(new Set(early.map((x) => x.type)).has('grammar')).toBe(true);
   });
 
+  it('newLesson beschränkt NEUE Items auf genau diese Lektion (Fokus aktuelle Lektion)', () => {
+    const q = SRS.buildQueue({ sources: ['vocab'], newLimit: 20, reviewLimit: 0, newLesson: 3, maxLesson: 25 });
+    expect(q.length).toBeGreaterThan(0);
+    expect(q.every((x) => x.reason === 'new')).toBe(true);
+    expect(q.every((x) => x.data.lesson === 3)).toBe(true);
+  });
+
   it('verschränkt fällige und neue Items (nicht alle due am Stück)', () => {
     const ks = (win.KANJI || []).slice(0, 4).map((k) => 'k:' + k.k);
     ks.forEach((id) => SRS.grade(id, 1, '2026-06-01'));

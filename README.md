@@ -54,8 +54,27 @@ Lokal: `python3 -m http.server` und `index.html` öffnen. Auf GitHub Pages insta
 
 Die APK wird in **GitHub Actions** gebaut (`.github/workflows/android.yml`): Test-Gate →
 `build:www` → `cap add android` → `cap sync` → **`gradlew assembleRelease`**, signiert mit dem
-festen Keystore `signing/go-nihongo.keystore`. Die fertige **`app-release.apk`** liegt als
-Workflow-Artefakt `go-nihongo-release-apk` zum Download bereit.
+festen Keystore `signing/go-nihongo.keystore`. Jeder Build liegt als Workflow-Artefakt
+`go-nihongo-release-apk` zum Download bereit.
+
+### Version & Release
+
+Die **eine Versionsquelle** ist das Feld `version` in `package.json` (Semver). Daraus erzeugt
+`scripts/gen-version.mjs` die Datei `assets/version.js` (`window.APP_VERSION`), die der **Footer**
+auf jeder Seite anzeigt — Web/PWA und APK zeigen damit dieselbe Version.
+
+**Release-Ablauf:**
+
+1. Version in `package.json` bumpen (z. B. `1.1.0`).
+2. `npm run version:gen` ausführen (aktualisiert `assets/version.js`) und committen.
+3. Auf GitHub ein **Release mit Tag `vX.Y.Z`** veröffentlichen (Tag == `package.json`-Version).
+4. Der Workflow baut die signierte APK, setzt `versionName = X.Y.Z`, benennt sie
+   `go-nihongo-X.Y.Z.apk` und **hängt sie ans Release**. Stimmt der Tag nicht mit der
+   `package.json`-Version überein, bricht der Build bewusst ab.
+
+Bei Push/PR läuft nur das **Test-Gate** — die APK wird dort **nicht** gebaut. Ein manueller
+Build (ohne Release) ist über *Run workflow* (`workflow_dispatch`) möglich und liefert eine
+`…-dev.<run#>`-APK als CI-Artefakt.
 
 **Updates ohne Neuinstallation:** Da die App eine stabile `applicationId`
 (`de.thordan.japanischkatalog`) und einen stabilen Signaturschlüssel hat und der `versionCode`

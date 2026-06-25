@@ -17,13 +17,15 @@ function page(dataPage, extraMain = '') {
 }
 
 describe('renderNav', () => {
-  it('füllt die obere Tab-Leiste, markiert die aktive Seite, ohne „Üben"', () => {
+  it('füllt die obere Tab-Leiste, markiert die aktive Seite, mit „Freies Üben"', () => {
     const win = page('heute');
     const top = win.document.getElementById('topnav');
     const tabs = [...top.querySelectorAll('.nav-tab')];
     expect(tabs.length).toBeGreaterThanOrEqual(9);
-    const labels = tabs.map((a) => a.textContent.trim());
-    expect(labels.some((l) => l.includes('Üben'))).toBe(false);
+    const labels = tabs.map((a) => a.querySelector('.nav-label').textContent.trim());
+    // „Freies Üben" ist da; das alte Trainings-„Üben" gibt es nicht mehr.
+    expect(labels).toContain('Freies Üben');
+    expect(labels.some((l) => l === 'Üben')).toBe(false);
     const active = top.querySelector('.nav-tab.active');
     expect(active.textContent).toContain('Heute');
     expect(active.getAttribute('href')).toBe('heute.html');
