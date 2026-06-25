@@ -46,8 +46,8 @@ describe('Lernpfad-Seite', () => {
   });
 
   it('nach Kern-Mastery erscheint „Test starten" und öffnet das Test-Modal', () => {
-    // L1-Kern (nur Vokabeln/Grammatik, keine Kanji) beherrschen.
-    win.SRS.lessonCore(1).forEach((it) => { win.SRS.grade(it.id, 1); win.SRS.grade(it.id, 1); });
+    // L1-Kern (nur Vokabeln/Grammatik, keine Kanji) beherrschen (Score ≥ MASTER_AT).
+    win.SRS.lessonCore(1).forEach((it) => { win.SRS.__test.setScore(it.id, 100); });
     // Redraw über unlockAll (zeichnet die Karten neu).
     click(win.document.getElementById('lp-unlockall'));
     const l1 = cards()[0];

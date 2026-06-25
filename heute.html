@@ -23,8 +23,9 @@
   <div class="page-intro">
     <span class="kicker">今日 · Tägliche Aufgabe</span>
     <h1>Heute <span class="jp">今日</span></h1>
-    <p>Deine gemischte Tagesrunde aus fälligen Wiederholungen und neuen Inhalten — Kanji,
-       Vokabeln und Grammatik. Der Fortschritt wird laufend gespeichert (im Browser).</p>
+    <p>Deine tägliche <b>Wiederholung</b>: alle fälligen Inhalte (Vokabeln, Grammatik, Kanji), die mit
+       der Zeit etwas verblasst sind, kommen hier zurück. <b>Neues</b> lernst du im
+       <a href="lernpfad.html">Lernpfad</a>. Der Fortschritt wird laufend gespeichert (im Browser).</p>
   </div>
 
   <div class="heute-stats">
@@ -35,12 +36,11 @@
 
   <div class="trainer-setup" id="h-setup">
     <div class="src-pick">
-      <span class="src-label">Heute:</span>
-      <label>Neu <input type="number" id="h-newlimit" value="5" min="0" max="30" style="width:3.2rem"></label>
-      <label>Wiederholung <input type="number" id="h-revlimit" value="15" min="0" max="60" style="width:3.2rem"></label>
+      <span class="src-label">Wiederholung:</span>
+      <label>max. Aufgaben <input type="number" id="h-revlimit" value="30" min="0" max="80" style="width:3.2rem"></label>
     </div>
     <div class="setup-actions">
-      <button class="btn-primary" id="h-start" type="button"><span class="msi" aria-hidden="true">play_arrow</span> Heutige Aufgabe starten</button>
+      <button class="btn-primary" id="h-start" type="button"><span class="msi" aria-hidden="true">play_arrow</span> Wiederholung starten</button>
     </div>
   </div>
 

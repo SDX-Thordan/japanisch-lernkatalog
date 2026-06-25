@@ -730,6 +730,23 @@ body.drill-open { overflow: hidden; }
 .f-bar-n { font-size: .8rem; font-weight: 700; color: var(--ink); margin-top: .25rem; }
 .f-bar-d { font-size: .68rem; color: var(--muted); }
 
+/* ---------- Profil-Grafiken (Gesamtüberblick) ---------- */
+.f-overview { display: flex; flex-wrap: wrap; gap: 1.6rem; align-items: center; }
+.f-ring { flex: 0 0 auto; }
+.f-ring-svg { width: 9rem; height: 9rem; }
+.f-ring-big { font-size: 1.7rem; font-weight: 800; fill: var(--ink); }
+.f-ring-small { font-size: .6rem; fill: var(--muted); letter-spacing: .04em; text-transform: uppercase; }
+.f-typebars { flex: 1 1 16rem; display: flex; flex-direction: column; gap: .9rem; }
+.f-typebar-top { display: flex; justify-content: space-between; align-items: baseline; font-size: .9rem; font-weight: 700; margin-bottom: .3rem; }
+.f-typebar-n { font-size: .8rem; font-weight: 600; color: var(--muted); }
+.f-bar2 { height: .7rem; background: var(--surface-2); border: 1px solid var(--border); border-radius: 999px; overflow: hidden; }
+.f-bar2 > span { display: block; height: 100%; background: linear-gradient(90deg, #e8889e, var(--accent)); border-radius: 999px; transition: width .4s; }
+.f-dist { display: flex; align-items: flex-end; gap: .5rem; }
+.f-distcol { flex: 1; display: flex; flex-direction: column; align-items: center; gap: .3rem; }
+.f-distbar-wrap { width: 100%; height: 7rem; display: flex; align-items: flex-end; }
+.f-distbar { width: 100%; min-height: 3px; background: linear-gradient(var(--accent), #e8889e); border-radius: 6px 6px 0 0; transition: height .4s; }
+.f-distn { font-size: .82rem; font-weight: 700; color: var(--ink); }
+
 .f-actions { display: flex; flex-wrap: wrap; gap: .6rem; align-items: center; }
 .f-danger { color: var(--accent-d); border-color: var(--accent); }
 .f-danger:hover { background: var(--accent); color: #fff; }

@@ -29,10 +29,25 @@
 
   <div class="heute-stats">
     <div class="hstat hstat-streak"><span class="hstat-flower" id="f-streak-flower"></span><span class="hstat-n" id="f-streak">0</span><span class="hstat-l">Streak (Tage)</span></div>
+    <div class="hstat hstat-streak"><span class="hstat-flower" id="f-avg-flower"></span><span class="hstat-n" id="f-avg">0%</span><span class="hstat-l">Ø Lernstand</span></div>
     <div class="hstat"><span class="hstat-n" id="f-learned">0</span><span class="hstat-l">gelernt gesamt</span></div>
     <div class="hstat"><span class="hstat-n" id="f-due">0</span><span class="hstat-l">heute fällig</span></div>
-    <div class="hstat"><span class="hstat-n" id="f-reviews">0</span><span class="hstat-l">Wiederholungen</span></div>
+    <div class="hstat"><span class="hstat-n" id="f-daily">0</span><span class="hstat-l">Tagesfortschritt</span></div>
   </div>
+
+  <section class="panel">
+    <h2>Gesamtüberblick <span class="jp">統計</span></h2>
+    <div class="f-overview">
+      <div class="f-ring" id="f-ring"></div>
+      <div class="f-typebars" id="f-typebars"></div>
+    </div>
+  </section>
+
+  <section class="panel">
+    <h2>Lernstand-Verteilung <span class="jp">🌸</span></h2>
+    <p style="color:var(--muted);margin-top:0">Wie viele Inhalte des Katalogs in welcher Blütenstufe stehen (links Knospe, rechts volle Blüte).</p>
+    <div class="f-dist" id="f-dist"></div>
+  </section>
 
   <section class="panel">
     <h2>Fällig in den nächsten 7 Tagen</h2>
