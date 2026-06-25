@@ -1,12 +1,16 @@
 /* Service Worker — Offline-Cache für den Lern-Katalog.
    Strategie:
-   - Navigationen (HTML) + Branding (manifest, App-Icons): NETWORK-FIRST mit Cache-Fallback,
-     damit App-Version & Logo online stets aktuell sind (kein „eingefrorenes" altes Icon mehr),
-     offline aber weiterhin laufen.
-   - Übrige statische Assets (JS/CSS/Daten/Font/KanjiVG-SVG): CACHE-FIRST (schnell, offline).
-   Cache-Version bei inhaltlichen Änderungen erhöhen. */
+   - Navigationen (HTML) + Branding (manifest, App-Icons) + Kern-Code (assets/*.js, *.css):
+     NETWORK-FIRST mit Cache-Fallback. So sind App-Version, Logo UND der Programmcode online
+     stets aktuell (kein „eingefrorenes" altes app.js mehr — der Grund, warum ein gemergter
+     Fix früher im Browser-Cache hängenblieb), offline läuft alles weiter aus dem Cache.
+   - Übrige statische Assets (Daten unter assets/data/, Font, KanjiVG-SVG): CACHE-FIRST (schnell).
+   Der Cache-Name wird automatisch aus der App-Version abgeleitet (importScripts unten),
+   sodass ein manuelles Hochzählen entfällt. */
 'use strict';
-var CACHE = 'katalog-v12';
+// Version laden, um den Cache-Namen abzuleiten (self.APP_VERSION; defensiv umschlossen).
+try { importScripts('assets/version.js'); } catch (e) {}
+var CACHE = 'katalog-' + (self.APP_VERSION || 'dev');
 
 var ASSETS = [
   './', 'index.html', 'heute.html', 'lernpfad.html', 'listen.html', 'grammatik.html', 'vokabular.html', 'kanji.html',
@@ -40,6 +44,12 @@ function isBranding(url) {
     /\/assets\/icons\/icon-(192|512|maskable-512)\.png$/.test(url.pathname);
 }
 
+// Kern-Code: assets/app.js, srs.js, exercises.js, kanji-write.js, version.js, ota.js, style.css.
+// NUR direkt unter assets/ (nicht assets/data/…) → Daten bleiben cache-first.
+function isCode(url) {
+  return /\/assets\/[^/]+\.(?:js|css)$/.test(url.pathname);
+}
+
 function putInCache(req, res) {
   if (res && res.status === 200 && res.type === 'basic') {
     var copy = res.clone();
@@ -53,12 +63,17 @@ self.addEventListener('fetch', function (e) {
   if (req.method !== 'GET') return;
   var url = new URL(req.url);
   var sameOrigin = url.origin === self.location.origin;
-  var networkFirst = sameOrigin && (req.mode === 'navigate' || isBranding(url));
+  var networkFirst = sameOrigin && (req.mode === 'navigate' || isBranding(url) || isCode(url));
 
   if (networkFirst) {
     // Netz zuerst (frisch), bei Fehler aus dem Cache (offline); Navigation fällt auf index.html zurück.
+    // WICHTIG: Für Code/Branding mit dem Server REVALIDIEREN (cache:'no-cache'), sonst liefert der
+    // HTTP-Cache des Browsers heuristisch eine veraltete Antwort an unseren fetch() — genau das ließ
+    // früher ein gemergtes app.js „hängen". Navigationen lassen sich nicht als Request mit init neu
+    // bauen ('navigate'-Mode), daher dort der einfache fetch(req).
+    var fresh = (req.mode === 'navigate') ? fetch(req) : fetch(req.url, { cache: 'no-cache' });
     e.respondWith(
-      fetch(req).then(function (res) { return putInCache(req, res); }).catch(function () {
+      fresh.then(function (res) { return putInCache(req, res); }).catch(function () {
         return caches.match(req).then(function (hit) { return hit || caches.match('index.html'); });
       })
     );

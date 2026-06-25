@@ -11,7 +11,9 @@ const version = String(pkg.version || '0.0.0');
 
 const out = `/* AUTO-GENERIERT von scripts/gen-version.mjs — nicht von Hand ändern.
    Quelle ist package.json "version". Anpassen über: Version bumpen + \`npm run version:gen\`. */
-window.APP_VERSION = '${version}';
+/* self statt window: funktioniert in der Seite (self===window) UND im Service-Worker
+   (importScripts), damit der SW den Cache-Namen aus der Version ableiten kann. */
+self.APP_VERSION = '${version}';
 `;
 
 writeFileSync(join(ROOT, 'assets', 'version.js'), out);

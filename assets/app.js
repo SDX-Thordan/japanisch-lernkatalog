@@ -1265,8 +1265,15 @@
 
   if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',init); else init();
 
-  /* ---------- PWA: Service Worker registrieren (offline-fähig, installierbar) ---------- */
+  /* ---------- PWA: Service Worker registrieren (offline-fähig, installierbar) ----------
+     Selbst-Update: Übernimmt ein neuer SW die Kontrolle (controllerchange), wird die Seite
+     EINMAL neu geladen — aber nur, wenn beim Laden bereits ein Controller aktiv war
+     (sonst würde der Erst-Install jeder neuen Installation einen unnötigen Reload auslösen). */
   if(typeof navigator!=='undefined' && 'serviceWorker' in navigator && location.protocol!=='file:'){
+    var hadController=!!navigator.serviceWorker.controller, reloading=false;
+    navigator.serviceWorker.addEventListener('controllerchange',function(){
+      if(hadController && !reloading){ reloading=true; location.reload(); }
+    });
     window.addEventListener('load',function(){ navigator.serviceWorker.register('service-worker.js').catch(function(){}); });
   }
 })();
