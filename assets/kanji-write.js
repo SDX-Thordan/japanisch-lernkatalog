@@ -181,6 +181,8 @@
       msg = document.getElementById('kw-msg');
     var session = buildSession();
     var pos = 0, widget = null;
+    // Einzel-Kanji-Modus (Deep-Link ?kanji=X): „Geschafft" führt zurück zur Kanji-Übersicht.
+    var single = (function () { try { return !!new URLSearchParams(location.search).get('kanji'); } catch (e) { return false; } })();
 
     function buildSession() {
       // Deep-Link aus einer Kanji-Karte: ?kanji=X → gezielt genau dieses Zeichen schreiben.
@@ -200,7 +202,8 @@
 
     function load() {
       if (pos >= session.length) {
-        stage.innerHTML = '<div class="tr-done-in">🎉 Geschafft! ' + session.length + ' Kanji geübt.</div>';
+        stage.innerHTML = '<div class="tr-done-in">🌸 Geschafft! ' + session.length + ' Kanji geübt.</div>' +
+          '<a class="btn-primary" href="kanji.html" style="margin-top:1rem"><span class="msi" aria-hidden="true">grid_view</span> Zur Kanji-Übersicht</a>';
         if (charEl) charEl.textContent = ''; if (meanEl) meanEl.textContent = '';
         if (prog) prog.textContent = ''; return;
       }
@@ -216,17 +219,19 @@
             if (window.SRS && window.SRS.gradeWrite) window.SRS.gradeWrite('k:' + k.k, true); } });
       }).catch(function () { stage.innerHTML = '<p>SVG konnte nicht geladen werden.</p>'; });
     }
-    function grade(g) {
+    // „Geschafft": bewerten; im Einzel-Modus zurück zur Kanji-Übersicht, sonst nächstes Kanji.
+    function done(g) {
       var k = session[pos];
       if (window.SRS && k) window.SRS.grade('k:' + k.k, g);
+      if (single) { location.href = 'kanji.html'; return; }
       pos++; load();
     }
 
     bind('kw-guide', function () { if (widget) { var on = widget.toggleGuide(); setMsg(on ? 'Vorlage an' : 'Vorlage aus'); } });
     bind('kw-play', function () { if (widget) widget.play(); });
     bind('kw-clear', function () { if (widget) widget.clear(); });
-    bind('kw-again', function () { grade(0); });
-    bind('kw-good', function () { grade(1); });
+    bind('kw-again', function () { setMsg(''); load(); }); // Nochmal: dasselbe Kanji neu starten
+    bind('kw-good', function () { done(1); });             // Geschafft: bewerten → weiter / zurück
     function bind(id, fn) { var e = document.getElementById(id); if (e) e.addEventListener('click', fn); }
 
     load();

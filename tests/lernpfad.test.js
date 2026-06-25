@@ -21,11 +21,11 @@ beforeEach(() => {
   SRS._useStorage(fakeStorage());
 });
 
-// Alle Kern-Items einer Lektion auf „beherrscht" bringen (Kanji inkl. korrektem Schreiben).
+// Alle Kern-Items einer Lektion auf „beherrscht" bringen (Score ≥ MASTER_AT; Kanji inkl. Schreiben).
+// Score wird deterministisch gesetzt (umgeht Pro-Wort-/Tagescap), Datum = heute (kein Zerfall).
 function masterLesson(L) {
   SRS.lessonCore(L).forEach((c) => {
-    SRS.grade(c.id, 1);
-    SRS.grade(c.id, 1);
+    SRS.__test.setScore(c.id, 100);
     if (c.type === 'kanji') SRS.gradeWrite(c.id, true);
   });
 }
@@ -63,7 +63,7 @@ describe('Default-Gating', () => {
 describe('Kanji-Schreib-Mastery', () => {
   it('Kanji ist erst nach korrektem Schreiben beherrscht', () => {
     const k = SRS.lessonCore(6).find((c) => c.type === 'kanji');
-    SRS.grade(k.id, 1); SRS.grade(k.id, 1);
+    SRS.__test.setScore(k.id, 100); // gut erkannt, aber noch nicht geschrieben
     expect(SRS.isMastered(k.id)).toBe(false);
     expect(SRS.needsWriting(k.id)).toBe(true);
     SRS.gradeWrite(k.id, true);
@@ -72,7 +72,7 @@ describe('Kanji-Schreib-Mastery', () => {
   });
   it('Vokabeln/Grammatik brauchen kein Schreiben', () => {
     const v = SRS.lessonCore(1).find((c) => c.type === 'vocab');
-    SRS.grade(v.id, 1); SRS.grade(v.id, 1);
+    SRS.__test.setScore(v.id, 100);
     expect(SRS.isMastered(v.id)).toBe(true);
     expect(SRS.needsWriting(v.id)).toBe(false);
   });

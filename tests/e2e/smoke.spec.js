@@ -20,11 +20,18 @@ test('Mobile: untere Tab-Leiste sichtbar, obere ausgeblendet', async ({ page }) 
   await expect(page.locator('#topnav')).toBeHidden();
 });
 
-test('Heute startet eine gemischte Session', async ({ page }) => {
+test('Heute ist reine Wiederholung (frischer Stand → nichts fällig)', async ({ page }) => {
   await page.goto('/heute.html');
   await page.click('#h-start');
+  await expect(page.locator('#h-done')).toBeVisible();
+  await expect(page.locator('#h-done')).toContainText('nichts fällig');
+});
+
+test('Lernpfad „Lektion lernen": geführter Kurs startet mit Phase „Vokabeln"', async ({ page }) => {
+  await page.goto('/heute.html?lesson=1');
+  await page.click('#h-start');
   await expect(page.locator('#h-stage')).toBeVisible();
-  await expect(page.locator('#h-prog')).toContainText('/');
+  await expect(page.locator('#h-prog')).toContainText('Vokabeln');
 });
 
 test('Grammatik: ein „Üben"-Knopf öffnet die kombinierte Session', async ({ page }) => {

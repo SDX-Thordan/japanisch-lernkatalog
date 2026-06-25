@@ -17,13 +17,23 @@
   var MIN_EASE = 1.3;
 
   /* ---------- Lernpfad/Gating-Konstanten (leicht justierbar) ---------- */
-  var MASTERY_REPS = 2;        // Item gilt als beherrscht ab so vielen erfolgreichen Reps
+  var MASTERY_REPS = 2;        // (Alt-Feld, bleibt für Migration/Stats)
   var WRITE_LEVEL_REPS = 2;    // ab diesem Erkennungs-Level müssen Kanji zusätzlich geschrieben werden
   var LESSON_TEST_PASS = 0.8;  // Bestehensgrenze des Lektionstests
   var LESSON_TEST_N = 10;      // Aufgaben pro Lektionstest
   var MAX_GATED_LESSON = 25;   // Lernpfad umfasst alle Lektionen L1–25
   // Kanji-Stufe → Test-Lektion (Default: letzte Lektion des jeweiligen Stufenblocks)
   var KANJI_LEVEL_LESSON = { 'A1.2': 6, 'A1.3': 9, 'A1.4': 12, 'A1.5': 14, 'A1.6': 17, 'A1.7': 20 };
+
+  /* ---------- Lernpunktzahl 0–100 (ersetzt SM-2); sanfte, justierbare Defaults ---------- */
+  var GAIN = 20;             // Punkte pro richtiger Antwort
+  var PENALTY = 15;          // Abzug pro falscher Antwort (max. 1×/Tag/Item)
+  var MASTER_AT = 80;        // ab hier „beherrscht" (= 4 Blütenblätter)
+  var GRACE_DAYS = 3;        // so viele Tage kein Zerfall nach der letzten Übung
+  var DECAY_PER_DAY = 2;     // danach Punkte/Tag Zerfall (sanft)
+  var ITEM_DAILY_CAP = 40;   // max. Punktgewinn pro Wort und Tag
+  var DAILY_CAP = 200;       // max. Punktgewinn über alle Wörter pro Tag (global)
+  var SCORE_THRESHOLDS = [20, 40, 60, 80, 100]; // Blütenblatt je 20 %
 
   /* ---------- Storage-Backend (injizierbar) ---------- */
   function defaultBackend() {
@@ -48,6 +58,14 @@
     return d.toISOString().slice(0, 10);
   }
   function round2(x) { return Math.round(x * 100) / 100; }
+  function clamp(x, lo, hi) { return x < lo ? lo : (x > hi ? hi : x); }
+  // Ganze Tage zwischen zwei ISO-Daten (b - a), TZ-sicher.
+  function daysBetween(a, b) {
+    if (!a || !b) return 0;
+    var pa = String(a).split('-'), pb = String(b).split('-');
+    var da = Date.UTC(+pa[0], +pa[1] - 1, +pa[2]), db = Date.UTC(+pb[0], +pb[1] - 1, +pb[2]);
+    return Math.round((db - da) / 86400000);
+  }
   // Fisher-Yates; rng() ∈ [0,1) injizierbar (Default Math.random) für deterministische Tests.
   function shuffleArr(a, rng) { rng = rng || Math.random; for (var i = a.length - 1; i > 0; i--) { var j = Math.floor(rng() * (i + 1)); var t = a[i]; a[i] = a[j]; a[j] = t; } return a; }
 
@@ -56,8 +74,25 @@
     return { v: VERSION, items: {}, lessons: {}, lists: {}, daily: {}, stats: { streakDays: 0, lastActive: null, totalReviews: 0 } };
   }
   function defaultItem() {
-    return { ease: DEFAULT_EASE, interval: 0, due: null, last: null, reps: 0, lapses: 0, streak: 0, writeReps: 0, lastWritten: null, history: [] };
+    return { score: 0, last: null, ease: DEFAULT_EASE, interval: 0, due: null, reps: 0, lapses: 0, streak: 0, writeReps: 0, lastWritten: null, history: [] };
   }
+  // Roh-Punktzahl eines Items (mit Lazy-Migration aus alten reps, falls score fehlt).
+  function rawScore(item) {
+    if (!item) return 0;
+    if (typeof item.score === 'number') return item.score;
+    return item.reps > 0 ? Math.min(100, item.reps * 40) : 0; // Alt-Daten: reps → Startpunkte
+  }
+  // Effektive Punktzahl: Roh-Punktzahl minus sanfter Zerfall seit der letzten Übung (ab GRACE_DAYS).
+  function effectiveScore(item, today) {
+    today = today || todayISO();
+    var s = rawScore(item);
+    if (s <= 0) return 0;
+    var base = (item && item.last) || (item && item.due) || null;
+    var idle = base ? Math.max(0, daysBetween(base, today)) : 0;
+    var decay = DECAY_PER_DAY * Math.max(0, idle - GRACE_DAYS);
+    return clamp(s - decay, 0, 100);
+  }
+  function scoreOf(id, today) { return effectiveScore(store.items[id], today); }
 
   var store = load();
 
@@ -126,19 +161,45 @@
   function get(id) { return store.items[id] || null; }
   function ensure(id) { return store.items[id] || defaultItem(); }
 
+  // Tages-Eintrag: globaler Gewinn, Pro-Wort-Gewinn und Strafe-Sperre an einer Stelle;
+  // setzt sich täglich selbst zurück (alte Tage werden beim Zugriff geprunt → bleibt winzig).
+  function dailyToday(today) {
+    today = today || todayISO();
+    store.daily = store.daily || {};
+    if (!store.daily[today]) store.daily = {}; // nur der aktuelle Tag ist relevant
+    var d = store.daily[today] || (store.daily[today] = { gain: 0, item: {}, pen: {} });
+    if (typeof d.gain !== 'number') d.gain = 0;
+    if (!d.item) d.item = {}; if (!d.pen) d.pen = {};
+    return d;
+  }
+
+  // Bewertung über die 0–100-Lernpunktzahl (ersetzt SM-2): Zerfall wird realisiert, dann
+  // +GAIN (gedeckelt pro Wort & global) bzw. −PENALTY (max. 1×/Tag); nach einem Fehler ist
+  // das Wort für den Rest des Tages eingefroren (kein weiterer Gain). reps/history bleiben.
   function grade(id, g, today) {
     today = today || todayISO();
     var item = store.items[id] || defaultItem();
-    var sched = sm2(item, g, today);
-    item.ease = sched.ease; item.interval = sched.interval; item.due = sched.due;
-    item.last = sched.last; item.reps = sched.reps; item.lapses = sched.lapses;
-    item.streak = g > 0 ? (item.streak || 0) + 1 : 0;
+    var d = dailyToday(today);
+    var cur = effectiveScore(item, today);
+    if (g <= 0) {
+      if (!d.pen[id]) { cur = clamp(cur - PENALTY, 0, 100); d.pen[id] = 1; }
+      item.lapses = (item.lapses || 0) + 1; item.streak = 0;
+    } else {
+      if (!d.pen[id]) {
+        var allowed = Math.min(GAIN, ITEM_DAILY_CAP - (d.item[id] || 0), DAILY_CAP - d.gain);
+        if (allowed > 0) { cur = clamp(cur + allowed, 0, 100); d.item[id] = (d.item[id] || 0) + allowed; d.gain += allowed; }
+      }
+      item.reps = (item.reps || 0) + 1; item.streak = (item.streak || 0) + 1;
+    }
+    item.score = round2(cur); item.last = today;
     item.history = (item.history || []).concat([{ t: today, grade: g }]).slice(-MAX_HISTORY);
     store.items[id] = item;
     store.stats.totalReviews = (store.stats.totalReviews || 0) + 1;
     save();
     return item;
   }
+  // Heutiger Tagesgewinn (für Cap-Hinweis in der UI).
+  function dailyGain(today) { return dailyToday(today).gain; }
   // Tagesstreak: zählt NUR, wenn die Tagesaufgabe („Heute"-Runde) abgeschlossen ist —
   // nicht bei jeder einzelnen Bewertung (sonst springt der Streak schon beim ersten freien Üben auf 1).
   // Idempotent pro Tag (mehrfacher Aufruf am selben Tag ändert nichts).
@@ -170,25 +231,26 @@
     if (type === 'kanji') return kanjiLessonOf(data.level);
     return data.lesson;
   }
-  // Item „beherrscht": genug erfolgreiche Reps; Kanji ab Schreib-Level zusätzlich korrekt geschrieben.
-  function isMastered(id) {
+  // Item „beherrscht": effektive Punktzahl ≥ MASTER_AT; Kanji zusätzlich min. einmal korrekt geschrieben.
+  function isMastered(id, today) {
     var it = store.items[id]; if (!it) return false;
-    if ((it.reps || 0) < MASTERY_REPS) return false;
-    if (typeOf(id) === 'kanji' && (it.reps || 0) >= WRITE_LEVEL_REPS && (it.writeReps || 0) < 1) return false;
+    if (effectiveScore(it, today) < MASTER_AT) return false;
+    if (typeOf(id) === 'kanji' && (it.writeReps || 0) < 1) return false;
     return true;
   }
-  // Kanji, das sein Schreib-Level erreicht hat, aber noch nicht korrekt geschrieben wurde.
+  // Kanji, das schon erkannt wird (gestartet), aber noch nicht korrekt geschrieben wurde.
   function needsWriting(id) {
     if (typeOf(id) !== 'kanji') return false;
     var it = store.items[id]; if (!it) return false;
-    return (it.reps || 0) >= WRITE_LEVEL_REPS && (it.writeReps || 0) < 1;
+    return rawScore(it) > 0 && (it.writeReps || 0) < 1;
   }
 
   /* ---------- Fälligkeit ---------- */
+  // Fällig = bereits gestartet (score > 0), aber durch Zerfall unter MASTER_AT gerutscht → Wiederholung.
   function isDue(id, today) {
-    today = today || todayISO();
     var it = store.items[id];
-    return !!(it && it.due && it.due <= today);
+    if (!it || rawScore(it) <= 0) return false;
+    return effectiveScore(it, today) < MASTER_AT;
   }
   function dueIds(today) {
     today = today || todayISO();
@@ -227,7 +289,7 @@
     var all = [].concat.apply([], perSource);
 
     var due = all.filter(function (x) { return isDue(x.id, today); })
-      .sort(function (a, b) { return (store.items[a.id].due || '').localeCompare(store.items[b.id].due || ''); })
+      .sort(function (a, b) { return effectiveScore(store.items[a.id], today) - effectiveScore(store.items[b.id], today); }) // am stärksten zerfallene zuerst
       .slice(0, reviewLimit)
       .map(function (x) { return { id: x.id, type: x.type, data: x.data, reason: 'due' }; });
 
@@ -235,7 +297,7 @@
     // Pro Quelle die Kandidaten mischen → „Heute" wählt zufällig aus den freigeschalteten Lektionen
     // (statt immer dieselben ersten Items). due/Wiederholungen bleiben nach Fälligkeit sortiert.
     var rng = opts.rng || Math.random;
-    var newBySource = perSource.map(function (reg) { return shuffleArr(reg.filter(function (x) { return !store.items[x.id] && newLessonOk(x); }), rng); });
+    var newBySource = perSource.map(function (reg) { return shuffleArr(reg.filter(function (x) { return rawScore(store.items[x.id]) <= 0 && newLessonOk(x); }), rng); });
     var fresh = [], guard = 0;
     while (fresh.length < newLimit && guard < newLimit * sources.length + sources.length) {
       var any = false;
@@ -262,14 +324,20 @@
   function stats(today) {
     today = today || todayISO();
     var ids = Object.keys(store.items);
-    var due = 0;
-    ids.forEach(function (id) { if (isDue(id, today)) due++; });
+    var due = 0, learned = 0, sum = 0;
+    ids.forEach(function (id) {
+      if (isDue(id, today)) due++;
+      if (rawScore(store.items[id]) > 0) { learned++; sum += effectiveScore(store.items[id], today); }
+    });
     return {
       streakDays: store.stats.streakDays || 0,
       lastActive: store.stats.lastActive || null,
       totalReviews: store.stats.totalReviews || 0,
-      learned: ids.length,
+      learned: learned,
       due: due,
+      avgScore: learned ? round2(sum / learned) : 0,
+      dailyGain: dailyGain(today),
+      dailyCap: DAILY_CAP,
     };
   }
 
@@ -283,9 +351,9 @@
     for (id in (b.items || {})) {
       var bi = b.items[id], ai = items[id];
       if (!ai) { items[id] = bi; continue; }
-      var ar = ai.reps || 0, br = bi.reps || 0;
-      if (br > ar) items[id] = bi;
-      else if (br === ar && (bi.due || '') > (ai.due || '')) items[id] = bi;
+      var as = rawScore(ai), bs = rawScore(bi);
+      if (bs > as) items[id] = bi;
+      else if (bs === as && (bi.last || bi.due || '') > (ai.last || ai.due || '')) items[id] = bi;
     }
     // Lektions-Status mergen: bestanden/freigeschaltet gewinnen, höherer Score gewinnt.
     var lessons = {}, lid;
@@ -338,15 +406,19 @@
   // Flache Kopie für Auswertungen (Fortschritts-Seite).
   function snapshot() { return JSON.parse(JSON.stringify(store)); }
 
-  // Fälligkeits-Vorschau: [{date, count}] für die nächsten `days` Tage ab today.
+  // Fälligkeits-Vorschau: [{date, count}] = gestartete Items, die an Tag d (durch Zerfall) erstmals
+  // unter MASTER_AT rutschen (i=0: alle bereits fälligen).
   function forecast(today, days) {
     today = today || todayISO(); days = days || 7;
     var out = [];
     for (var i = 0; i < days; i++) {
       var d = addDays(today, i), n = 0;
       Object.keys(store.items).forEach(function (id) {
-        var due = store.items[id].due;
-        if (due && (i === 0 ? due <= d : due === d)) n++;
+        var it = store.items[id];
+        if (rawScore(it) <= 0) return;
+        var dueNow = effectiveScore(it, d) < MASTER_AT;
+        var duePrev = i > 0 && effectiveScore(it, addDays(today, i - 1)) < MASTER_AT;
+        if (i === 0 ? dueNow : (dueNow && !duePrev)) n++;
       });
       out.push({ date: d, count: n });
     }
@@ -362,10 +434,18 @@
     (window.KANJI || []).forEach(function (k) { if (kanjiLessonOf(k.level) === lesson) out.push({ id: srsId('kanji', k), type: 'kanji', data: k }); });
     return out;
   }
-  function coreProgress(lesson) {
-    var core = lessonCore(lesson), mastered = 0;
-    core.forEach(function (c) { if (isMastered(c.id)) mastered++; });
-    return { mastered: mastered, total: core.length, fraction: core.length ? mastered / core.length : 1 };
+  function coreProgress(lesson, today) {
+    var core = lessonCore(lesson), mastered = 0, sum = 0;
+    core.forEach(function (c) { if (isMastered(c.id, today)) mastered++; sum += effectiveScore(store.items[c.id], today); });
+    return { mastered: mastered, total: core.length, fraction: core.length ? mastered / core.length : 1,
+      avgScore: core.length ? sum / core.length : 0 };
+  }
+  // Neue (noch nicht gelernte) Kern-Items einer Lektion, nach Typ gruppiert — Grundlage für den
+  // geführten Kurs (Vokabeln → Grammatik → … → Kanji). Beispiel-Phasen baut die UI aus der Grammatik.
+  function lessonPlan(lesson) {
+    var out = { vocab: [], grammar: [], kanji: [] };
+    lessonCore(lesson).forEach(function (c) { if (rawScore(store.items[c.id]) <= 0) out[c.type].push(c); });
+    return out;
   }
   function lessonRec(lesson) { store.lessons = store.lessons || {}; return store.lessons[lesson] || {}; }
   function lessonState(lesson) {
@@ -477,12 +557,14 @@
   window.SRS = {
     srsId: srsId, typeOf: typeOf,
     get: get, ensure: ensure, grade: grade, gradeWrite: gradeWrite,
-    completeDaily: completeDaily,
+    completeDaily: completeDaily, dailyGain: dailyGain,
+    // Lernpunktzahl 0–100
+    effectiveScore: scoreOf, scoreOf: scoreOf, MASTER_AT: MASTER_AT,
     isDue: isDue, dueIds: dueIds,
     buildQueue: buildQueue, stats: stats,
     // Lernpfad / Gating
     isMastered: isMastered, needsWriting: needsWriting,
-    kanjiLessonOf: kanjiLessonOf, lessonCore: lessonCore, coreProgress: coreProgress,
+    kanjiLessonOf: kanjiLessonOf, lessonCore: lessonCore, coreProgress: coreProgress, lessonPlan: lessonPlan,
     lessonState: lessonState, maxUnlockedLesson: maxUnlockedLesson, currentLesson: currentLesson,
     canTakeTest: canTakeTest, recordLessonTest: recordLessonTest,
     unlockAll: unlockAll, resetLessons: resetLessons,
@@ -492,6 +574,8 @@
     exportJSON: exportJSON, importJSON: importJSON, downloadBackup: downloadBackup, reset: reset,
     snapshot: snapshot, forecast: forecast,
     _useStorage: useStorage,
-    __test: { sm2: sm2, mergeStore: mergeStore, addDays: addDays, todayISO: todayISO, registry: registry, itemLesson: itemLesson },
+    __test: { sm2: sm2, mergeStore: mergeStore, addDays: addDays, todayISO: todayISO, registry: registry, itemLesson: itemLesson,
+      effectiveScore: effectiveScore, rawScore: rawScore,
+      setScore: function (id, score, last) { var it = store.items[id] || defaultItem(); it.score = score; it.last = last || todayISO(); store.items[id] = it; save(); return it; } },
   };
 })();

@@ -74,13 +74,21 @@ describe('sm2() — SM-2-light Scheduler (rein)', () => {
 });
 
 describe('grade() + Fälligkeit + Persistenz', () => {
-  it('grade() legt Item an, persistiert und macht es fällig in der Zukunft', () => {
-    SRS.grade('k:学', 1, '2026-06-23');
-    const it = SRS.get('k:学');
+  it('grade() legt Item an, hebt den Score (+20) und ist bei niedrigem Stand fällig', () => {
+    SRS.grade('v:あ|1', 1, '2026-06-23');
+    const it = SRS.get('v:あ|1');
     expect(it).toBeTruthy();
-    expect(it.due).toBe('2026-06-24');
-    expect(SRS.isDue('k:学', '2026-06-23')).toBe(false);
-    expect(SRS.isDue('k:学', '2026-06-24')).toBe(true);
+    expect(it.score).toBe(20);
+    // gestartet, aber unter MASTER_AT → fällig (Wiederholung)
+    expect(SRS.isDue('v:あ|1', '2026-06-23')).toBe(true);
+  });
+  it('gemeistert (Score ≥ MASTER_AT) ist nicht fällig; Zerfall macht es später wieder fällig', () => {
+    // Pro-Wort-Cap 40/Tag → über zwei Tage auf 80 bringen.
+    SRS.grade('v:い|1', 1, '2026-06-01'); SRS.grade('v:い|1', 1, '2026-06-01');
+    SRS.grade('v:い|1', 1, '2026-06-02'); SRS.grade('v:い|1', 1, '2026-06-02');
+    expect(SRS.get('v:い|1').score).toBe(80);
+    expect(SRS.isDue('v:い|1', '2026-06-02')).toBe(false);
+    expect(SRS.isDue('v:い|1', '2026-07-15')).toBe(true); // lange nicht geübt → zerfallen → fällig
   });
   it('Persistenz übersteht einen Neu-Load aus demselben Storage', () => {
     const store = fakeStorage();
@@ -93,12 +101,13 @@ describe('grade() + Fälligkeit + Persistenz', () => {
     win2.SRS._useStorage(store);
     expect(win2.SRS.get('k:水').reps).toBe(1);
   });
-  it('dueIds() listet nur fällige IDs', () => {
-    SRS.grade('k:学', 1, '2026-06-20'); // fällig 06-21
-    SRS.grade('k:水', 1, '2026-06-23'); // fällig 06-24
-    const due = SRS.dueIds('2026-06-23');
-    expect(due).toContain('k:学');
-    expect(due).not.toContain('k:水');
+  it('dueIds() listet gestartete, nicht gemeisterte Items (Score < MASTER_AT)', () => {
+    SRS.grade('v:あ|1', 1, '2026-06-21'); // Score 20 → fällig
+    SRS.grade('v:い|1', 1, '2026-06-20'); SRS.grade('v:い|1', 1, '2026-06-20'); // +40
+    SRS.grade('v:い|1', 1, '2026-06-21'); SRS.grade('v:い|1', 1, '2026-06-21'); // → 80 (gemeistert)
+    const due = SRS.dueIds('2026-06-21');
+    expect(due).toContain('v:あ|1');
+    expect(due).not.toContain('v:い|1');
   });
 });
 

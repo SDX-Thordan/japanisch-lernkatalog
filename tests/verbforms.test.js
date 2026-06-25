@@ -24,12 +24,14 @@ describe('genVerbFormExercises("te")', () => {
       expect(ex.richtig).toBeLessThan(ex.optionen.length);
       // Optionen eindeutig
       expect(new Set(ex.optionen).size).toBe(ex.optionen.length);
-      // Lösung = tatsächliche て-Form des Verbs (über die Konjugations-Engine gegengeprüft)
+      // Lösung = tatsächliche て-Form des Verbs (über die Konjugations-Engine gegengeprüft).
+      // Robust gegen Homographen (gleiche Kana, andere Gruppe): mindestens ein Treffer muss passen.
       const kana = kanaFromFrage(ex.frage);
-      const v = (win.VOKABULAR || []).find((x) => x.kana === kana);
-      expect(v).toBeTruthy();
-      const c = K.conjugate(v.kana, K.verbGroup(v.pos));
-      expect(ex.optionen[ex.richtig]).toBe(c.te);
+      const teForms = (win.VOKABULAR || [])
+        .filter((x) => x.kana === kana && /^V\./.test(x.pos))
+        .map((x) => { const c = K.conjugate(x.kana, K.verbGroup(x.pos)); return c && c.te; });
+      expect(teForms.length).toBeGreaterThan(0);
+      expect(teForms).toContain(ex.optionen[ex.richtig]);
     });
   });
 

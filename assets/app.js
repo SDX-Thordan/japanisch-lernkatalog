@@ -305,7 +305,7 @@
     const tr=el('tr','item'); tr.dataset.filter=String(w.lesson);
     tr.dataset.type=vocabType(w.pos);
     tr.dataset.search=norm([w.kanji,w.kana,w.romaji,w.de,w.pos].join(' '));
-    tr.innerHTML='<td class="vocab-jp">'+esc(written)+'</td><td>'+
+    tr.innerHTML='<td class="vocab-jp">'+scoreBadgeHtml('v:'+w.kana+'|'+w.lesson)+esc(written)+'</td><td>'+
       (showKana?'<span class="vocab-reading">'+esc(w.kana)+'</span>':'')+'</td>'+
       '<td class="de hideable">'+esc(w.de)+'</td><td><span class="pos">'+esc(w.pos)+'</span></td>'+
       (listsOn?'<td class="vocab-add"><button class="v-add" type="button" title="Zu Liste hinzufügen" data-vid="v:'+esc(w.kana)+'|'+w.lesson+'" data-word="'+esc(written)+'">＋</button></td>':'');
@@ -355,7 +355,7 @@
     const card=el('article','gp item collapsible collapsed'); card.dataset.filter=String(L);
     card.dataset.search=norm([g.pattern,g.title,g.bildung,g.erklaerung,all.map(b=>b.jp+' '+(b.r||'')+' '+b.de).join(' ')].join(' '));
     card.innerHTML=
-      '<div class="gp-head card-toggle"><span class="gp-pattern">'+esc(g.pattern)+'</span>'+
+      '<div class="gp-head card-toggle">'+scoreBadgeHtml('g:'+g.pattern)+'<span class="gp-pattern">'+esc(g.pattern)+'</span>'+
       (g.title?'<span class="gp-title">'+esc(g.title)+'</span>':'')+'<span class="tag">L'+L+'</span></div>'+
       '<div class="collapse-body">'+
       (g.bildung?'<div class="gp-bildung"><b>Bildung:</b> '+esc(g.bildung)+'</div>':'')+
@@ -618,19 +618,35 @@
     h.innerHTML='<h2>'+esc(title)+'</h2>'+(theme?'<span class="theme">'+esc(theme)+'</span>':'')+'<span class="gcount">'+n+'</span>';
     return h;
   }
-  // Durchschnittliche Wiederholungen der Items einer Lektion (über alle Kern-Items, ungesehene zählen 0).
-  function lessonRepsAvg(L,type){
-    if(!(window.SRS&&window.SRS.lessonCore&&window.SRS.get))return 0;
+  // Lernstand-Schwellen: 0 = Knospe (noch nicht gelernt), dann alle 20 % ein Blütenblatt.
+  const SCORE_THRESHOLDS=[20,40,60,80,100];
+  // Effektiver Lernstand (0–100) eines Items.
+  function itemScore(id){ return (window.SRS&&window.SRS.effectiveScore)?window.SRS.effectiveScore(id):0; }
+  // Mini-Blüte für den Lernstand eines einzelnen Items (Vokabel/Grammatik/Kanji).
+  function scoreBadge(id){
+    const v=Math.round(itemScore(id));
+    const s=el('span','grp-flower',sakuraSvg(v,SCORE_THRESHOLDS,{cls:'sakura-sm'}));
+    s.title='Lernstand '+v+' %';
+    return s;
+  }
+  function scoreBadgeHtml(id){
+    if(!(window.SRS&&window.SRS.effectiveScore))return '';
+    const v=Math.round(itemScore(id));
+    return '<span class="grp-flower lernstand" title="Lernstand '+v+' %">'+sakuraSvg(v,SCORE_THRESHOLDS,{cls:'sakura-sm'})+'</span>';
+  }
+  // Durchschnittlicher Lernstand der Items einer Lektion (über alle Kern-Items, ungesehene zählen 0).
+  function lessonScoreAvg(L,type){
+    if(!(window.SRS&&window.SRS.lessonCore&&window.SRS.effectiveScore))return 0;
     const core=window.SRS.lessonCore(L).filter(c=>!type||c.type===type);
     if(!core.length)return 0;
-    let sum=0; core.forEach(c=>{ const it=window.SRS.get(c.id); if(it)sum+=it.reps||0; });
+    let sum=0; core.forEach(c=>{ sum+=window.SRS.effectiveScore(c.id); });
     return sum/core.length;
   }
-  // Sakura-Wiederhol-Indikator je Lektion (Schwellen für Ø-Wiederholungen).
+  // Sakura-Lernstand-Indikator je Lektion (Ø-Lernstand der Items).
   function lessonRepsBadge(L,type){
-    const avg=lessonRepsAvg(L,type);
-    const s=el('span','grp-flower',sakuraSvg(avg,[1,2,4,7,12],{cls:'sakura-sm'}));
-    s.title='Ø '+avg.toFixed(1)+' Wiederholungen';
+    const avg=lessonScoreAvg(L,type);
+    const s=el('span','grp-flower',sakuraSvg(avg,SCORE_THRESHOLDS,{cls:'sakura-sm'}));
+    s.title='Ø Lernstand '+Math.round(avg)+' %';
     return s;
   }
   function buildChips(values,labelFn){
@@ -722,14 +738,33 @@
     const onlyLesson=isNaN(lessonParam)?null:lessonParam;
     function lessonOf(c){ return c.type==='kanji'?window.SRS.kanjiLessonOf(c.data.level):c.data.lesson; }
     function refreshStats(){ const s=window.SRS.stats(); setText('h-streak',s.streakDays); setText('h-due',s.due); setText('h-learned',s.learned); setHtml('h-streak-flower',sakuraSvg(s.streakDays)); }
+    // Grammatik-Items einer Lektion mit Satz-Übungen → Beispiel-Aufgaben für den geführten Kurs.
+    function lessonGrammarExamples(L){
+      return (window.GRAMMATIK||[]).filter(g=>g.lesson===L && window.SATZ_TEMPLATES && window.SATZ_TEMPLATES[g.pattern])
+        .map(g=>({id:window.SRS.srsId('grammar',g),type:'grammar',data:g}));
+    }
+    // Geführter Kurs einer Lektion: NUR neue Items, didaktisch geordnet
+    // Vokabeln → Grammatik → Beispiele → Kanji → Beispiele nochmal. Leer, wenn alles gelernt.
+    function buildLessonCourse(L){
+      const plan=window.SRS.lessonPlan(L);
+      if(plan.vocab.length+plan.grammar.length+plan.kanji.length===0)return []; // alles gelernt → Test
+      const d=[], push=(arr,phase,mode)=>arr.forEach(c=>d.push({id:c.id,type:c.type,data:c.data,reason:'new',phase:phase,mode:mode}));
+      const ex=lessonGrammarExamples(L);
+      push(plan.vocab,'Vokabeln','card');
+      push(plan.grammar,'Grammatik','card');
+      ex.forEach(c=>d.push({id:c.id,type:'grammar',data:c.data,reason:'example',phase:'Beispiele',mode:'exercise'}));
+      push(plan.kanji,'Kanji','write');
+      ex.forEach(c=>d.push({id:c.id,type:'grammar',data:c.data,reason:'example',phase:'Beispiele nochmal',mode:'exercise'}));
+      return d;
+    }
     function start(){
-      // Gating: Wiederholungen aus allen freigeschalteten Lektionen; NEUE Items fokussiert auf die
-      // aktuelle Lektion (niedrigste, deren Kern noch nicht gemeistert ist) → füllt sichtbar den
-      // Lernpfad-Fortschritt. Mit ?lesson=L gezielt genau eine Lektion lernen.
-      const maxLesson=onlyLesson!=null?onlyLesson:window.SRS.maxUnlockedLesson();
-      const newLesson=onlyLesson!=null?onlyLesson:window.SRS.currentLesson();
-      deck=window.SRS.buildQueue({sources:['kanji','vocab','grammar'],newLimit:clampInt('h-newlimit',5),reviewLimit:clampInt('h-revlimit',15),maxLesson:maxLesson,newLesson:newLesson});
-      if(onlyLesson!=null)deck=deck.filter(c=>lessonOf(c)===onlyLesson);
+      if(onlyLesson!=null){
+        // Lernpfad-Modus: geführter Kurs der Lektion (nur neue Items, in Phasen).
+        deck=buildLessonCourse(onlyLesson);
+      } else {
+        // Heute = reine Wiederholung: nur fällige (zerfallene) Items aus allen freigeschalteten Lektionen.
+        deck=window.SRS.buildQueue({sources:['kanji','vocab','grammar'],newLimit:0,reviewLimit:clampInt('h-revlimit',30),maxLesson:window.SRS.maxUnlockedLesson()});
+      }
       total=deck.length; setup.classList.add('hidden'); done.classList.add('hidden'); stage.classList.remove('hidden'); render();
     }
     function finishItem(grade){ const c=deck[0]; if(grade!=null&&c)window.SRS.grade(c.id,grade); deck.shift(); refreshStats(); render(); }
@@ -737,17 +772,26 @@
       if(!deck.length){ stage.classList.add('hidden'); done.classList.remove('hidden');
         // Tagesaufgabe abgeschlossen → Streak genau einmal pro Tag hochzählen (nicht bei Einzel-Bewertungen).
         if(total>0){ window.SRS.completeDaily(); refreshStats(); }
-        done.innerHTML=(total?'<div class="tr-done-in">Tagesrunde geschafft!<br>'+total+' Aufgaben erledigt.</div>':'<div class="tr-done-in">Für heute ist alles erledigt.</div>')+
+        if(onlyLesson!=null){
+          // Geführter Kurs: entweder durchgearbeitet oder schon komplett gelernt → zum Lektionstest.
+          done.innerHTML='<div class="tr-done-in">'+(total?'Lektion '+onlyLesson+' durchgearbeitet! 🌸':'Alle Inhalte dieser Lektion sind gelernt.')+
+            '<br>Jetzt im Lernpfad den <b>Lektionstest</b> machen, um die nächste freizuschalten.</div>'+
+            '<a class="btn-primary" href="lernpfad.html"><span class="msi" aria-hidden="true">route</span> Zum Lernpfad</a>';
+          return;
+        }
+        done.innerHTML=(total?'<div class="tr-done-in">Wiederholung geschafft!<br>'+total+' Aufgaben erledigt.</div>':'<div class="tr-done-in">Heute nichts fällig — alles frisch. 🌸</div>')+
           '<button class="btn-primary" id="h-again" type="button"><span class="msi" aria-hidden="true">refresh</span> Noch eine Runde</button>';
         const a=document.getElementById('h-again'); if(a)a.addEventListener('click',()=>{ done.classList.add('hidden'); setup.classList.remove('hidden'); refreshStats(); });
         return; }
       const c=deck[0], learned=total-deck.length;
-      prog.textContent='Aufgabe '+(learned+1)+' / '+total+(onlyLesson!=null?' · Lektion '+onlyLesson:'');
-      typeTag.textContent=({kanji:'漢字 Kanji',vocab:'語彙 Vokabel',grammar:'文法 Grammatik'}[c.type]||'')+(c.reason==='due'?' · Wiederholung':' · neu');
+      prog.textContent=(onlyLesson!=null&&c.phase?c.phase+' · ':'')+'Aufgabe '+(learned+1)+' / '+total+(onlyLesson!=null?' · Lektion '+onlyLesson:'');
+      const reasonLbl=c.reason==='due'?' · Wiederholung':(c.reason==='example'?' · Beispiel':' · neu');
+      typeTag.textContent=({kanji:'漢字 Kanji',vocab:'語彙 Vokabel',grammar:'文法 Grammatik'}[c.type]||'')+reasonLbl;
       typeTag.className='tag tr-type-'+c.type;
-      // Kanji, das sein Schreib-Level erreicht hat: erst korrekt schreiben.
-      if(c.type==='kanji'&&window.KanjiWrite&&window.SRS.needsWriting(c.id))renderWriteCard(c);
-      else if(c.type==='grammar'&&window.Exercises&&window.SATZ_TEMPLATES&&window.SATZ_TEMPLATES[c.data.pattern])renderExerciseItem(c);
+      // Modus aus dem Kurs (card/exercise/write) bzw. Auto-Routing in der Wiederholung.
+      const canWrite=window.KanjiWrite, canEx=window.Exercises&&window.SATZ_TEMPLATES&&window.SATZ_TEMPLATES[c.data.pattern];
+      if((c.mode==='write'||(c.mode==null&&c.type==='kanji'&&window.SRS.needsWriting(c.id)))&&canWrite)renderWriteCard(c);
+      else if((c.mode==='exercise'||(c.mode==null&&c.type==='grammar'))&&canEx)renderExerciseItem(c);
       else renderFlashcard(c);
     }
     function renderWriteCard(c){
@@ -809,7 +853,9 @@
       const maxC=Math.max(1,...fc.map(d=>d.count));
       const bars=fc.map(d=>'<div class="f-bar"><div class="f-bar-fill" style="height:'+Math.round(d.count/maxC*100)+'%"></div>'+
         '<span class="f-bar-n">'+d.count+'</span><span class="f-bar-d">'+d.date.slice(5)+'</span></div>').join('');
-      setText('f-streak',s.streakDays); setText('f-learned',s.learned); setText('f-due',s.due); setText('f-reviews',s.totalReviews); setHtml('f-streak-flower',sakuraSvg(s.streakDays));
+      setText('f-streak',s.streakDays); setText('f-learned',s.learned); setText('f-due',s.due); setHtml('f-streak-flower',sakuraSvg(s.streakDays));
+      setText('f-avg',Math.round(s.avgScore||0)+'%'); setHtml('f-avg-flower',sakuraSvg(s.avgScore||0,SCORE_THRESHOLDS,{cls:'sakura-sm'}));
+      setText('f-daily',(s.dailyGain||0)+' / '+(s.dailyCap||0));
       const forecast=document.getElementById('f-forecast'); if(forecast)forecast.innerHTML=bars;
       // Lernpfad-Fortschritt: Status + Kern-Fortschritt + Test-Score je Lektion.
       const lp=document.getElementById('f-lessons');
