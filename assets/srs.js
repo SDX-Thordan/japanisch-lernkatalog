@@ -48,6 +48,8 @@
     return d.toISOString().slice(0, 10);
   }
   function round2(x) { return Math.round(x * 100) / 100; }
+  // Fisher-Yates; rng() ∈ [0,1) injizierbar (Default Math.random) für deterministische Tests.
+  function shuffleArr(a, rng) { rng = rng || Math.random; for (var i = a.length - 1; i > 0; i--) { var j = Math.floor(rng() * (i + 1)); var t = a[i]; a[i] = a[j]; a[j] = t; } return a; }
 
   /* ---------- Store-Grundgerüst ---------- */
   function freshStore() {
@@ -223,7 +225,10 @@
       .map(function (x) { return { id: x.id, type: x.type, data: x.data, reason: 'due' }; });
 
     // Neue Items im Round-Robin über die Quellen ziehen, damit Kanji, Vokabeln & Grammatik vorkommen.
-    var newBySource = perSource.map(function (reg) { return reg.filter(function (x) { return !store.items[x.id]; }); });
+    // Pro Quelle die Kandidaten mischen → „Heute" wählt zufällig aus den freigeschalteten Lektionen
+    // (statt immer dieselben ersten Items). due/Wiederholungen bleiben nach Fälligkeit sortiert.
+    var rng = opts.rng || Math.random;
+    var newBySource = perSource.map(function (reg) { return shuffleArr(reg.filter(function (x) { return !store.items[x.id]; }), rng); });
     var fresh = [], guard = 0;
     while (fresh.length < newLimit && guard < newLimit * sources.length + sources.length) {
       var any = false;
