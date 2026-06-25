@@ -51,7 +51,7 @@
 
   /* ---------- Store-Grundgerüst ---------- */
   function freshStore() {
-    return { v: VERSION, items: {}, lessons: {}, daily: {}, stats: { streakDays: 0, lastActive: null, totalReviews: 0 } };
+    return { v: VERSION, items: {}, lessons: {}, lists: {}, daily: {}, stats: { streakDays: 0, lastActive: null, totalReviews: 0 } };
   }
   function defaultItem() {
     return { ease: DEFAULT_EASE, interval: 0, due: null, last: null, reps: 0, lapses: 0, streak: 0, writeReps: 0, lastWritten: null, history: [] };
@@ -73,6 +73,7 @@
       v: VERSION,
       items: s.items || {},
       lessons: s.lessons || {},
+      lists: s.lists || {},
       daily: s.daily || {},
       stats: {
         streakDays: (s.stats && s.stats.streakDays) || 0,
@@ -282,9 +283,18 @@
         testDate: newer ? bl.testDate : al.testDate,
       };
     }
+    // Vokabellisten mergen: gleiche id → Items vereinigen; sonst übernehmen.
+    var mlists = {}, mid;
+    for (mid in (a.lists || {})) mlists[mid] = { id: mid, name: a.lists[mid].name, created: a.lists[mid].created, items: (a.lists[mid].items || []).slice() };
+    for (mid in (b.lists || {})) {
+      var bl2 = b.lists[mid];
+      if (!mlists[mid]) { mlists[mid] = { id: mid, name: bl2.name, created: bl2.created, items: (bl2.items || []).slice() }; continue; }
+      (bl2.items || []).forEach(function (x) { if (mlists[mid].items.indexOf(x) === -1) mlists[mid].items.push(x); });
+      mlists[mid].name = mlists[mid].name || bl2.name;
+    }
     var as = a.stats || {}, bs = b.stats || {};
     return {
-      v: VERSION, items: items, lessons: lessons, daily: a.daily || b.daily || {},
+      v: VERSION, items: items, lessons: lessons, lists: mlists, daily: a.daily || b.daily || {},
       stats: {
         streakDays: Math.max(as.streakDays || 0, bs.streakDays || 0),
         lastActive: (as.lastActive || '') > (bs.lastActive || '') ? as.lastActive : (bs.lastActive || as.lastActive || null),
@@ -378,6 +388,51 @@
   }
   function resetLessons() { store.lessons = {}; save(); }
 
+  /* ---------- Persönliche Vokabellisten ---------- */
+  function nextListId() {
+    store.lists = store.lists || {};
+    var max = 0;
+    Object.keys(store.lists).forEach(function (k) { var n = parseInt(String(k).replace(/^l/, ''), 10); if (n > max) max = n; });
+    return 'l' + (max + 1);
+  }
+  function createList(name, today) {
+    store.lists = store.lists || {};
+    var id = nextListId();
+    store.lists[id] = { id: id, name: String(name || 'Liste ' + id.slice(1)).trim() || ('Liste ' + id.slice(1)), created: today || todayISO(), items: [] };
+    save();
+    return store.lists[id];
+  }
+  function renameList(id, name) {
+    var l = store.lists && store.lists[id]; if (!l) return null;
+    l.name = String(name || '').trim() || l.name; save(); return l;
+  }
+  function deleteList(id) { if (store.lists && store.lists[id]) { delete store.lists[id]; save(); } }
+  function addToList(id, ids) {
+    var l = store.lists && store.lists[id]; if (!l) return null;
+    (Array.isArray(ids) ? ids : [ids]).forEach(function (x) { if (x && l.items.indexOf(x) === -1) l.items.push(x); });
+    save(); return l;
+  }
+  function removeFromList(id, ids) {
+    var l = store.lists && store.lists[id]; if (!l) return null;
+    var rm = Array.isArray(ids) ? ids : [ids];
+    l.items = l.items.filter(function (x) { return rm.indexOf(x) === -1; });
+    save(); return l;
+  }
+  function lists() {
+    store.lists = store.lists || {};
+    return Object.keys(store.lists).map(function (k) { return store.lists[k]; })
+      .sort(function (a, b) { return (parseInt(a.id.slice(1), 10) || 0) - (parseInt(b.id.slice(1), 10) || 0); });
+  }
+  // Vokabel-IDs einer Liste zu Daten auflösen (nicht auflösbare IDs werden übersprungen).
+  function vocabIndex() {
+    var idx = {}; (window.VOKABULAR || []).forEach(function (v) { idx[srsId('vocab', v)] = v; }); return idx;
+  }
+  function listItems(id) {
+    var l = store.lists && store.lists[id]; if (!l) return [];
+    var idx = vocabIndex();
+    return l.items.map(function (x) { return { id: x, data: idx[x] || null }; }).filter(function (o) { return o.data; });
+  }
+
   /* ---------- UI-Komfort: Download/Upload im Browser ---------- */
   function downloadBackup(filename) {
     filename = filename || 'katalog-fortschritt.json';
@@ -404,6 +459,9 @@
     lessonState: lessonState, maxUnlockedLesson: maxUnlockedLesson,
     canTakeTest: canTakeTest, recordLessonTest: recordLessonTest,
     unlockAll: unlockAll, resetLessons: resetLessons,
+    // Persönliche Vokabellisten
+    createList: createList, renameList: renameList, deleteList: deleteList,
+    addToList: addToList, removeFromList: removeFromList, lists: lists, listItems: listItems,
     exportJSON: exportJSON, importJSON: importJSON, downloadBackup: downloadBackup, reset: reset,
     snapshot: snapshot, forecast: forecast,
     _useStorage: useStorage,

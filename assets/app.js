@@ -1,5 +1,5 @@
 /* ============================================================
-   日本語 A1.7 — Lern-Katalog · app.js
+   Go! Nihongo · app.js
    Rendering + Suche/Filter + Lesungen-Schalter + Karteikarten
    + Verb-Konjugator + Verben-Seite + Trainings-Modus.
    Reine Vanilla-JS, offline lauffähig (file://), keine Abhängigkeiten.
@@ -137,20 +137,27 @@
   /* ============================================================  VOKABULAR  */
   function renderVocab(content){
     const data=window.VOKABULAR||[], byLesson={};
+    const listsOn=!!window.SRS;
     data.forEach(w=>{(byLesson[w.lesson]=byLesson[w.lesson]||[]).push(w);});
     Object.keys(byLesson).map(Number).sort((a,b)=>a-b).forEach(L=>{
       const arr=byLesson[L];
       const group=el('section','group'); group.dataset.group=String(L);
-      group.appendChild(groupHead('Lektion '+L,(L>20?'🔒 Vorschau · ':'')+((LESSON[L]||{}).thema||''),arr.length));
+      const head=groupHead('Lektion '+L,(LESSON[L]||{}).thema||'',arr.length);
+      if(listsOn){ const b=el('button','v-add-lesson','＋ Lektion → Liste'); b.type='button'; b.dataset.lesson=String(L); head.appendChild(b); }
+      group.appendChild(head);
       const wrap=el('div','table-wrap'), table=el('table','vocab');
-      table.innerHTML='<thead><tr><th>Japanisch</th><th>Lesung</th><th>Bedeutung</th><th>Wortart</th></tr></thead>';
-      const tb=el('tbody'); arr.forEach(w=>tb.appendChild(vocabRow(w))); table.appendChild(tb);
+      table.innerHTML='<thead><tr><th>Japanisch</th><th>Lesung</th><th>Bedeutung</th><th>Wortart</th>'+(listsOn?'<th></th>':'')+'</tr></thead>';
+      const tb=el('tbody'); arr.forEach(w=>tb.appendChild(vocabRow(w,listsOn))); table.appendChild(tb);
       wrap.appendChild(table); group.appendChild(wrap); content.appendChild(group);
     });
     buildChips(Object.keys(byLesson).map(Number).sort((a,b)=>a-b), L=>'L'+L);
     buildTypeChips();
+    if(listsOn){ content.addEventListener('click',e=>{
+      const a=e.target.closest('.v-add'); if(a){ e.stopPropagation(); openListPicker([a.dataset.vid],a.dataset.word); return; }
+      const al=e.target.closest('.v-add-lesson'); if(al){ const L=+al.dataset.lesson; const ids=(window.VOKABULAR||[]).filter(v=>v.lesson===L).map(v=>'v:'+v.kana+'|'+v.lesson); openListPicker(ids,'Lektion '+L); return; }
+    }); }
   }
-  function vocabRow(w){
+  function vocabRow(w,listsOn){
     const written=(w.kanji&&w.kanji.length)?w.kanji:w.kana;
     const showKana=(w.kanji&&w.kanji.length&&w.kanji!==w.kana);
     const tr=el('tr','item'); tr.dataset.filter=String(w.lesson);
@@ -158,7 +165,8 @@
     tr.dataset.search=norm([w.kanji,w.kana,w.romaji,w.de,w.pos].join(' '));
     tr.innerHTML='<td class="vocab-jp">'+esc(written)+'</td><td>'+
       (showKana?'<span class="vocab-reading">'+esc(w.kana)+'</span>':'')+'</td>'+
-      '<td class="de hideable">'+esc(w.de)+'</td><td><span class="pos">'+esc(w.pos)+'</span></td>';
+      '<td class="de hideable">'+esc(w.de)+'</td><td><span class="pos">'+esc(w.pos)+'</span></td>'+
+      (listsOn?'<td class="vocab-add"><button class="v-add" type="button" title="Zu Liste hinzufügen" data-vid="v:'+esc(w.kana)+'|'+w.lesson+'" data-word="'+esc(written)+'">＋</button></td>':'');
     return tr;
   }
   // Ordnet eine Wortart einer Filter-Kategorie zu.
@@ -178,7 +186,7 @@
     Object.keys(byLesson).map(Number).sort((a,b)=>a-b).forEach(L=>{
       const arr=byLesson[L];
       const group=el('section','group'); group.dataset.group=String(L);
-      group.appendChild(groupHead('Lektion '+L,(L>20?'🔒 Vorschau · ':'')+((LESSON[L]||{}).thema||''),arr.length));
+      group.appendChild(groupHead('Lektion '+L,(LESSON[L]||{}).thema||'',arr.length));
       arr.forEach(g=>group.appendChild(grammarCard(g,L)));
       content.appendChild(group);
     });
@@ -740,6 +748,138 @@
     document.addEventListener('keydown',e=>{ if(overlay&&!overlay.hidden&&e.key==='Escape')closeTest(); });
   }
 
+  /* ============================================================  LISTEN-PICKER (geteilt: Vokabular-Seite)  */
+  let picker=null;
+  function ensurePicker(){
+    if(picker)return picker;
+    const ov=el('div','pick-overlay'); ov.hidden=true;
+    ov.innerHTML='<div class="pick-modal" role="dialog" aria-modal="true" aria-label="Zu Liste hinzufügen">'+
+      '<div class="pick-head"><span class="pick-title"></span><button class="drill-close pick-close" type="button" aria-label="Schließen">✕</button></div>'+
+      '<div class="pick-existing"></div>'+
+      '<div class="pick-new"><input class="pick-name" type="text" placeholder="Neue Liste …" aria-label="Neue Liste"><button class="btn-primary pick-add" type="button">Anlegen &amp; hinzufügen</button></div>'+
+      '<div class="pick-msg" role="status"></div></div>';
+    document.body.appendChild(ov);
+    ov.addEventListener('click',e=>{ if(e.target===ov)ov.hidden=true; });
+    ov.querySelector('.pick-close').addEventListener('click',()=>{ ov.hidden=true; });
+    picker={ ov, title:ov.querySelector('.pick-title'), existing:ov.querySelector('.pick-existing'),
+      name:ov.querySelector('.pick-name'), add:ov.querySelector('.pick-add'), msg:ov.querySelector('.pick-msg') };
+    return picker;
+  }
+  // Öffnet den Picker, um die gegebenen Vokabel-IDs zu einer (neuen) Liste hinzuzufügen.
+  function openListPicker(ids, label){
+    if(!window.SRS)return;
+    const p=ensurePicker();
+    p.title.textContent='„'+label+'" zu Liste hinzufügen';
+    p.msg.textContent=''; p.name.value='';
+    function addTo(id,name){ window.SRS.addToList(id,ids); p.msg.textContent='✓ '+ids.length+' zu „'+name+'" hinzugefügt.'; renderExisting(); }
+    function renderExisting(){
+      const ls=window.SRS.lists();
+      p.existing.innerHTML = ls.length ? '<div class="pick-lbl">Vorhandene Listen</div>' : '<div class="pick-lbl">Noch keine Liste — leg unten eine an.</div>';
+      ls.forEach(l=>{ const b=el('button','pick-list','<span>'+esc(l.name)+'</span><span class="pick-n">'+l.items.length+'</span>'); b.type='button';
+        b.addEventListener('click',()=>addTo(l.id,l.name)); p.existing.appendChild(b); });
+    }
+    renderExisting();
+    p.add.onclick=()=>{ const nm=(p.name.value||'').trim(); if(!nm){ p.name.focus(); return; } const l=window.SRS.createList(nm); addTo(l.id,l.name); p.name.value=''; };
+    p.ov.hidden=false;
+  }
+
+  /* ============================================================  LISTEN (persönliche Vokabellisten)  */
+  function initListen(){
+    const root=document.getElementById('lst-root'); if(!root||!window.SRS)return;
+    const nameInp=document.getElementById('lst-create-name'), createBtn=document.getElementById('lst-create');
+
+    function vocabFront(v){ const w=(v.kanji&&v.kanji.length)?v.kanji:v.kana; return ruby(w,v.kana); }
+    function draw(){
+      const ls=window.SRS.lists();
+      root.innerHTML='';
+      if(!ls.length){ root.appendChild(el('p','lst-empty','Noch keine Liste. Lege oben eine an oder füge auf der <a href="vokabular.html">Vokabular-Seite</a> Wörter hinzu.')); return; }
+      ls.forEach(l=>{
+        const items=window.SRS.listItems(l.id);
+        const card=el('article','lst-card');
+        card.innerHTML='<div class="lst-head"><span class="lst-name">'+esc(l.name)+'</span><span class="lst-count">'+items.length+' Wörter</span></div>'+
+          '<div class="lst-actions"></div><div class="lst-items hidden"></div>';
+        const actions=card.querySelector('.lst-actions');
+        const train=el('button','btn-primary lst-train','▶ Trainieren'); train.type='button'; train.disabled=!items.length;
+        train.addEventListener('click',()=>openTrainer(l));
+        const show=el('button','btn lst-show',(items.length?'Wörter ('+items.length+')':'Wörter')); show.type='button';
+        const itemsBox=card.querySelector('.lst-items');
+        show.addEventListener('click',()=>{ itemsBox.classList.toggle('hidden'); if(!itemsBox.dataset.built){ buildItems(itemsBox,l,items); itemsBox.dataset.built='1'; } });
+        const ren=el('button','btn lst-ren','✎ Umbenennen'); ren.type='button';
+        ren.addEventListener('click',()=>{ const nn=window.prompt('Liste umbenennen:',l.name); if(nn&&nn.trim()){ window.SRS.renameList(l.id,nn.trim()); draw(); } });
+        const del=el('button','btn lst-del','🗑 Löschen'); del.type='button';
+        del.addEventListener('click',()=>{ if(window.confirm('Liste „'+l.name+'" löschen? (Vokabeln selbst bleiben erhalten.)')){ window.SRS.deleteList(l.id); draw(); } });
+        actions.appendChild(train); actions.appendChild(show); actions.appendChild(ren); actions.appendChild(del);
+        root.appendChild(card);
+      });
+    }
+    function buildItems(box,l,items){
+      box.innerHTML='';
+      items.forEach(o=>{ const row=el('div','lst-item');
+        row.innerHTML='<span class="lst-jp ja">'+vocabFront(o.data)+'</span><span class="lst-de">'+esc(o.data.de)+'</span>';
+        const rm=el('button','lst-rm','✕'); rm.type='button'; rm.title='Aus Liste entfernen';
+        rm.addEventListener('click',()=>{ window.SRS.removeFromList(l.id,[o.id]); draw(); });
+        row.appendChild(rm); box.appendChild(row); });
+    }
+
+    /* ----- Trainer (Karteikarten, Richtung de↔jp) ----- */
+    let tov=null, dir='jp2de';
+    function ensureTrainer(){
+      if(tov)return tov;
+      tov=el('div','lt-overlay'); tov.hidden=true;
+      tov.innerHTML='<div class="lt-modal" role="dialog" aria-modal="true" aria-label="Liste trainieren">'+
+        '<div class="lt-head"><span class="lt-title"></span>'+
+          '<button class="lt-dir btn" type="button"></button>'+
+          '<button class="drill-close lt-close" type="button" aria-label="Schließen">✕</button></div>'+
+        '<div class="lt-top"><span class="lt-prog"></span></div>'+
+        '<div class="lt-card"><div class="lt-front"></div><div class="lt-back hidden"></div>'+
+          '<div class="lt-controls"><button class="btn-primary lt-reveal" type="button">Aufdecken <span class="kbd">Leertaste</span></button>'+
+          '<button class="btn btn-again lt-again hidden" type="button">↻ Nochmal</button>'+
+          '<button class="btn btn-next lt-good hidden" type="button">Gewusst →</button></div></div>'+
+        '<div class="lt-done hidden"></div></div>';
+      document.body.appendChild(tov);
+      tov.querySelector('.lt-close').addEventListener('click',()=>{ tov.hidden=true; });
+      tov.addEventListener('click',e=>{ if(e.target===tov)tov.hidden=true; });
+      document.addEventListener('keydown',e=>{ if(tov.hidden)return;
+        if(e.key==='Escape'){ tov.hidden=true; return; }
+        if(e.code==='Space'){ e.preventDefault(); const good=tov.querySelector('.lt-good'), rev=tov.querySelector('.lt-reveal');
+          if(good&&!good.classList.contains('hidden'))good.click(); else if(rev&&!rev.classList.contains('hidden'))rev.click(); } });
+      return tov;
+    }
+    function openTrainer(l){
+      const ov=ensureTrainer();
+      const q=s=>ov.querySelector(s);
+      const title=q('.lt-title'), dirBtn=q('.lt-dir'), prog=q('.lt-prog'),
+        card=q('.lt-card'), front=q('.lt-front'), back=q('.lt-back'), done=q('.lt-done'),
+        reveal=q('.lt-reveal'), again=q('.lt-again'), good=q('.lt-good');
+      title.textContent=l.name;
+      let deck=[], total=0;
+      function dirLabel(){ return dir==='jp2de'?'日本語 → Deutsch':'Deutsch → 日本語'; }
+      function start(){ const items=window.SRS.listItems(l.id); deck=shuffle(items.slice()); total=deck.length; done.classList.add('hidden'); card.classList.remove('hidden'); render(); }
+      function render(){
+        if(!deck.length){ card.classList.add('hidden'); done.classList.remove('hidden');
+          done.innerHTML=total?'<div class="tr-done-in">🎉 Geschafft!<br>Alle '+total+' Karten durch.</div><button class="btn-primary lt-restart" type="button">↻ Nochmal</button>':'<div class="tr-done-in">Diese Liste ist leer.</div>';
+          const rs=done.querySelector('.lt-restart'); if(rs)rs.addEventListener('click',start); return; }
+        const learned=total-deck.length; prog.textContent='Karte '+(learned+1)+' / '+total;
+        const o=deck[0], v=o.data;
+        const jp='<div class="lt-jp ja">'+vocabFront(v)+'</div>', de='<div class="lt-de">'+esc(v.de)+'</div>';
+        const reading='<div class="lt-reading ja">'+esc(v.kana)+'</div>';
+        if(dir==='jp2de'){ front.innerHTML=jp; back.innerHTML=de+reading; }
+        else { front.innerHTML=de; back.innerHTML=jp+reading; }
+        back.classList.add('hidden'); reveal.classList.remove('hidden'); again.classList.add('hidden'); good.classList.add('hidden');
+      }
+      reveal.onclick=()=>{ back.classList.remove('hidden'); reveal.classList.add('hidden'); again.classList.remove('hidden'); good.classList.remove('hidden'); };
+      good.onclick=()=>{ const o=deck.shift(); if(window.SRS.get(o.id)||true)window.SRS.grade(o.id,1); render(); };
+      again.onclick=()=>{ const o=deck.shift(); window.SRS.grade(o.id,0); deck.push(o); render(); };
+      dirBtn.textContent=dirLabel();
+      dirBtn.onclick=()=>{ dir=dir==='jp2de'?'de2jp':'jp2de'; dirBtn.textContent=dirLabel(); start(); };
+      ov.hidden=false; start();
+    }
+
+    if(createBtn)createBtn.addEventListener('click',()=>{ const nm=(nameInp.value||'').trim(); if(!nm){ nameInp.focus(); return; } window.SRS.createList(nm); nameInp.value=''; draw(); });
+    if(nameInp)nameInp.addEventListener('keydown',e=>{ if(e.key==='Enter'&&createBtn)createBtn.click(); });
+    draw();
+  }
+
   /* ============================================================  INIT  */
   function init(){
     const page=document.body.dataset.page;
@@ -757,6 +897,7 @@
     if(page==='heute')initHeute();
     if(page==='fortschritt')initFortschritt();
     if(page==='schreiben')initSchreiben();
+    if(page==='listen')initListen();
     if(page==='lernpfad')initLernpfad();
     initSearch(); initToggles();
   }
