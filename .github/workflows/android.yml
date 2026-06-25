@@ -29,6 +29,8 @@ jobs:
 
   build:
     needs: test
+    # APK NUR bei Release (oder manuell) bauen — nicht bei jedem Push/PR.
+    if: github.event_name == 'release' || github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
     permissions:
       contents: write   # für das Hochladen der APK ans GitHub-Release

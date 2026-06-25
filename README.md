@@ -72,7 +72,9 @@ auf jeder Seite anzeigt — Web/PWA und APK zeigen damit dieselbe Version.
    `go-nihongo-X.Y.Z.apk` und **hängt sie ans Release**. Stimmt der Tag nicht mit der
    `package.json`-Version überein, bricht der Build bewusst ab.
 
-Push/PR auf `main`/`claude/**` bauen weiterhin eine `…-dev.<run#>`-APK als CI-Artefakt.
+Bei Push/PR läuft nur das **Test-Gate** — die APK wird dort **nicht** gebaut. Ein manueller
+Build (ohne Release) ist über *Run workflow* (`workflow_dispatch`) möglich und liefert eine
+`…-dev.<run#>`-APK als CI-Artefakt.
 
 **Updates ohne Neuinstallation:** Da die App eine stabile `applicationId`
 (`de.thordan.japanischkatalog`) und einen stabilen Signaturschlüssel hat und der `versionCode`
