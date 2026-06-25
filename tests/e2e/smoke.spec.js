@@ -50,8 +50,8 @@ test('Listen: Liste anlegen und auf Vokabular „+" vorhanden', async ({ page })
   await page.fill('#lst-create-name', 'E2E-Liste');
   await page.click('#lst-create');
   await expect(page.locator('.lst-name')).toHaveText('E2E-Liste');
-  // Branding & kein Vorschau-Toggle mehr
-  await expect(page.locator('.brand-name')).toHaveText('Go! Nihongo');
+  // Branding & kein Vorschau-Toggle mehr (Header-Brand, nicht der Footer)
+  await expect(page.locator('.brand .brand-name')).toHaveText('Go! Nihongo');
   await page.goto('/vokabular.html');
   await expect(page.locator('#toggle-preview')).toHaveCount(0);
   await expect(page.locator('.v-add').first()).toBeVisible();
