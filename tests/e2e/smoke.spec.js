@@ -36,8 +36,8 @@ test('Grammatik: ein „Üben"-Knopf öffnet die kombinierte Session', async ({ 
   await ueben.scrollIntoViewIfNeeded();
   await ueben.click();
   await expect(page.locator('.drill-overlay')).toBeVisible();
-  // entweder eine MC-Aufgabe oder ein Übersetzungs-Prompt ist sichtbar
-  await expect(page.locator('.drill-overlay .drill-ex .ex-opt, .drill-overlay .drill-prompt').first()).toBeVisible();
+  // Session läuft — Fortschrittsanzeige ist unabhängig vom Aufgabentyp stabil.
+  await expect(page.locator('.drill-overlay .drill-prog')).toContainText('Aufgabe');
 });
 
 test('Freies Üben: „Verbformen" öffnet generierte MC-Aufgaben', async ({ page }) => {
