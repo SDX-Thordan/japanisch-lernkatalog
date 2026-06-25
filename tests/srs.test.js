@@ -103,14 +103,19 @@ describe('grade() + Fälligkeit + Persistenz', () => {
 });
 
 describe('Streak-Logik (global)', () => {
-  it('gestern aktiv → +1, Lücke → reset, heute → idempotent', () => {
+  it('zählt nur bei completeDaily() — nicht bei einzelnen grade()-Aufrufen', () => {
+    // Einzelne Bewertungen (z. B. freies Üben) dürfen den Streak NICHT hochzählen.
     SRS.grade('k:a', 1, '2026-06-20');
+    expect(SRS.stats('2026-06-20').streakDays).toBe(0);
+  });
+  it('gestern aktiv → +1, Lücke → reset, heute → idempotent', () => {
+    SRS.completeDaily('2026-06-20');
     expect(SRS.stats('2026-06-20').streakDays).toBe(1);
-    SRS.grade('k:b', 1, '2026-06-21'); // direkt am Folgetag
+    SRS.completeDaily('2026-06-21'); // direkt am Folgetag
     expect(SRS.stats('2026-06-21').streakDays).toBe(2);
-    SRS.grade('k:c', 1, '2026-06-21'); // selber Tag → idempotent
+    SRS.completeDaily('2026-06-21'); // selber Tag → idempotent
     expect(SRS.stats('2026-06-21').streakDays).toBe(2);
-    SRS.grade('k:d', 1, '2026-06-25'); // Lücke → reset auf 1
+    SRS.completeDaily('2026-06-25'); // Lücke → reset auf 1
     expect(SRS.stats('2026-06-25').streakDays).toBe(1);
   });
 });

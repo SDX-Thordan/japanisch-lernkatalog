@@ -13,6 +13,7 @@
   var NS = 'http://www.w3.org/2000/svg';
   var BOX = 109;            // KanjiVG-Koordinatensystem
   var HIT = 24;             // Toleranz (in BOX-Einheiten) für Start/Endpunkt
+  var SNAP_UNTIL = 3;       // bis < so vielen korrekten Schreibungen: Striche „einrasten" (geführt)
 
   function cpFile(k) { return k.codePointAt(0).toString(16).padStart(5, '0') + '.svg'; }
 
@@ -111,9 +112,21 @@
     function endDraw() {
       if (!drawing) return; drawing = false;
       var ok = strokeMatches(cur, infos[idx]);
-      if (ok) { done.push(cur.slice()); idx++; if (opts.onProgress) opts.onProgress(idx, strokes.length); }
+      if (ok) {
+        // Snap-Modus (Anfang): den akzeptierten Strich sauber auf die Referenz „einrasten";
+        // später (genug korrekte Schreibungen) freihändig die eigenen Punkte behalten.
+        var rec = cur.slice();
+        if (opts.snap) { var ref = refStrokePoints(strokes[idx]); if (ref && ref.length >= 2) rec = ref; }
+        done.push(rec); idx++; if (opts.onProgress) opts.onProgress(idx, strokes.length);
+      }
       cur = []; redraw();
       if (ok && idx >= strokes.length && opts.onComplete) opts.onComplete();
+    }
+    // Referenz-Strich in gleichmäßige Punkte (BOX-Koord.) abtasten — für das Snapping.
+    function refStrokePoints(d) {
+      var pts = [], n = 18;
+      for (var t = 0; t <= n; t++) { var p = samplePoint(d, t / n); if (p) pts.push({ x: p.x, y: p.y }); }
+      return pts;
     }
     canvas.addEventListener('pointerdown', startDraw);
     canvas.addEventListener('pointermove', moveDraw);
@@ -170,6 +183,13 @@
     var pos = 0, widget = null;
 
     function buildSession() {
+      // Deep-Link aus einer Kanji-Karte: ?kanji=X → gezielt genau dieses Zeichen schreiben.
+      var param = null;
+      try { param = new URLSearchParams(location.search).get('kanji'); } catch (e) {}
+      if (param) {
+        var one = (window.KANJI || []).filter(function (x) { return x.k === param; });
+        if (one.length) return one;
+      }
       if (window.SRS) {
         var q = window.SRS.buildQueue({ sources: ['kanji'], newLimit: 8, reviewLimit: 12 });
         if (q.length) return q.map(function (x) { return x.data; });
@@ -188,8 +208,9 @@
       if (charEl) charEl.textContent = k.k; if (meanEl) meanEl.textContent = k.meaning || '';
       if (prog) prog.textContent = 'Kanji ' + (pos + 1) + ' / ' + session.length;
       setMsg('');
+      var snap = !!(window.SRS && window.SRS.get && (((window.SRS.get('k:' + k.k) || {}).writeReps || 0) < SNAP_UNTIL));
       fetch('assets/kanjivg/' + cpFile(k.k)).then(function (r) { return r.text(); }).then(function (svg) {
-        widget = create(stage, { svgText: svg, size: Math.min(320, root.clientWidth - 40),
+        widget = create(stage, { svgText: svg, size: Math.min(320, root.clientWidth - 40), snap: snap,
           onProgress: function (i, n) { setMsg('Strich ' + i + ' / ' + n); },
           onComplete: function () { setMsg('✓ Alle Striche geschrieben!');
             if (window.SRS && window.SRS.gradeWrite) window.SRS.gradeWrite('k:' + k.k, true); } });

@@ -135,17 +135,22 @@
     item.streak = g > 0 ? (item.streak || 0) + 1 : 0;
     item.history = (item.history || []).concat([{ t: today, grade: g }]).slice(-MAX_HISTORY);
     store.items[id] = item;
-    updateGlobalStreak(today);
     store.stats.totalReviews = (store.stats.totalReviews || 0) + 1;
     save();
     return item;
   }
-  function updateGlobalStreak(today) {
+  // Tagesstreak: zählt NUR, wenn die Tagesaufgabe („Heute"-Runde) abgeschlossen ist —
+  // nicht bei jeder einzelnen Bewertung (sonst springt der Streak schon beim ersten freien Üben auf 1).
+  // Idempotent pro Tag (mehrfacher Aufruf am selben Tag ändert nichts).
+  function completeDaily(today) {
+    today = today || todayISO();
     var last = store.stats.lastActive;
-    if (last === today) return;
+    if (last === today) return store.stats.streakDays || 0;
     if (last && addDays(last, 1) === today) store.stats.streakDays = (store.stats.streakDays || 0) + 1;
     else store.stats.streakDays = 1;
     store.stats.lastActive = today;
+    save();
+    return store.stats.streakDays;
   }
 
   // Korrektes Schreiben eines Kanji vermerken (vom KanjiVG-Widget bei vollständiger,
@@ -212,8 +217,10 @@
     var reviewLimit = opts.reviewLimit != null ? opts.reviewLimit : 15;
     var today = opts.today || todayISO();
     var maxLesson = opts.maxLesson;
+    var newLesson = opts.newLesson; // optional: neue Items auf genau diese Lektion beschränken
 
     var lessonOk = function (x) { if (maxLesson == null) return true; var L = itemLesson(x.type, x.data); return L != null && L <= maxLesson; };
+    var newLessonOk = function (x) { if (newLesson == null) return true; return itemLesson(x.type, x.data) === newLesson; };
     // Pro Quelle getrennt halten, damit neue Items über die Quellen ausbalanciert werden
     // (sonst dominiert eine Quelle, weil sie in der Liste vorne steht → „Heute" zeigt nur Vokabeln bzw. nur Kanji).
     var perSource = sources.map(function (s) { return registry(s).filter(lessonOk); });
@@ -228,7 +235,7 @@
     // Pro Quelle die Kandidaten mischen → „Heute" wählt zufällig aus den freigeschalteten Lektionen
     // (statt immer dieselben ersten Items). due/Wiederholungen bleiben nach Fälligkeit sortiert.
     var rng = opts.rng || Math.random;
-    var newBySource = perSource.map(function (reg) { return shuffleArr(reg.filter(function (x) { return !store.items[x.id]; }), rng); });
+    var newBySource = perSource.map(function (reg) { return shuffleArr(reg.filter(function (x) { return !store.items[x.id] && newLessonOk(x); }), rng); });
     var fresh = [], guard = 0;
     while (fresh.length < newLimit && guard < newLimit * sources.length + sources.length) {
       var any = false;
@@ -375,6 +382,13 @@
     for (var l = 1; l <= MAX_GATED_LESSON; l++) { if (lessonState(l).unlocked) L = l; else break; }
     return L;
   }
+  // Aktuelle Lektion: die niedrigste freigeschaltete, deren Kern noch nicht vollständig gemeistert ist.
+  // „Heute" führt neue Items aus genau dieser Lektion ein → Üben füllt sichtbar deren Lernpfad-Fortschritt.
+  function currentLesson() {
+    var max = maxUnlockedLesson();
+    for (var l = 1; l <= max; l++) { if (coreProgress(l).fraction < 1) return l; }
+    return max;
+  }
   function canTakeTest(lesson) { var s = lessonState(lesson); return s.unlocked && s.coreMastered; }
   function recordLessonTest(lesson, score, today) {
     today = today || todayISO();
@@ -463,12 +477,13 @@
   window.SRS = {
     srsId: srsId, typeOf: typeOf,
     get: get, ensure: ensure, grade: grade, gradeWrite: gradeWrite,
+    completeDaily: completeDaily,
     isDue: isDue, dueIds: dueIds,
     buildQueue: buildQueue, stats: stats,
     // Lernpfad / Gating
     isMastered: isMastered, needsWriting: needsWriting,
     kanjiLessonOf: kanjiLessonOf, lessonCore: lessonCore, coreProgress: coreProgress,
-    lessonState: lessonState, maxUnlockedLesson: maxUnlockedLesson,
+    lessonState: lessonState, maxUnlockedLesson: maxUnlockedLesson, currentLesson: currentLesson,
     canTakeTest: canTakeTest, recordLessonTest: recordLessonTest,
     unlockAll: unlockAll, resetLessons: resetLessons,
     // Persönliche Vokabellisten
