@@ -27,15 +27,23 @@ test('Heute startet eine gemischte Session', async ({ page }) => {
   await expect(page.locator('#h-prog')).toContainText('/');
 });
 
-test('Grammatik zeigt „Mehr erklären" und kann eine Übung öffnen', async ({ page }) => {
+test('Grammatik: ein „Üben"-Knopf öffnet die kombinierte Session', async ({ page }) => {
   await page.goto('/grammatik.html');
   // Grammatik-Karten sind eingeklappt — erst aufklappen, dann ist der Üben-Button sichtbar.
-  const card = page.locator('.gp:has(.gp-plus .gp-learn)').first();
+  const card = page.locator('.gp:has(.gp-ueben)').first();
   await card.locator('.gp-head').click();
-  const learn = card.locator('.gp-plus .gp-learn').first();
-  await learn.scrollIntoViewIfNeeded();
-  await learn.click();
-  await expect(card.locator('.gp-ex-host .ex-opt').first()).toBeVisible();
+  const ueben = card.locator('.gp-ueben').first();
+  await ueben.scrollIntoViewIfNeeded();
+  await ueben.click();
+  await expect(page.locator('.drill-overlay')).toBeVisible();
+  // entweder eine MC-Aufgabe oder ein Übersetzungs-Prompt ist sichtbar
+  await expect(page.locator('.drill-overlay .drill-ex .ex-opt, .drill-overlay .drill-prompt').first()).toBeVisible();
+});
+
+test('Freies Üben: „Verbformen" öffnet generierte MC-Aufgaben', async ({ page }) => {
+  await page.goto('/ueben.html');
+  await page.click('[data-src="verbforms"]');
+  await expect(page.locator('.drill-overlay .drill-ex .ex-opt').first()).toBeVisible();
 });
 
 test('Schreiben lädt das KanjiVG-Canvas', async ({ page }) => {

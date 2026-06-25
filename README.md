@@ -63,14 +63,14 @@ Die **eine Versionsquelle** ist das Feld `version` in `package.json` (Semver). D
 `scripts/gen-version.mjs` die Datei `assets/version.js` (`window.APP_VERSION`), die der **Footer**
 auf jeder Seite anzeigt — Web/PWA und APK zeigen damit dieselbe Version.
 
-**Release-Ablauf:**
+**Release-Ablauf:** Auf GitHub einfach ein **Release mit Tag `vX.Y.Z`** veröffentlichen. Der
+**Tag ist maßgeblich** — du musst `package.json` vorher *nicht* von Hand bumpen: Der Workflow
+trägt `X.Y.Z` in `package.json` ein, erzeugt daraus `assets/version.js` (Footer) und die signierte
+APK (`versionName = X.Y.Z`, `versionCode = Run-Nummer`), benennt sie `go-nihongo-X.Y.Z.apk` und
+**hängt sie ans Release**.
 
-1. Version in `package.json` bumpen (z. B. `1.1.0`).
-2. `npm run version:gen` ausführen (aktualisiert `assets/version.js`) und committen.
-3. Auf GitHub ein **Release mit Tag `vX.Y.Z`** veröffentlichen (Tag == `package.json`-Version).
-4. Der Workflow baut die signierte APK, setzt `versionName = X.Y.Z`, benennt sie
-   `go-nihongo-X.Y.Z.apk` und **hängt sie ans Release**. Stimmt der Tag nicht mit der
-   `package.json`-Version überein, bricht der Build bewusst ab.
+> Optional fürs Web/Repo: Soll der committete Stand (z. B. GitHub Pages) dieselbe Version zeigen,
+> `package.json` bumpen, `npm run version:gen` ausführen und committen.
 
 Bei Push/PR läuft nur das **Test-Gate** — die APK wird dort **nicht** gebaut. Ein manueller
 Build (ohne Release) ist über *Run workflow* (`workflow_dispatch`) möglich und liefert eine
