@@ -2,7 +2,9 @@ name: Build APK
 
 on:
   push:
-    branches: [ main, claude/japanese-learning-app-j2m6r8 ]
+    branches: [ main, 'claude/**' ]
+  pull_request:
+    branches: [ main ]
   workflow_dispatch:
 
 jobs:
