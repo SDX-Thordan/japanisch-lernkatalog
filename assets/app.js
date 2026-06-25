@@ -834,6 +834,64 @@
     p.ov.hidden=false;
   }
 
+  /* ============================================================  FREIES ÜBEN (Zufallskarten je Quelle, ungated)  */
+  const FREE_SRC={
+    kanji:{ data:()=>window.KANJI||[], label:'漢字 Kanji' },
+    vocab:{ data:()=>window.VOKABULAR||[], label:'語彙 Vokabeln' },
+    grammar:{ data:()=>window.GRAMMATIK||[], label:'文法 Grammatik' },
+  };
+  let freeOv=null;
+  function ensureFreeDom(){
+    if(freeOv)return freeOv;
+    const ov=el('div','lt-overlay'); ov.hidden=true;
+    ov.innerHTML='<div class="lt-modal" role="dialog" aria-modal="true" aria-label="Freies Üben">'+
+      '<div class="lt-head"><span class="lt-title"></span><button class="drill-close lt-close" type="button" aria-label="Schließen"><span class="msi" aria-hidden="true">close</span></button></div>'+
+      '<div class="lt-top"><span class="lt-prog"></span></div>'+
+      '<div class="lt-card"><div class="lt-front"></div><div class="lt-back hidden"></div>'+
+        '<div class="lt-controls"><button class="btn-primary fr-reveal" type="button">Aufdecken <span class="kbd">Leertaste</span></button>'+
+        '<button class="btn btn-again fr-again hidden" type="button"><span class="msi" aria-hidden="true">refresh</span> Nochmal</button>'+
+        '<button class="btn btn-next fr-good hidden" type="button">Gewusst →</button></div></div>'+
+      '<div class="lt-done hidden"></div></div>';
+    document.body.appendChild(ov);
+    ov.querySelector('.lt-close').addEventListener('click',()=>{ ov.hidden=true; });
+    ov.addEventListener('click',e=>{ if(e.target===ov)ov.hidden=true; });
+    document.addEventListener('keydown',e=>{ if(freeOv.hidden)return;
+      if(e.key==='Escape'){ freeOv.hidden=true; return; }
+      if(e.code==='Space'){ e.preventDefault(); const g=freeOv.querySelector('.fr-good'),r=freeOv.querySelector('.fr-reveal');
+        if(g&&!g.classList.contains('hidden'))g.click(); else if(r&&!r.classList.contains('hidden'))r.click(); } });
+    freeOv=ov; return ov;
+  }
+  function openFreePractice(source){
+    const cfg=FREE_SRC[source]; if(!cfg)return;
+    const data=cfg.data(); if(!data.length)return;
+    const ov=ensureFreeDom(), q=s=>ov.querySelector(s);
+    const title=q('.lt-title'),prog=q('.lt-prog'),card=q('.lt-card'),front=q('.lt-front'),back=q('.lt-back'),done=q('.lt-done'),reveal=q('.fr-reveal'),again=q('.fr-again'),good=q('.fr-good');
+    title.textContent='Freies Üben · '+cfg.label;
+    let deck=[], total=0;
+    function start(){ deck=shuffle(data.slice()).slice(0,10).map(d=>({t:source,d:d})); total=deck.length; done.classList.add('hidden'); card.classList.remove('hidden'); render(); }
+    function render(){
+      if(!deck.length){ card.classList.add('hidden'); done.classList.remove('hidden');
+        done.innerHTML='<div class="tr-done-in">Runde geschafft — '+total+' Karten.</div><button class="btn-primary fr-restart" type="button"><span class="msi" aria-hidden="true">refresh</span> Neue Runde</button>';
+        done.querySelector('.fr-restart').addEventListener('click',start); return; }
+      const learned=total-deck.length; prog.textContent='Karte '+(learned+1)+' / '+total;
+      const c=deck[0]; front.innerHTML=frontHtml(c); back.innerHTML=backHtml(c);
+      back.classList.add('hidden'); reveal.classList.remove('hidden'); again.classList.add('hidden'); good.classList.add('hidden');
+    }
+    function grade(g){ const c=deck[0]; if(c&&window.SRS){ const id=window.SRS.srsId(c.t,c.d); if(id)window.SRS.grade(id,g); } }
+    reveal.onclick=()=>{ back.classList.remove('hidden'); reveal.classList.add('hidden'); again.classList.remove('hidden'); good.classList.remove('hidden'); };
+    good.onclick=()=>{ grade(1); deck.shift(); render(); };
+    again.onclick=()=>{ grade(0); const c=deck.shift(); deck.push(c); render(); };
+    ov.hidden=false; start();
+  }
+  // „Üben"-Button auf den Nachschlage-Seiten (Vokabular/Grammatik/Kanji) für freies Zufalls-Üben.
+  function addFreeUebenButton(page){
+    const src={kanji:'kanji',vokabular:'vocab',grammatik:'grammar'}[page]; if(!src)return;
+    const host=document.querySelector('.toolbar .toolbar-row')||document.querySelector('.toolbar');
+    if(!host)return;
+    const b=el('button','btn-primary page-ueben','<span class="msi" aria-hidden="true">school</span> Üben'); b.type='button';
+    b.addEventListener('click',()=>openFreePractice(src)); host.appendChild(b);
+  }
+
   /* ============================================================  LISTEN (persönliche Vokabellisten)  */
   function initListen(){
     const root=document.getElementById('lst-root'); if(!root||!window.SRS)return;
@@ -850,7 +908,7 @@
         card.innerHTML='<div class="lst-head"><span class="lst-name">'+esc(l.name)+'</span><span class="lst-count">'+items.length+' Wörter</span></div>'+
           '<div class="lst-actions"></div><div class="lst-items hidden"></div>';
         const actions=card.querySelector('.lst-actions');
-        const train=el('button','btn-primary lst-train','<span class="msi" aria-hidden="true">play_arrow</span> Trainieren'); train.type='button'; train.disabled=!items.length;
+        const train=el('button','btn-primary lst-train','<span class="msi" aria-hidden="true">play_arrow</span> Üben'); train.type='button'; train.disabled=!items.length;
         train.addEventListener('click',()=>openTrainer(l));
         const show=el('button','btn lst-show',(items.length?'Wörter ('+items.length+')':'Wörter')); show.type='button';
         const itemsBox=card.querySelector('.lst-items');
@@ -945,6 +1003,7 @@
       groups=Array.prototype.slice.call(content.querySelectorAll('.group'));
       applyFilter();
     }
+    if(page==='kanji'||page==='vokabular'||page==='grammatik')addFreeUebenButton(page);
     if(page==='heute')initHeute();
     if(page==='profil')initProfil();
     if(page==='schreiben')initSchreiben();

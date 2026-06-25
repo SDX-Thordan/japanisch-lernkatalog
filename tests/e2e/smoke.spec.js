@@ -67,3 +67,11 @@ test('Listen: Liste anlegen und auf Vokabular „+" vorhanden', async ({ page })
   await expect(page.locator('#toggle-preview')).toHaveCount(0);
   await expect(page.locator('.v-add').first()).toBeVisible();
 });
+
+test('Freies Üben: „Üben"-Button auf Vokabular öffnet Karteikarten', async ({ page }) => {
+  await page.goto('/vokabular.html');
+  const ueben = page.locator('.page-ueben');
+  await expect(ueben).toBeVisible();
+  await ueben.click();
+  await expect(page.locator('.lt-overlay .lt-front')).not.toBeEmpty();
+});
