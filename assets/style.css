@@ -78,21 +78,54 @@ body {
 .brand-logo { width: 30px; height: 30px; border-radius: 8px; display: block; box-shadow: 0 1px 2px rgba(40,30,10,.12); }
 .brand-name { font-size: 1.05rem; letter-spacing: .01em; }
 .brand .jp { font-family: var(--font-ja); color: var(--accent); font-size: 1.25rem; }
-.brand .lv { font-size: .95rem; letter-spacing: .02em; }
-.nav { display: flex; gap: .25rem; margin-left: auto; flex-wrap: wrap; }
+.brand-jp { display: inline-flex; align-items: center; justify-content: center; width: 32px; height: 32px; background: var(--accent); color: #fff; font-family: var(--font-ja); font-size: 1.15rem; font-weight: 700; border-radius: 9px; box-shadow: 0 1px 2px rgba(40,30,10,.18); }
 .section-label { font-size: .8rem; text-transform: uppercase; letter-spacing: .08em; color: var(--faint); font-weight: 800; margin: 1.6rem 0 .6rem; }
 .section-label:first-of-type { margin-top: .6rem; }
-.nav a {
-  text-decoration: none;
-  color: var(--muted);
-  padding: .35rem .7rem;
-  border-radius: 7px;
-  font-size: .92rem;
-  font-weight: 600;
-  transition: background .15s, color .15s;
+
+/* ---------- Material-Icons (selbst gehostet, offline) ---------- */
+@font-face { font-family: 'Material Icons Outlined'; font-style: normal; font-weight: 400; src: url(icons/material/material-icons-outlined.woff2) format('woff2'); font-display: block; }
+.msi { font-family: 'Material Icons Outlined'; font-weight: normal; font-style: normal; font-size: 1.2em; line-height: 1; letter-spacing: normal; text-transform: none; display: inline-block; white-space: nowrap; word-wrap: normal; direction: ltr; -webkit-font-feature-settings: 'liga'; font-feature-settings: 'liga'; -webkit-font-smoothing: antialiased; vertical-align: middle; }
+
+/* ---------- Top-Navigation: gruppierte Tabs (Browser) ---------- */
+.nav { display: flex; gap: 1.1rem; margin-left: auto; flex-wrap: wrap; align-items: flex-end; }
+.nav-group { display: flex; flex-direction: column; gap: .15rem; }
+.nav-group-label { font-size: .6rem; text-transform: uppercase; letter-spacing: .08em; color: var(--faint); font-weight: 800; padding: 0 .35rem; }
+.nav-row { display: flex; gap: .15rem; }
+.nav-tab { display: inline-flex; align-items: center; gap: .3rem; text-decoration: none; color: var(--muted); padding: .35rem .6rem; border-radius: 8px; font-size: .88rem; font-weight: 600; transition: background .15s, color .15s; }
+.nav-tab .msi { font-size: 1.15rem; }
+.nav-tab:hover { background: var(--chip); color: var(--ink); }
+.nav-tab.active { color: var(--accent); background: #f6e7e2; }
+
+/* ---------- Untere Tab-Leiste (App / schmal) ---------- */
+.bottomnav { display: none; }
+
+/* ---------- Sekundäre Tab-Zeile (Nachschlagen) ---------- */
+.subnav { display: flex; gap: .4rem; flex-wrap: wrap; margin: 0 0 1.1rem; }
+.subnav-tab { display: inline-flex; align-items: center; gap: .3rem; text-decoration: none; color: var(--muted); border: 1px solid var(--border); border-radius: 999px; padding: .3rem .8rem; font-size: .85rem; font-weight: 600; }
+.subnav-tab .msi { font-size: 1rem; }
+.subnav-tab:hover { border-color: var(--accent); color: var(--accent); }
+.subnav-tab.active { background: var(--accent); color: #fff; border-color: var(--accent); }
+
+@media (max-width: 760px) {
+  .nav { display: none; }
+  .bottomnav { display: flex; position: fixed; left: 0; right: 0; bottom: 0; z-index: 60; background: var(--surface); border-top: 1px solid var(--border); box-shadow: 0 -2px 12px rgba(40,30,10,.06); padding-bottom: env(safe-area-inset-bottom, 0); }
+  .bn-tab { flex: 1; display: flex; flex-direction: column; align-items: center; gap: .1rem; text-decoration: none; color: var(--muted); padding: .45rem .2rem .5rem; font-size: .66rem; font-weight: 600; }
+  .bn-tab .msi { font-size: 1.5rem; }
+  .bn-tab.active { color: var(--accent); }
+  body { padding-bottom: 4.4rem; }
 }
-.nav a:hover { background: var(--chip); color: var(--ink); }
-.nav a.active { color: var(--accent); background: #f6e7e2; }
+
+/* ---------- Streak als Sakura-Blüte ---------- */
+.hstat-flower { display: block; }
+.sakura { width: 2.1rem; height: 2.1rem; display: block; margin: 0 auto .15rem; }
+
+/* ---------- Lernpfad-Badge (Material-Icon) ---------- */
+.lp-badge .msi { font-size: 1.3rem; }
+.lp-card.lp-locked .lp-badge { color: var(--faint); }
+.lp-card.lp-open .lp-badge { color: var(--muted); }
+.lp-card.lp-test .lp-badge { color: var(--accent); }
+.lp-card.lp-done .lp-badge { color: var(--good); }
+.lp-hint .msi { font-size: 1rem; }
 
 /* ---------- Layout ---------- */
 main {

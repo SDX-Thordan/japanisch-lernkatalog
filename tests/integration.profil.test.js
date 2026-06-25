@@ -7,7 +7,7 @@ function fakeStorage() {
   return { getItem: (k) => (k in d ? d[k] : null), setItem: (k, v) => { d[k] = String(v); }, removeItem: (k) => { delete d[k]; } };
 }
 
-const BODY = `<!DOCTYPE html><html><body data-page="fortschritt"><div id="f-root">
+const BODY = `<!DOCTYPE html><html><body data-page="profil"><div id="f-root">
   <span id="f-streak"></span><span id="f-learned"></span><span id="f-due"></span><span id="f-reviews"></span>
   <div id="f-forecast"></div>
   <button id="f-export"></button><button id="f-import"></button><input id="f-file" type="file">

@@ -14,20 +14,8 @@
 
 <header class="topbar">
   <div class="topbar-inner">
-    <a class="brand" href="index.html"><img class="brand-logo" src="assets/icons/icon-192.png" alt="" width="30" height="30"><span class="brand-name">Go! Nihongo</span></a>
-    <nav class="nav">
-      <a href="index.html" class="active">Start</a>
-      <a href="heute.html">Heute</a>
-      <a href="lernpfad.html">Lernpfad</a>
-      <a href="ueben.html">Üben</a>
-      <a href="listen.html">Listen</a>
-      <a href="vokabular.html">Vokabular</a>
-      <a href="grammatik.html">Grammatik</a>
-      <a href="kanji.html">Kanji</a>
-      <a href="verben.html">Verben</a>
-      <a href="schreiben.html">Schreiben</a>
-      <a href="fortschritt.html">Fortschritt</a>
-    </nav>
+    <a class="brand" href="index.html"><span class="brand-jp" aria-hidden="true">行</span><span class="brand-name">Go! Nihongo</span></a>
+    <nav id="topnav" class="nav" aria-label="Hauptnavigation"></nav>
   </div>
 </header>
 
@@ -53,12 +41,6 @@
       <h3>Lernpfad</h3>
       <p>Lektionen freispielen: Kern beherrschen (Kanji auch schreiben) &amp; Test bestehen.</p>
       <span class="nc-count">Freischalten · Tests</span>
-    </a>
-    <a class="navcard" href="ueben.html">
-      <div class="nc-jp">練習</div>
-      <h3>Üben</h3>
-      <p>Karteikarten-Training: 10 zufällige Karten pro Runde.</p>
-      <span class="nc-count">Grammatik · Vokabular · Kanji</span>
     </a>
     <a class="navcard" href="schreiben.html">
       <div class="nc-jp">書く</div>
@@ -104,10 +86,10 @@
       <p>Eigene Vokabellisten anlegen und als Karteikarten trainieren (de↔jp).</p>
       <span class="nc-count">Persönlich</span>
     </a>
-    <a class="navcard" href="fortschritt.html">
+    <a class="navcard" href="profil.html">
       <div class="nc-jp">進捗</div>
-      <h3>Fortschritt</h3>
-      <p>Streak, fällige Karten &amp; Sicherung deines Lernstands (JSON-Export/Import).</p>
+      <h3>Profil</h3>
+      <p>Streak, Statistik &amp; Sicherung deines Lernstands inkl. Vokabellisten (JSON-Export/Import).</p>
       <span class="nc-count">Statistik · Backup</span>
     </a>
   </div>
@@ -158,5 +140,7 @@
     set('c-verben', vb + ' Verben');
   })();
 </script>
+<script src="assets/srs.js"></script>
+<script src="assets/app.js"></script>
 </body>
 </html>

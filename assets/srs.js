@@ -48,6 +48,8 @@
     return d.toISOString().slice(0, 10);
   }
   function round2(x) { return Math.round(x * 100) / 100; }
+  // Fisher-Yates; rng() ∈ [0,1) injizierbar (Default Math.random) für deterministische Tests.
+  function shuffleArr(a, rng) { rng = rng || Math.random; for (var i = a.length - 1; i > 0; i--) { var j = Math.floor(rng() * (i + 1)); var t = a[i]; a[i] = a[j]; a[j] = t; } return a; }
 
   /* ---------- Store-Grundgerüst ---------- */
   function freshStore() {
@@ -211,22 +213,32 @@
     var today = opts.today || todayISO();
     var maxLesson = opts.maxLesson;
 
-    var all = [];
-    sources.forEach(function (s) { all = all.concat(registry(s)); });
-
-    // Gating: nur Items aus freigeschalteten Lektionen (Default: kein Limit → rückwärtskompatibel).
-    if (maxLesson != null) {
-      all = all.filter(function (x) { var L = itemLesson(x.type, x.data); return L != null && L <= maxLesson; });
-    }
+    var lessonOk = function (x) { if (maxLesson == null) return true; var L = itemLesson(x.type, x.data); return L != null && L <= maxLesson; };
+    // Pro Quelle getrennt halten, damit neue Items über die Quellen ausbalanciert werden
+    // (sonst dominiert eine Quelle, weil sie in der Liste vorne steht → „Heute" zeigt nur Vokabeln bzw. nur Kanji).
+    var perSource = sources.map(function (s) { return registry(s).filter(lessonOk); });
+    var all = [].concat.apply([], perSource);
 
     var due = all.filter(function (x) { return isDue(x.id, today); })
       .sort(function (a, b) { return (store.items[a.id].due || '').localeCompare(store.items[b.id].due || ''); })
       .slice(0, reviewLimit)
       .map(function (x) { return { id: x.id, type: x.type, data: x.data, reason: 'due' }; });
 
-    var fresh = all.filter(function (x) { return !store.items[x.id]; })
-      .slice(0, newLimit)
-      .map(function (x) { return { id: x.id, type: x.type, data: x.data, reason: 'new' }; });
+    // Neue Items im Round-Robin über die Quellen ziehen, damit Kanji, Vokabeln & Grammatik vorkommen.
+    // Pro Quelle die Kandidaten mischen → „Heute" wählt zufällig aus den freigeschalteten Lektionen
+    // (statt immer dieselben ersten Items). due/Wiederholungen bleiben nach Fälligkeit sortiert.
+    var rng = opts.rng || Math.random;
+    var newBySource = perSource.map(function (reg) { return shuffleArr(reg.filter(function (x) { return !store.items[x.id]; }), rng); });
+    var fresh = [], guard = 0;
+    while (fresh.length < newLimit && guard < newLimit * sources.length + sources.length) {
+      var any = false;
+      for (var si = 0; si < newBySource.length && fresh.length < newLimit; si++) {
+        var lst = newBySource[si];
+        if (lst.length) { var x = lst.shift(); fresh.push({ id: x.id, type: x.type, data: x.data, reason: 'new' }); any = true; }
+      }
+      if (!any) break;
+      guard++;
+    }
 
     return interleave(due, fresh);
   }

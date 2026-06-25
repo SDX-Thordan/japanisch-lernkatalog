@@ -5,14 +5,20 @@ Läuft als **Offline-Website / PWA** und als **Android-APK** — derselbe Code-S
 
 ## Funktionen
 
-- **Katalog** — Grammatik, Vokabular, Kanji und Verben (Auto-Konjugator) mit Suche, Filtern und Furigana.
+- **Nachschlagen** — Grammatik, Vokabular, Kanji und Verben (Auto-Konjugator) mit Suche, Filtern und Furigana.
 - **Heute** — tägliche, gemischte Lernrunde aus fälligen Wiederholungen und neuen Inhalten
-  (Spaced Repetition, SM-2-light).
+  (Spaced Repetition, SM-2-light); an den Lernpfad gekoppelt.
+- **Lernpfad** — Lektionen L1–25 freispielen: Kern beherrschen (Kanji ab einem Level auch
+  schreiben) + Lektionstest bestehen.
+- **Listen** — eigene Vokabellisten als Karteikarten in beide Richtungen (日本語↔Deutsch) trainieren.
 - **Dynamische Satzbildung** — generierte Übungen (Partikel-MC, Wörter ordnen, Übersetzen)
   aus geprüften Satz-Vorlagen × getaggten Vokabeln.
-- **Erweiterte Grammatik** — ausführliche Erklärungen, häufige Fehler, Abgrenzungen und Übungen.
 - **Kanji-Schreiben** — echte Strichreihenfolge (KanjiVG): nachzeichnen, abspielen, selbst bewerten.
-- **Fortschritt** — Streak, Fälligkeitsvorschau und **JSON-Export/Import** zur Sicherung.
+- **Profil** — Streak (als aufgehende Sakura-Blüte), Fälligkeitsvorschau und **JSON-Export/Import**
+  des gesamten Lernstands inkl. Vokabellisten.
+
+UI: gruppierte Tab-Navigation (Browser) bzw. untere Tab-Leiste (App), Material-Icons als
+**selbst gehostete Font** (offline) — keine externen Requests.
 
 Der Lernstand wird lokal im Browser (`localStorage`, Schlüssel `katalog_srs_v1`) gespeichert
 und kann als JSON exportiert/importiert werden.
@@ -73,7 +79,10 @@ cd android && ./gradlew assembleRelease \
   -Pandroid.injected.signing.key.password=gonihongo
 ```
 
-App-Icons aus `assets/icons/logo.png` neu erzeugen: `node scripts/gen-icons.mjs`.
+App-Icons (Web/PWA + `resources/` für Android) aus `assets/icons/logo.png` neu erzeugen:
+`npm run icons`. Das **Android-Launcher-Icon & Splash** werden im CI-Build aus `resources/`
+via **`@capacitor/assets`** generiert (Schritt in `android.yml`) — nicht mehr das
+Capacitor-Standard-Icon.
 
 ## Lizenz
 

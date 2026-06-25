@@ -51,6 +51,91 @@
     out+=esc(f.slice(last)); return out;
   }
 
+  /* ---------- Material-Icon (selbst gehostete Outlined-Font, Ligaturen, offline) ---------- */
+  function icon(name){ return '<span class="msi" aria-hidden="true">'+name+'</span>'; }
+
+  /* ---------- Streak als Sakura-Blüte (Inline-SVG, öffnet sich mit der Streak-Länge) ---------- */
+  // stage 0..4: Knospe → volle Blüte. Fünf Blütenblätter, deren Spreizung/Deckkraft mit der Stufe wächst.
+  function sakuraStage(streak){ streak=streak||0; if(streak<=0)return 0; if(streak<3)return 1; if(streak<7)return 2; if(streak<14)return 3; return 4; }
+  function sakuraSvg(streak){
+    const st=sakuraStage(streak);
+    const open=[0,0.18,0.45,0.72,1][st];           // Öffnungsgrad
+    const petalOp=st===0?0.25:1;
+    const PINK='#e8889e', PINKD='#d96a86', CORE='#f6c84c';
+    // fünf Blütenblätter radial; „open" skaliert Abstand vom Zentrum + Größe
+    let petals='';
+    for(let i=0;i<5;i++){
+      const a=(-90+i*72)*Math.PI/180;
+      const d=6+open*7;                              // Abstand vom Zentrum
+      const cx=24+Math.cos(a)*d, cy=24+Math.sin(a)*d;
+      const r=4.5+open*5.5;
+      petals+='<g transform="translate('+cx.toFixed(1)+' '+cy.toFixed(1)+') rotate('+(i*72)+')">'+
+        '<path d="M0 '+(-r).toFixed(1)+' C '+(r*0.9).toFixed(1)+' '+(-r).toFixed(1)+', '+(r*0.9).toFixed(1)+' '+(r*0.6).toFixed(1)+', 0 '+(r*1.05).toFixed(1)+' C '+(-r*0.9).toFixed(1)+' '+(r*0.6).toFixed(1)+', '+(-r*0.9).toFixed(1)+' '+(-r).toFixed(1)+', 0 '+(-r).toFixed(1)+' Z" '+
+        'fill="'+PINK+'" stroke="'+PINKD+'" stroke-width="0.6" opacity="'+petalOp+'"/></g>';
+    }
+    const core=st>=2?'<circle cx="24" cy="24" r="'+(2+open*2.2).toFixed(1)+'" fill="'+CORE+'"/>':'';
+    const bud=st===0?'<circle cx="24" cy="24" r="5" fill="#cdb7a6"/><path d="M24 19 v-6" stroke="#7c9a5e" stroke-width="2" stroke-linecap="round"/>':'';
+    return '<svg class="sakura sakura-'+st+'" viewBox="0 0 48 48" role="img" aria-label="Streak-Blüte Stufe '+st+'">'+bud+petals+core+'</svg>';
+  }
+
+  /* ---------- Navigation (responsiv: oben gruppiert / unten Tab-Leiste) ---------- */
+  const NAV_GROUPS=[
+    {group:'Lernen', items:[
+      {page:'heute',href:'heute.html',label:'Heute',icon:'today'},
+      {page:'lernpfad',href:'lernpfad.html',label:'Lernpfad',icon:'route'},
+    ]},
+    {group:'Nachschlagen', items:[
+      {page:'vokabular',href:'vokabular.html',label:'Vokabular',icon:'menu_book'},
+      {page:'grammatik',href:'grammatik.html',label:'Grammatik',icon:'rule'},
+      {page:'kanji',href:'kanji.html',label:'Kanji',icon:'translate'},
+      {page:'verben',href:'verben.html',label:'Verben',icon:'bolt'},
+      {page:'schreiben',href:'schreiben.html',label:'Schreiben',icon:'draw'},
+    ]},
+    {group:'Mein Bereich', items:[
+      {page:'listen',href:'listen.html',label:'Listen',icon:'bookmarks'},
+      {page:'profil',href:'profil.html',label:'Profil',icon:'person'},
+    ]},
+  ];
+  const REFERENCE_PAGES=['vokabular','grammatik','kanji','verben','schreiben'];
+  // Untere App-Leiste: 5 Primärziele; „Nachschlagen" ist ein Hub (Einstieg Vokabular).
+  const BOTTOM=[
+    {page:'heute',href:'heute.html',label:'Heute',icon:'today'},
+    {page:'lernpfad',href:'lernpfad.html',label:'Lernpfad',icon:'route'},
+    {page:'listen',href:'listen.html',label:'Listen',icon:'bookmarks'},
+    {page:'nachschlagen',href:'vokabular.html',label:'Nachschlagen',icon:'menu_book',match:REFERENCE_PAGES},
+    {page:'profil',href:'profil.html',label:'Profil',icon:'person'},
+  ];
+  function navLink(it,page,cls){
+    const active=(it.match?it.match.indexOf(page)!==-1:it.page===page);
+    const a=el('a',cls+(active?' active':''),icon(it.icon)+'<span class="nav-label">'+esc(it.label)+'</span>');
+    a.href=it.href; if(active)a.setAttribute('aria-current','page'); return a;
+  }
+  function renderNav(page){
+    // Obere, gruppierte Leiste (Browser)
+    const top=document.getElementById('topnav');
+    if(top){ top.innerHTML='';
+      NAV_GROUPS.forEach(g=>{ const grp=el('div','nav-group');
+        grp.appendChild(el('span','nav-group-label',esc(g.group)));
+        const row=el('div','nav-row'); g.items.forEach(it=>row.appendChild(navLink(it,page,'nav-tab')));
+        grp.appendChild(row); top.appendChild(grp); });
+    }
+    // Untere Tab-Leiste (App / schmal)
+    if(!document.getElementById('bottomnav')){
+      const bn=el('nav','bottomnav'); bn.id='bottomnav'; bn.setAttribute('aria-label','App-Navigation');
+      BOTTOM.forEach(it=>bn.appendChild(navLink(it,page,'bn-tab')));
+      document.body.appendChild(bn);
+    }
+    // Sekundäre Tab-Zeile auf Nachschlage-Seiten
+    if(REFERENCE_PAGES.indexOf(page)!==-1){
+      const main=document.querySelector('main');
+      if(main && !document.querySelector('.subnav')){
+        const sub=el('nav','subnav'); sub.setAttribute('aria-label','Nachschlagen');
+        NAV_GROUPS[1].items.forEach(it=>sub.appendChild(navLink(it,page,'subnav-tab')));
+        main.insertBefore(sub, main.firstChild);
+      }
+    }
+  }
+
   /* ============================================================
      VERB-KONJUGATOR (Minna no Nihongo Gruppen I/II/III)
      ============================================================ */
@@ -220,7 +305,7 @@
       (ex?'<ul class="gp-ex">'+ex+'</ul>':'')+
       '</div>';
     if(drillable.length){
-      const btn=el('button','gp-learn','▶ Diese Grammatik üben '+
+      const btn=el('button','gp-learn','<span class="msi" aria-hidden="true">play_arrow</span> Diese Grammatik üben '+
         '<span class="gp-learn-n">'+drillable.length+' Sätze · beide Richtungen</span>');
       btn.type='button';
       btn.addEventListener('click',()=>openGrammarDrill(g,drillable));
@@ -245,7 +330,7 @@
       wrap.appendChild(ul);
     }
     if(plus.uebungen&&plus.uebungen.length&&window.Exercises){
-      const btn=el('button','gp-learn','▶ Grammatik-Übungen <span class="gp-learn-n">'+plus.uebungen.length+' Aufgaben</span>'); btn.type='button';
+      const btn=el('button','gp-learn','<span class="msi" aria-hidden="true">play_arrow</span> Grammatik-Übungen <span class="gp-learn-n">'+plus.uebungen.length+' Aufgaben</span>'); btn.type='button';
       const host=el('div','gp-ex-host hidden');
       btn.addEventListener('click',()=>{ host.classList.toggle('hidden');
         if(!host.dataset.built){ buildPlusExercises(host,g.pattern,plus.uebungen); host.dataset.built='1'; } });
@@ -278,7 +363,7 @@
       '<div class="drill-modal" role="dialog" aria-modal="true" aria-label="Grammatik üben">'+
         '<div class="drill-head">'+
           '<div class="drill-titlewrap"><span class="drill-pattern ja"></span><span class="drill-title"></span></div>'+
-          '<button class="drill-close" type="button" aria-label="Schließen">✕</button>'+
+          '<button class="drill-close" type="button" aria-label="Schließen"><span class="msi" aria-hidden="true">close</span></button>'+
         '</div>'+
         '<div class="drill-stage">'+
           '<div class="drill-top"><span class="drill-dir"></span><span class="drill-prog"></span></div>'+
@@ -288,7 +373,7 @@
             '<div class="drill-answer hidden"><div class="drill-answer-lbl"></div><div class="drill-answer-txt"></div></div>'+
             '<div class="drill-controls">'+
               '<button class="btn-primary drill-reveal" type="button">Aufdecken <span class="kbd">Leertaste</span></button>'+
-              '<button class="btn btn-again drill-again hidden" type="button">↻ Nochmal</button>'+
+              '<button class="btn btn-again drill-again hidden" type="button"><span class="msi" aria-hidden="true">refresh</span> Nochmal</button>'+
               '<button class="btn btn-next drill-next hidden" type="button">Weiter →</button>'+
             '</div>'+
           '</div>'+
@@ -336,8 +421,8 @@
       d.card.classList.add('hidden'); d.done.classList.remove('hidden');
       d.dir.textContent=''; d.prog.textContent='';
       if(d.total){
-        d.done.innerHTML='<div class="drill-done-in">🎉 Geschafft!<br>Alle '+d.total+' Übersetzungen sitzen.</div>'+
-          '<button class="btn-primary drill-restart" type="button">↻ Nochmal üben</button>';
+        d.done.innerHTML='<div class="drill-done-in">Geschafft!<br>Alle '+d.total+' Übersetzungen sitzen.</div>'+
+          '<button class="btn-primary drill-restart" type="button"><span class="msi" aria-hidden="true">refresh</span> Nochmal üben</button>';
         d.done.querySelector('.drill-restart').addEventListener('click',drillRestart);
       } else {
         d.done.innerHTML='<div class="drill-done-in">Für diesen Punkt gibt es noch keine Beispielsätze zum Üben.</div>';
@@ -490,43 +575,8 @@
   }
   function initSearch(){ const input=document.getElementById('search-input'); if(!input)return; input.addEventListener('input',()=>{ query=input.value; applyFilter(); }); }
 
-  /* ============================================================  TRAINING (Üben)  */
+  /* ============================================================  Karteikarten-Helfer (Heute)  */
   function shuffle(a){ for(let i=a.length-1;i>0;i--){ const j=Math.floor(Math.random()*(i+1)); const t=a[i]; a[i]=a[j]; a[j]=t; } return a; }
-  function initTraining(){
-    const front=document.getElementById('tr-front'), back=document.getElementById('tr-back');
-    const prog=document.getElementById('tr-progress'), type=document.getElementById('tr-type');
-    const revealBtn=document.getElementById('tr-reveal'), againBtn=document.getElementById('tr-again'), nextBtn=document.getElementById('tr-next');
-    const done=document.getElementById('tr-done'), cardBox=document.getElementById('tr-card'), newBtn=document.getElementById('tr-new');
-    if(!cardBox)return;
-    let deck=[], total=0;
-    const on=id=>{ const e=document.getElementById(id); return e?e.checked:true; };
-    function pool(){ const p=[];
-      if(on('src-kanji'))(window.KANJI||[]).forEach(k=>p.push({t:'kanji',d:k}));
-      if(on('src-vocab'))(window.VOKABULAR||[]).forEach(v=>p.push({t:'vocab',d:v}));
-      if(on('src-grammar'))(window.GRAMMATIK||[]).forEach(g=>p.push({t:'grammar',d:g}));
-      return p; }
-    function start(){ const p=pool(); deck=p.length?shuffle(p.slice()).slice(0,10):[]; total=deck.length;
-      done.classList.add('hidden'); cardBox.classList.remove('hidden'); render(); }
-    function render(){
-      if(!deck.length){ cardBox.classList.add('hidden'); done.classList.remove('hidden');
-        done.innerHTML = total ? '<div class="tr-done-in">🎉 Runde geschafft!<br>Alle '+total+' Karten gelernt.</div>' : '<div class="tr-done-in">Bitte mindestens eine Quelle auswählen.</div>'; return; }
-      const learned=total-deck.length; prog.textContent='Gelernt '+learned+' / '+total;
-      const c=deck[0]; type.textContent={kanji:'漢字 Kanji',vocab:'語彙 Vokabel',grammar:'文法 Grammatik'}[c.t];
-      type.className='tag tr-type-'+c.t;
-      front.innerHTML=frontHtml(c); back.innerHTML=backHtml(c); back.classList.add('hidden');
-      revealBtn.classList.remove('hidden'); againBtn.classList.add('hidden'); nextBtn.classList.add('hidden');
-    }
-    function reveal(){ back.classList.remove('hidden'); revealBtn.classList.add('hidden'); againBtn.classList.remove('hidden'); nextBtn.classList.remove('hidden'); }
-    // Bewertung an die SRS-Engine koppeln (falls geladen): „Gewusst" = 1, „Nochmal" = 0.
-    function gradeCurrent(g){ const c=deck[0]; if(c&&window.SRS){ const id=window.SRS.srsId(c.t,c.d); if(id)window.SRS.grade(id,g); } }
-    function next(){ gradeCurrent(1); deck.shift(); render(); }
-    function again(){ gradeCurrent(0); const c=deck.shift(); deck.push(c); render(); }
-    revealBtn.addEventListener('click',reveal); nextBtn.addEventListener('click',next); againBtn.addEventListener('click',again);
-    if(newBtn)newBtn.addEventListener('click',start);
-    document.addEventListener('keydown',e=>{ if(e.code==='Space'){ e.preventDefault();
-      if(!back.classList.contains('hidden'))next(); else if(!revealBtn.classList.contains('hidden'))reveal(); } });
-    start();
-  }
   function frontHtml(c){
     if(c.t==='kanji')return '<div class="tr-big ja">'+esc(c.d.k)+'</div><div class="tr-q">On-/Kun-Lesung & Bedeutung?</div>';
     if(c.t==='vocab'){ const v=c.d, w=(v.kanji&&v.kanji.length)?v.kanji:v.kana;
@@ -553,6 +603,7 @@
 
   /* ============================================================  HEUTE (Tagesaufgabe)  */
   function setText(id,v){ const e=document.getElementById(id); if(e)e.textContent=v; }
+  function setHtml(id,h){ const e=document.getElementById(id); if(e)e.innerHTML=h; }
   function clampInt(id,dflt){ const e=document.getElementById(id); let n=e?parseInt(e.value,10):dflt; if(isNaN(n)||n<0)n=dflt; return n; }
   function initHeute(){
     const stage=document.getElementById('h-stage'); if(!stage||!window.SRS)return;
@@ -563,7 +614,7 @@
     const lessonParam=parseInt(new URLSearchParams(location.search).get('lesson'),10);
     const onlyLesson=isNaN(lessonParam)?null:lessonParam;
     function lessonOf(c){ return c.type==='kanji'?window.SRS.kanjiLessonOf(c.data.level):c.data.lesson; }
-    function refreshStats(){ const s=window.SRS.stats(); setText('h-streak',s.streakDays); setText('h-due',s.due); setText('h-learned',s.learned); }
+    function refreshStats(){ const s=window.SRS.stats(); setText('h-streak',s.streakDays); setText('h-due',s.due); setText('h-learned',s.learned); setHtml('h-streak-flower',sakuraSvg(s.streakDays)); }
     function start(){
       // Gating: nur freigeschaltete Lektionen; mit ?lesson=L gezielt eine Lektion lernen.
       const maxLesson=onlyLesson!=null?onlyLesson:window.SRS.maxUnlockedLesson();
@@ -574,8 +625,8 @@
     function finishItem(grade){ const c=deck[0]; if(grade!=null&&c)window.SRS.grade(c.id,grade); deck.shift(); refreshStats(); render(); }
     function render(){
       if(!deck.length){ stage.classList.add('hidden'); done.classList.remove('hidden');
-        done.innerHTML=(total?'<div class="tr-done-in">🎉 Tagesrunde geschafft!<br>'+total+' Aufgaben erledigt.</div>':'<div class="tr-done-in">Für heute ist alles erledigt. 🎌</div>')+
-          '<button class="btn-primary" id="h-again" type="button">↻ Noch eine Runde</button>';
+        done.innerHTML=(total?'<div class="tr-done-in">Tagesrunde geschafft!<br>'+total+' Aufgaben erledigt.</div>':'<div class="tr-done-in">Für heute ist alles erledigt.</div>')+
+          '<button class="btn-primary" id="h-again" type="button"><span class="msi" aria-hidden="true">refresh</span> Noch eine Runde</button>';
         const a=document.getElementById('h-again'); if(a)a.addEventListener('click',()=>{ done.classList.add('hidden'); setup.classList.remove('hidden'); refreshStats(); });
         return; }
       const c=deck[0], learned=total-deck.length;
@@ -593,9 +644,9 @@
         '<span class="tr-q">'+esc(k.meaning||'')+' — schreibe das Kanji in richtiger Strichreihenfolge</span></div>'+
         '<div class="kw-stage"></div><div class="kw-msg" aria-live="polite"></div>'+
         '<div class="tr-controls"><button class="btn h-kw-guide" type="button">Vorlage</button>'+
-        '<button class="btn h-kw-play" type="button">▶ Reihenfolge</button>'+
+        '<button class="btn h-kw-play" type="button"><span class="msi" aria-hidden="true">play_arrow</span> Reihenfolge</button>'+
         '<button class="btn h-kw-clear" type="button">Löschen</button>'+
-        '<button class="btn btn-again h-kw-again" type="button">↻ Später</button></div></div>';
+        '<button class="btn btn-again h-kw-again" type="button"><span class="msi" aria-hidden="true">refresh</span> Später</button></div></div>';
       const mount=body.querySelector('.kw-stage'), msg=body.querySelector('.kw-msg');
       const size=Math.min(300,(stage.clientWidth||320)-40);
       fetch('assets/kanjivg/'+window.KanjiWrite.cpFile(k.k)).then(r=>r.text()).then(svg=>{
@@ -614,7 +665,7 @@
       const fc={t:c.type,d:c.data};
       body.innerHTML='<div class="tr-card"><div class="tr-front">'+frontHtml(fc)+'</div><div class="tr-back hidden">'+backHtml(fc)+'</div>'+
         '<div class="tr-controls"><button class="btn-primary h-reveal" type="button">Aufdecken <span class="kbd">Leertaste</span></button>'+
-        '<button class="btn btn-again h-again2 hidden" type="button">↻ Nochmal</button>'+
+        '<button class="btn btn-again h-again2 hidden" type="button"><span class="msi" aria-hidden="true">refresh</span> Nochmal</button>'+
         '<button class="btn btn-next h-good hidden" type="button">Gewusst →</button></div></div>';
       const back=body.querySelector('.tr-back'), reveal=body.querySelector('.h-reveal'), again=body.querySelector('.h-again2'), good=body.querySelector('.h-good');
       reveal.addEventListener('click',()=>{ back.classList.remove('hidden'); reveal.classList.add('hidden'); again.classList.remove('hidden'); good.classList.remove('hidden'); });
@@ -638,14 +689,14 @@
   }
 
   /* ============================================================  FORTSCHRITT (Statistik + Sicherung)  */
-  function initFortschritt(){
+  function initProfil(){
     const root=document.getElementById('f-root'); if(!root||!window.SRS)return;
     function draw(){
       const s=window.SRS.stats(), snap=window.SRS.snapshot(), fc=window.SRS.forecast(undefined,7);
       const maxC=Math.max(1,...fc.map(d=>d.count));
       const bars=fc.map(d=>'<div class="f-bar"><div class="f-bar-fill" style="height:'+Math.round(d.count/maxC*100)+'%"></div>'+
         '<span class="f-bar-n">'+d.count+'</span><span class="f-bar-d">'+d.date.slice(5)+'</span></div>').join('');
-      setText('f-streak',s.streakDays); setText('f-learned',s.learned); setText('f-due',s.due); setText('f-reviews',s.totalReviews);
+      setText('f-streak',s.streakDays); setText('f-learned',s.learned); setText('f-due',s.due); setText('f-reviews',s.totalReviews); setHtml('f-streak-flower',sakuraSvg(s.streakDays));
       const forecast=document.getElementById('f-forecast'); if(forecast)forecast.innerHTML=bars;
       // Lernpfad-Fortschritt: Status + Kern-Fortschritt + Test-Score je Lektion.
       const lp=document.getElementById('f-lessons');
@@ -682,11 +733,11 @@
     function lessonCard(L){
       const st=window.SRS.lessonState(L), cp=st.coreProgress, thema=(LESSON[L]||{}).thema||'';
       const cls=st.testPassed?'lp-done':(st.unlocked?(st.coreMastered?'lp-test':'lp-open'):'lp-locked');
-      const badge=st.testPassed?'✅':(st.unlocked?(st.coreMastered?'🧪':'▶'):'🔒');
+      const badge=st.testPassed?icon('check_circle'):(st.unlocked?(st.coreMastered?icon('quiz'):icon('play_arrow')):icon('lock'));
       const card=el('article','lp-card '+cls);
       let html='<div class="lp-top"><span class="lp-num">Lektion '+L+'</span><span class="lp-badge">'+badge+'</span></div>'+
         '<div class="lp-thema">'+esc(thema)+'</div>';
-      if(!st.unlocked){ html+='<div class="lp-hint">🔒 Erst die vorige Lektion bestehen.</div>'; card.innerHTML=html; return card; }
+      if(!st.unlocked){ html+='<div class="lp-hint"><span class="msi" aria-hidden="true">lock</span> Erst die vorige Lektion bestehen.</div>'; card.innerHTML=html; return card; }
       html+='<div class="lp-core"><div class="lp-core-bar"><span style="width:'+Math.round(cp.fraction*100)+'%"></span></div>'+
         '<span class="lp-core-n">beherrscht '+cp.mastered+' / '+cp.total+'</span></div><div class="lp-actions"></div>';
       card.innerHTML=html;
@@ -707,7 +758,7 @@
       if(overlay)return overlay;
       overlay=el('div','lp-overlay'); overlay.hidden=true;
       overlay.innerHTML='<div class="lp-modal" role="dialog" aria-modal="true" aria-label="Lektionstest">'+
-        '<div class="lp-modal-head"><span class="lp-modal-title"></span><button class="drill-close lp-close" type="button" aria-label="Schließen">✕</button></div>'+
+        '<div class="lp-modal-head"><span class="lp-modal-title"></span><button class="drill-close lp-close" type="button" aria-label="Schließen"><span class="msi" aria-hidden="true">close</span></button></div>'+
         '<div class="lp-modal-top"><span class="lp-modal-prog"></span></div><div class="lp-modal-body"></div></div>';
       document.body.appendChild(overlay);
       overlay.querySelector('.lp-close').addEventListener('click',closeTest);
@@ -733,9 +784,9 @@
       function result(){
         const score=n?correct/n:0, r=window.SRS.recordLessonTest(L,score), pct=Math.round(score*100);
         progEl.textContent='';
-        bodyEl.innerHTML='<div class="lp-result '+(r.passed?'ok':'no')+'">'+(r.passed?'🎉 Bestanden!':'Leider nicht bestanden')+
+        bodyEl.innerHTML='<div class="lp-result '+(r.passed?'ok':'no')+'">'+(r.passed?'Bestanden!':'Leider nicht bestanden')+
           '<div class="lp-result-score">'+correct+' / '+n+' richtig · '+pct+'%</div>'+
-          '<div class="lp-result-msg">'+(r.passed?(r.unlocked?'Lektion '+(L+1)+' ist jetzt freigeschaltet.':'Du hast alle Lektionen abgeschlossen! 🎌'):'Mindestens 80 % nötig — übe weiter und versuch es erneut.')+'</div></div>'+
+          '<div class="lp-result-msg">'+(r.passed?(r.unlocked?'Lektion '+(L+1)+' ist jetzt freigeschaltet.':'Du hast alle Lektionen abgeschlossen!'):'Mindestens 80 % nötig — übe weiter und versuch es erneut.')+'</div></div>'+
           '<button class="btn-primary lp-result-close" type="button">Weiter</button>';
         bodyEl.querySelector('.lp-result-close').addEventListener('click',()=>{ closeTest(); draw(); });
       }
@@ -754,7 +805,7 @@
     if(picker)return picker;
     const ov=el('div','pick-overlay'); ov.hidden=true;
     ov.innerHTML='<div class="pick-modal" role="dialog" aria-modal="true" aria-label="Zu Liste hinzufügen">'+
-      '<div class="pick-head"><span class="pick-title"></span><button class="drill-close pick-close" type="button" aria-label="Schließen">✕</button></div>'+
+      '<div class="pick-head"><span class="pick-title"></span><button class="drill-close pick-close" type="button" aria-label="Schließen"><span class="msi" aria-hidden="true">close</span></button></div>'+
       '<div class="pick-existing"></div>'+
       '<div class="pick-new"><input class="pick-name" type="text" placeholder="Neue Liste …" aria-label="Neue Liste"><button class="btn-primary pick-add" type="button">Anlegen &amp; hinzufügen</button></div>'+
       '<div class="pick-msg" role="status"></div></div>';
@@ -783,6 +834,64 @@
     p.ov.hidden=false;
   }
 
+  /* ============================================================  FREIES ÜBEN (Zufallskarten je Quelle, ungated)  */
+  const FREE_SRC={
+    kanji:{ data:()=>window.KANJI||[], label:'漢字 Kanji' },
+    vocab:{ data:()=>window.VOKABULAR||[], label:'語彙 Vokabeln' },
+    grammar:{ data:()=>window.GRAMMATIK||[], label:'文法 Grammatik' },
+  };
+  let freeOv=null;
+  function ensureFreeDom(){
+    if(freeOv)return freeOv;
+    const ov=el('div','lt-overlay'); ov.hidden=true;
+    ov.innerHTML='<div class="lt-modal" role="dialog" aria-modal="true" aria-label="Freies Üben">'+
+      '<div class="lt-head"><span class="lt-title"></span><button class="drill-close lt-close" type="button" aria-label="Schließen"><span class="msi" aria-hidden="true">close</span></button></div>'+
+      '<div class="lt-top"><span class="lt-prog"></span></div>'+
+      '<div class="lt-card"><div class="lt-front"></div><div class="lt-back hidden"></div>'+
+        '<div class="lt-controls"><button class="btn-primary fr-reveal" type="button">Aufdecken <span class="kbd">Leertaste</span></button>'+
+        '<button class="btn btn-again fr-again hidden" type="button"><span class="msi" aria-hidden="true">refresh</span> Nochmal</button>'+
+        '<button class="btn btn-next fr-good hidden" type="button">Gewusst →</button></div></div>'+
+      '<div class="lt-done hidden"></div></div>';
+    document.body.appendChild(ov);
+    ov.querySelector('.lt-close').addEventListener('click',()=>{ ov.hidden=true; });
+    ov.addEventListener('click',e=>{ if(e.target===ov)ov.hidden=true; });
+    document.addEventListener('keydown',e=>{ if(freeOv.hidden)return;
+      if(e.key==='Escape'){ freeOv.hidden=true; return; }
+      if(e.code==='Space'){ e.preventDefault(); const g=freeOv.querySelector('.fr-good'),r=freeOv.querySelector('.fr-reveal');
+        if(g&&!g.classList.contains('hidden'))g.click(); else if(r&&!r.classList.contains('hidden'))r.click(); } });
+    freeOv=ov; return ov;
+  }
+  function openFreePractice(source){
+    const cfg=FREE_SRC[source]; if(!cfg)return;
+    const data=cfg.data(); if(!data.length)return;
+    const ov=ensureFreeDom(), q=s=>ov.querySelector(s);
+    const title=q('.lt-title'),prog=q('.lt-prog'),card=q('.lt-card'),front=q('.lt-front'),back=q('.lt-back'),done=q('.lt-done'),reveal=q('.fr-reveal'),again=q('.fr-again'),good=q('.fr-good');
+    title.textContent='Freies Üben · '+cfg.label;
+    let deck=[], total=0;
+    function start(){ deck=shuffle(data.slice()).slice(0,10).map(d=>({t:source,d:d})); total=deck.length; done.classList.add('hidden'); card.classList.remove('hidden'); render(); }
+    function render(){
+      if(!deck.length){ card.classList.add('hidden'); done.classList.remove('hidden');
+        done.innerHTML='<div class="tr-done-in">Runde geschafft — '+total+' Karten.</div><button class="btn-primary fr-restart" type="button"><span class="msi" aria-hidden="true">refresh</span> Neue Runde</button>';
+        done.querySelector('.fr-restart').addEventListener('click',start); return; }
+      const learned=total-deck.length; prog.textContent='Karte '+(learned+1)+' / '+total;
+      const c=deck[0]; front.innerHTML=frontHtml(c); back.innerHTML=backHtml(c);
+      back.classList.add('hidden'); reveal.classList.remove('hidden'); again.classList.add('hidden'); good.classList.add('hidden');
+    }
+    function grade(g){ const c=deck[0]; if(c&&window.SRS){ const id=window.SRS.srsId(c.t,c.d); if(id)window.SRS.grade(id,g); } }
+    reveal.onclick=()=>{ back.classList.remove('hidden'); reveal.classList.add('hidden'); again.classList.remove('hidden'); good.classList.remove('hidden'); };
+    good.onclick=()=>{ grade(1); deck.shift(); render(); };
+    again.onclick=()=>{ grade(0); const c=deck.shift(); deck.push(c); render(); };
+    ov.hidden=false; start();
+  }
+  // „Üben"-Button auf den Nachschlage-Seiten (Vokabular/Grammatik/Kanji) für freies Zufalls-Üben.
+  function addFreeUebenButton(page){
+    const src={kanji:'kanji',vokabular:'vocab',grammatik:'grammar'}[page]; if(!src)return;
+    const host=document.querySelector('.toolbar .toolbar-row')||document.querySelector('.toolbar');
+    if(!host)return;
+    const b=el('button','btn-primary page-ueben','<span class="msi" aria-hidden="true">school</span> Üben'); b.type='button';
+    b.addEventListener('click',()=>openFreePractice(src)); host.appendChild(b);
+  }
+
   /* ============================================================  LISTEN (persönliche Vokabellisten)  */
   function initListen(){
     const root=document.getElementById('lst-root'); if(!root||!window.SRS)return;
@@ -799,14 +908,14 @@
         card.innerHTML='<div class="lst-head"><span class="lst-name">'+esc(l.name)+'</span><span class="lst-count">'+items.length+' Wörter</span></div>'+
           '<div class="lst-actions"></div><div class="lst-items hidden"></div>';
         const actions=card.querySelector('.lst-actions');
-        const train=el('button','btn-primary lst-train','▶ Trainieren'); train.type='button'; train.disabled=!items.length;
+        const train=el('button','btn-primary lst-train','<span class="msi" aria-hidden="true">play_arrow</span> Üben'); train.type='button'; train.disabled=!items.length;
         train.addEventListener('click',()=>openTrainer(l));
         const show=el('button','btn lst-show',(items.length?'Wörter ('+items.length+')':'Wörter')); show.type='button';
         const itemsBox=card.querySelector('.lst-items');
         show.addEventListener('click',()=>{ itemsBox.classList.toggle('hidden'); if(!itemsBox.dataset.built){ buildItems(itemsBox,l,items); itemsBox.dataset.built='1'; } });
-        const ren=el('button','btn lst-ren','✎ Umbenennen'); ren.type='button';
+        const ren=el('button','btn lst-ren','<span class="msi" aria-hidden="true">edit</span> Umbenennen'); ren.type='button';
         ren.addEventListener('click',()=>{ const nn=window.prompt('Liste umbenennen:',l.name); if(nn&&nn.trim()){ window.SRS.renameList(l.id,nn.trim()); draw(); } });
-        const del=el('button','btn lst-del','🗑 Löschen'); del.type='button';
+        const del=el('button','btn lst-del','<span class="msi" aria-hidden="true">delete</span> Löschen'); del.type='button';
         del.addEventListener('click',()=>{ if(window.confirm('Liste „'+l.name+'" löschen? (Vokabeln selbst bleiben erhalten.)')){ window.SRS.deleteList(l.id); draw(); } });
         actions.appendChild(train); actions.appendChild(show); actions.appendChild(ren); actions.appendChild(del);
         root.appendChild(card);
@@ -816,7 +925,7 @@
       box.innerHTML='';
       items.forEach(o=>{ const row=el('div','lst-item');
         row.innerHTML='<span class="lst-jp ja">'+vocabFront(o.data)+'</span><span class="lst-de">'+esc(o.data.de)+'</span>';
-        const rm=el('button','lst-rm','✕'); rm.type='button'; rm.title='Aus Liste entfernen';
+        const rm=el('button','lst-rm','<span class="msi" aria-hidden="true">close</span>'); rm.type='button'; rm.title='Aus Liste entfernen';
         rm.addEventListener('click',()=>{ window.SRS.removeFromList(l.id,[o.id]); draw(); });
         row.appendChild(rm); box.appendChild(row); });
     }
@@ -829,11 +938,11 @@
       tov.innerHTML='<div class="lt-modal" role="dialog" aria-modal="true" aria-label="Liste trainieren">'+
         '<div class="lt-head"><span class="lt-title"></span>'+
           '<button class="lt-dir btn" type="button"></button>'+
-          '<button class="drill-close lt-close" type="button" aria-label="Schließen">✕</button></div>'+
+          '<button class="drill-close lt-close" type="button" aria-label="Schließen"><span class="msi" aria-hidden="true">close</span></button></div>'+
         '<div class="lt-top"><span class="lt-prog"></span></div>'+
         '<div class="lt-card"><div class="lt-front"></div><div class="lt-back hidden"></div>'+
           '<div class="lt-controls"><button class="btn-primary lt-reveal" type="button">Aufdecken <span class="kbd">Leertaste</span></button>'+
-          '<button class="btn btn-again lt-again hidden" type="button">↻ Nochmal</button>'+
+          '<button class="btn btn-again lt-again hidden" type="button"><span class="msi" aria-hidden="true">refresh</span> Nochmal</button>'+
           '<button class="btn btn-next lt-good hidden" type="button">Gewusst →</button></div></div>'+
         '<div class="lt-done hidden"></div></div>';
       document.body.appendChild(tov);
@@ -857,7 +966,7 @@
       function start(){ const items=window.SRS.listItems(l.id); deck=shuffle(items.slice()); total=deck.length; done.classList.add('hidden'); card.classList.remove('hidden'); render(); }
       function render(){
         if(!deck.length){ card.classList.add('hidden'); done.classList.remove('hidden');
-          done.innerHTML=total?'<div class="tr-done-in">🎉 Geschafft!<br>Alle '+total+' Karten durch.</div><button class="btn-primary lt-restart" type="button">↻ Nochmal</button>':'<div class="tr-done-in">Diese Liste ist leer.</div>';
+          done.innerHTML=total?'<div class="tr-done-in">Geschafft!<br>Alle '+total+' Karten durch.</div><button class="btn-primary lt-restart" type="button"><span class="msi" aria-hidden="true">refresh</span> Nochmal</button>':'<div class="tr-done-in">Diese Liste ist leer.</div>';
           const rs=done.querySelector('.lt-restart'); if(rs)rs.addEventListener('click',start); return; }
         const learned=total-deck.length; prog.textContent='Karte '+(learned+1)+' / '+total;
         const o=deck[0], v=o.data;
@@ -883,6 +992,7 @@
   /* ============================================================  INIT  */
   function init(){
     const page=document.body.dataset.page;
+    renderNav(page);
     const content=document.getElementById('content');
     if(content){
       if(page==='kanji')renderKanji(content);
@@ -893,9 +1003,9 @@
       groups=Array.prototype.slice.call(content.querySelectorAll('.group'));
       applyFilter();
     }
-    if(page==='ueben')initTraining();
+    if(page==='kanji'||page==='vokabular'||page==='grammatik')addFreeUebenButton(page);
     if(page==='heute')initHeute();
-    if(page==='fortschritt')initFortschritt();
+    if(page==='profil')initProfil();
     if(page==='schreiben')initSchreiben();
     if(page==='listen')initListen();
     if(page==='lernpfad')initLernpfad();

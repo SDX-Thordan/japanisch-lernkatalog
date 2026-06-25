@@ -23,6 +23,8 @@ beforeEach(() => {
     'assets/srs.js', 'assets/exercises.js', 'assets/app.js',
   ], { html: BODY });
   win.SRS._useStorage(fakeStorage());
+  // Deterministisch: feste Item-Auswahl (buildQueue mischt jetzt zufällig) und mc-Übungen.
+  win.Math.random = () => 0;
 });
 
 function click(elm) { elm.dispatchEvent(new win.Event('click', { bubbles: true })); }

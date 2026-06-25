@@ -42,6 +42,18 @@ describe('buildQueue()', () => {
     expect(Math.max(...lessons(gated))).toBeLessThanOrEqual(5);
   });
 
+  it('balanciert neue Items über Quellen (Kanji, Vokabeln & Grammatik)', () => {
+    // alles freigeschaltet → neue Items sollen alle drei Quellen abdecken
+    const q = SRS.buildQueue({ newLimit: 6, reviewLimit: 0, maxLesson: 25 });
+    const types = new Set(q.map((x) => x.type));
+    expect(types.has('kanji')).toBe(true);
+    expect(types.has('vocab')).toBe(true);
+    expect(types.has('grammar')).toBe(true);
+    // früh (nur L1 frei): Grammatik ist trotz vieler Vokabeln dabei
+    const early = SRS.buildQueue({ newLimit: 6, reviewLimit: 0, maxLesson: 1 });
+    expect(new Set(early.map((x) => x.type)).has('grammar')).toBe(true);
+  });
+
   it('verschränkt fällige und neue Items (nicht alle due am Stück)', () => {
     const ks = (win.KANJI || []).slice(0, 4).map((k) => 'k:' + k.k);
     ks.forEach((id) => SRS.grade(id, 1, '2026-06-01'));
