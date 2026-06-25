@@ -32,7 +32,7 @@
   var GRACE_DAYS = 3;        // so viele Tage kein Zerfall nach der letzten Übung
   var DECAY_PER_DAY = 2;     // danach Punkte/Tag Zerfall (sanft)
   var ITEM_DAILY_CAP = 40;   // max. Punktgewinn pro Wort und Tag
-  var DAILY_CAP = 200;       // max. Punktgewinn über alle Wörter pro Tag (global)
+  var DAILY_CAP = 400;       // max. Punktgewinn über alle Wörter pro Tag (global)
   var SCORE_THRESHOLDS = [20, 40, 60, 80, 100]; // Blütenblatt je 20 %
 
   /* ---------- Storage-Backend (injizierbar) ---------- */
@@ -341,6 +341,27 @@
     };
   }
 
+  // Aggregierte Gesamtstatistik über den ganzen Katalog (für die Profil-Grafiken).
+  function catalogStats(today) {
+    today = today || todayISO();
+    var sources = ['vocab', 'grammar', 'kanji'];
+    var petals = [0, 0, 0, 0, 0, 0]; // Items je Blütenstufe 0..5
+    var total = 0, started = 0, mastered = 0, sum = 0, byType = {};
+    sources.forEach(function (s) {
+      var reg = registry(s), t = { total: reg.length, started: 0, mastered: 0, sum: 0 };
+      reg.forEach(function (x) {
+        var it = store.items[x.id], eff = effectiveScore(it, today);
+        var p = 0; for (var i = 0; i < SCORE_THRESHOLDS.length; i++) { if (eff >= SCORE_THRESHOLDS[i]) p++; }
+        petals[p]++; total++; sum += eff; t.sum += eff;
+        if (it && rawScore(it) > 0) { started++; t.started++; }
+        if (isMastered(x.id, today)) { mastered++; t.mastered++; }
+      });
+      t.avg = t.total ? t.sum / t.total : 0;
+      byType[s] = t;
+    });
+    return { total: total, started: started, mastered: mastered, avg: total ? sum / total : 0, petals: petals, byType: byType };
+  }
+
   /* ---------- Sicherung: Export / Import / Merge ---------- */
   function exportJSON() { return JSON.stringify(store, null, 2); }
 
@@ -561,7 +582,7 @@
     // Lernpunktzahl 0–100
     effectiveScore: scoreOf, scoreOf: scoreOf, MASTER_AT: MASTER_AT,
     isDue: isDue, dueIds: dueIds,
-    buildQueue: buildQueue, stats: stats,
+    buildQueue: buildQueue, stats: stats, catalogStats: catalogStats,
     // Lernpfad / Gating
     isMastered: isMastered, needsWriting: needsWriting,
     kanjiLessonOf: kanjiLessonOf, lessonCore: lessonCore, coreProgress: coreProgress, lessonPlan: lessonPlan,

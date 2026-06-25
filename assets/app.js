@@ -642,6 +642,33 @@
     let sum=0; core.forEach(c=>{ sum+=window.SRS.effectiveScore(c.id); });
     return sum/core.length;
   }
+  // Kreis-Fortschrittsanzeige (SVG): pct 0–100 mit Beschriftung in der Mitte.
+  function ringSvg(pct,centerBig,centerSmall){
+    const r=42, c=2*Math.PI*r, off=c*(1-Math.max(0,Math.min(100,pct))/100);
+    return '<svg viewBox="0 0 100 100" class="f-ring-svg" role="img" aria-label="'+esc(centerBig+' '+centerSmall)+'">'+
+      '<circle cx="50" cy="50" r="'+r+'" fill="none" stroke="var(--border)" stroke-width="9"/>'+
+      '<circle cx="50" cy="50" r="'+r+'" fill="none" stroke="var(--accent)" stroke-width="9" stroke-linecap="round" '+
+        'stroke-dasharray="'+c.toFixed(1)+'" stroke-dashoffset="'+off.toFixed(1)+'" transform="rotate(-90 50 50)"/>'+
+      '<text x="50" y="49" text-anchor="middle" class="f-ring-big">'+esc(centerBig)+'</text>'+
+      '<text x="50" y="64" text-anchor="middle" class="f-ring-small">'+esc(centerSmall)+'</text></svg>';
+  }
+  // Profil-Gesamtüberblick: Ring (gemeistert %), Balken je Typ, Blütenstufen-Verteilung.
+  function drawOverview(cs){
+    const ringPct=cs.total?Math.round(cs.mastered/cs.total*100):0;
+    setHtml('f-ring',ringSvg(ringPct,ringPct+'%','gemeistert'));
+    const TYPES=[['vocab','語彙 Vokabeln'],['grammar','文法 Grammatik'],['kanji','漢字 Kanji']];
+    setHtml('f-typebars',TYPES.map(([k,lbl])=>{ const t=cs.byType[k]||{total:0,mastered:0,avg:0};
+      const pct=t.total?Math.round(t.mastered/t.total*100):0;
+      return '<div class="f-typebar"><div class="f-typebar-top"><span>'+esc(lbl)+'</span>'+
+        '<span class="f-typebar-n">'+t.mastered+' / '+t.total+'</span></div>'+
+        '<div class="f-bar2"><span style="width:'+pct+'%"></span></div></div>';
+    }).join(''));
+    const max=Math.max(1,...cs.petals);
+    setHtml('f-dist',cs.petals.map((n,i)=>'<div class="f-distcol" title="'+n+' Inhalte · '+i+' Blütenblätter">'+
+      '<div class="f-distbar-wrap"><div class="f-distbar" style="height:'+Math.round(n/max*100)+'%"></div></div>'+
+      '<span class="f-distn">'+n+'</span>'+sakuraSvg(i*20,SCORE_THRESHOLDS,{cls:'sakura-sm'})+'</div>').join(''));
+  }
+
   // Sakura-Lernstand-Indikator je Lektion (Ø-Lernstand der Items).
   function lessonRepsBadge(L,type){
     const avg=lessonScoreAvg(L,type);
@@ -856,6 +883,7 @@
       setText('f-streak',s.streakDays); setText('f-learned',s.learned); setText('f-due',s.due); setHtml('f-streak-flower',sakuraSvg(s.streakDays));
       setText('f-avg',Math.round(s.avgScore||0)+'%'); setHtml('f-avg-flower',sakuraSvg(s.avgScore||0,SCORE_THRESHOLDS,{cls:'sakura-sm'}));
       setText('f-daily',(s.dailyGain||0)+' / '+(s.dailyCap||0));
+      if(window.SRS.catalogStats)drawOverview(window.SRS.catalogStats());
       const forecast=document.getElementById('f-forecast'); if(forecast)forecast.innerHTML=bars;
       // Lernpfad-Fortschritt: Status + Kern-Fortschritt + Test-Score je Lektion.
       const lp=document.getElementById('f-lessons');
