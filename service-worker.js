@@ -2,16 +2,16 @@
    Cacht App-Shell, Daten und KanjiVG-SVGs, damit die App (auch als PWA) offline läuft.
    Cache-Version bei inhaltlichen Änderungen erhöhen. */
 'use strict';
-var CACHE = 'katalog-v3';
+var CACHE = 'katalog-v4';
 
 var ASSETS = [
   './', 'index.html', 'heute.html', 'lernpfad.html', 'listen.html', 'grammatik.html', 'vokabular.html', 'kanji.html',
-  'schreiben.html', 'verben.html', 'ueben.html', 'fortschritt.html',
+  'schreiben.html', 'verben.html', 'profil.html',
   'assets/style.css', 'assets/app.js', 'assets/srs.js', 'assets/exercises.js', 'assets/kanji-write.js',
   'assets/data/kanji.js', 'assets/data/vokabular.js', 'assets/data/grammatik.js',
   'assets/data/grammatik_extra.js', 'assets/data/grammatik_furigana.js', 'assets/data/grammatik_plus.js',
   'assets/data/vokabular_tags.js', 'assets/data/saetze.js',
-  'manifest.webmanifest',
+  'manifest.webmanifest', 'assets/icons/material/material-icons-outlined.woff2',
   'assets/icons/icon-192.png', 'assets/icons/icon-512.png', 'assets/icons/icon-maskable-512.png'
 ];
 

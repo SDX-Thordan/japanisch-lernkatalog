@@ -10,7 +10,7 @@ function fakeStorage() {
 let win, SRS;
 beforeEach(() => {
   win = loadWithData(['assets/app.js', 'assets/srs.js'], {
-    html: '<!DOCTYPE html><html><body data-page="fortschritt"></body></html>',
+    html: '<!DOCTYPE html><html><body data-page="profil"></body></html>',
   });
   SRS = win.SRS;
   SRS._useStorage(fakeStorage());

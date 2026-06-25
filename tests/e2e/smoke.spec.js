@@ -1,10 +1,21 @@
 import { test, expect } from '@playwright/test';
 
-test('Übersicht lädt mit Navigation zu den neuen Seiten', async ({ page }) => {
+test('Übersicht lädt mit gruppierter Tab-Navigation', async ({ page }) => {
   await page.goto('/index.html');
-  await expect(page.locator('.nav a', { hasText: 'Heute' })).toBeVisible();
-  await expect(page.locator('.nav a', { hasText: 'Schreiben' })).toBeVisible();
-  await expect(page.locator('.nav a', { hasText: 'Fortschritt' })).toBeVisible();
+  await expect(page.locator('.nav-tab', { hasText: 'Heute' })).toBeVisible();
+  await expect(page.locator('.nav-tab', { hasText: 'Schreiben' })).toBeVisible();
+  await expect(page.locator('.nav-tab', { hasText: 'Profil' })).toBeVisible();
+  await expect(page.locator('.nav-group-label', { hasText: 'Nachschlagen' })).toBeVisible();
+  // kein „Üben" mehr
+  await expect(page.locator('.nav-tab', { hasText: 'Üben' })).toHaveCount(0);
+});
+
+test('Mobile: untere Tab-Leiste sichtbar, obere ausgeblendet', async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 800 });
+  await page.goto('/heute.html');
+  await expect(page.locator('.bottomnav')).toBeVisible();
+  await expect(page.locator('.bottomnav .bn-tab', { hasText: 'Heute' })).toBeVisible();
+  await expect(page.locator('#topnav')).toBeHidden();
 });
 
 test('Heute startet eine gemischte Session', async ({ page }) => {
@@ -31,8 +42,8 @@ test('Schreiben lädt das KanjiVG-Canvas', async ({ page }) => {
   await expect(page.locator('#kw-char')).not.toBeEmpty();
 });
 
-test('Fortschritt: Export-Button vorhanden, Forecast gerendert', async ({ page }) => {
-  await page.goto('/fortschritt.html');
+test('Profil: Export-Button vorhanden, Forecast gerendert', async ({ page }) => {
+  await page.goto('/profil.html');
   await expect(page.locator('#f-export')).toBeVisible();
   await expect(page.locator('#f-forecast .f-bar')).toHaveCount(7);
 });

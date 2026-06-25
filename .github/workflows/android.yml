@@ -44,10 +44,14 @@ jobs:
       - name: Web-Assets nach www/ stagen
         run: npm run build:www
 
-      - name: Android-Projekt erzeugen (Capacitor) + synchronisieren
-        run: |
-          npx cap add android
-          npx cap sync android
+      - name: Android-Projekt erzeugen (Capacitor)
+        run: npx cap add android
+
+      - name: App-Icon & Splash aus resources/ erzeugen (@capacitor/assets)
+        run: npx @capacitor/assets generate --android
+
+      - name: Synchronisieren
+        run: npx cap sync android
 
       - name: Version setzen (hochzählend → Update ohne Neuinstallation)
         run: |
