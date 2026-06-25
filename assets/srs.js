@@ -211,22 +211,29 @@
     var today = opts.today || todayISO();
     var maxLesson = opts.maxLesson;
 
-    var all = [];
-    sources.forEach(function (s) { all = all.concat(registry(s)); });
-
-    // Gating: nur Items aus freigeschalteten Lektionen (Default: kein Limit → rückwärtskompatibel).
-    if (maxLesson != null) {
-      all = all.filter(function (x) { var L = itemLesson(x.type, x.data); return L != null && L <= maxLesson; });
-    }
+    var lessonOk = function (x) { if (maxLesson == null) return true; var L = itemLesson(x.type, x.data); return L != null && L <= maxLesson; };
+    // Pro Quelle getrennt halten, damit neue Items über die Quellen ausbalanciert werden
+    // (sonst dominiert eine Quelle, weil sie in der Liste vorne steht → „Heute" zeigt nur Vokabeln bzw. nur Kanji).
+    var perSource = sources.map(function (s) { return registry(s).filter(lessonOk); });
+    var all = [].concat.apply([], perSource);
 
     var due = all.filter(function (x) { return isDue(x.id, today); })
       .sort(function (a, b) { return (store.items[a.id].due || '').localeCompare(store.items[b.id].due || ''); })
       .slice(0, reviewLimit)
       .map(function (x) { return { id: x.id, type: x.type, data: x.data, reason: 'due' }; });
 
-    var fresh = all.filter(function (x) { return !store.items[x.id]; })
-      .slice(0, newLimit)
-      .map(function (x) { return { id: x.id, type: x.type, data: x.data, reason: 'new' }; });
+    // Neue Items im Round-Robin über die Quellen ziehen, damit Kanji, Vokabeln & Grammatik vorkommen.
+    var newBySource = perSource.map(function (reg) { return reg.filter(function (x) { return !store.items[x.id]; }); });
+    var fresh = [], guard = 0;
+    while (fresh.length < newLimit && guard < newLimit * sources.length + sources.length) {
+      var any = false;
+      for (var si = 0; si < newBySource.length && fresh.length < newLimit; si++) {
+        var lst = newBySource[si];
+        if (lst.length) { var x = lst.shift(); fresh.push({ id: x.id, type: x.type, data: x.data, reason: 'new' }); any = true; }
+      }
+      if (!any) break;
+      guard++;
+    }
 
     return interleave(due, fresh);
   }
