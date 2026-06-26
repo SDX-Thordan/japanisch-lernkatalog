@@ -78,6 +78,17 @@ jobs:
       - name: Android-Projekt erzeugen (Capacitor)
         run: npx cap add android
 
+      - name: SDK-Versionen für @capgo anheben (compileSdk 35, minSdk 23)
+        run: |
+          set -eo pipefail
+          # @capgo zieht androidx.work ≥ 2.10 (verlangt compileSdk 35) und play-services-tasks 18.4.1
+          # (verlangt minSdk 23). Capacitor 6 setzt 34/22 → beide anheben. targetSdk bleibt 34.
+          sed -i -E "s/compileSdkVersion *= *[0-9]+/compileSdkVersion = 35/" android/variables.gradle
+          sed -i -E "s/minSdkVersion *= *[0-9]+/minSdkVersion = 23/" android/variables.gradle
+          grep -E "minSdkVersion|compileSdkVersion|targetSdkVersion" android/variables.gradle
+          grep -q "compileSdkVersion = 35" android/variables.gradle || { echo "::error::compileSdkVersion-Patch fehlgeschlagen"; exit 1; }
+          grep -q "minSdkVersion = 23" android/variables.gradle || { echo "::error::minSdkVersion-Patch fehlgeschlagen"; exit 1; }
+
       - name: App-Icon & Splash aus resources/ erzeugen (@capacitor/assets)
         run: |
           set -eo pipefail
