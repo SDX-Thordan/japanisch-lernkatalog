@@ -78,6 +78,14 @@ jobs:
       - name: Android-Projekt erzeugen (Capacitor)
         run: npx cap add android
 
+      - name: compileSdk auf 35 anheben (@capgo zieht androidx.work:work-runtime ≥ 2.10, das compileSdk 35 verlangt)
+        run: |
+          set -eo pipefail
+          # Capacitor 6 setzt compileSdkVersion = 34; androidx.work 2.10.x verlangt aber 35 (AAR-Metadaten-Check).
+          sed -i -E "s/compileSdkVersion *= *[0-9]+/compileSdkVersion = 35/" android/variables.gradle
+          grep -E "compileSdkVersion|targetSdkVersion" android/variables.gradle
+          grep -q "compileSdkVersion = 35" android/variables.gradle || { echo "::error::compileSdkVersion-Patch fehlgeschlagen"; exit 1; }
+
       - name: App-Icon & Splash aus resources/ erzeugen (@capacitor/assets)
         run: |
           set -eo pipefail
