@@ -32,7 +32,7 @@
   var GRACE_DAYS = 3;        // so viele Tage kein Zerfall nach der letzten Übung
   var DECAY_PER_DAY = 2;     // danach Punkte/Tag Zerfall (sanft)
   var ITEM_DAILY_CAP = 40;   // max. Punktgewinn pro Wort und Tag
-  var DAILY_CAP = 400;       // max. Punktgewinn über alle Wörter pro Tag (global)
+  var DAILY_CAP = 500;       // max. Punktgewinn über alle Wörter pro Tag (global)
   var SCORE_THRESHOLDS = [20, 40, 60, 80, 100]; // Blütenblatt je 20 %
 
   /* ---------- Storage-Backend (injizierbar) ---------- */
