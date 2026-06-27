@@ -568,6 +568,31 @@ table.conj-table tbody tr:last-child th, table.conj-table tbody tr:last-child td
 .rc-opt.rc-correct { border-color: #2e8b57; background: #e7f6ec; color: #1f6b40; font-weight: 600; }
 .rc-opt.rc-wrong { border-color: #b23a2e; background: #fbeae8; color: #8f2d23; }
 .rc-next-wrap { display: flex; justify-content: center; margin-top: auto; padding-top: 1.2rem; }
+
+/* TIPPEN (Produktion): Bedeutung → Wort eingeben (Romaji/Kana/Kanji). */
+.ty-card { align-items: center; }
+.ty-q { text-align: center; }
+.ty-de { font-size: 1.7rem; font-weight: 600; color: var(--ink); margin: .4rem 0 .1rem; }
+.ty-input { display: block; width: 100%; max-width: 22rem; margin: 1.1rem auto 0; padding: .7rem .9rem; font-size: 1.3rem;
+  text-align: center; border: 1px solid var(--border); border-radius: 10px; font-family: var(--font-ja-sans); }
+.ty-input.ty-ok { border-color: #2e8b57; background: #e7f6ec; }
+.ty-input.ty-bad { border-color: #b23a2e; background: #fbeae8; }
+.ty-fb { text-align: center; margin-top: .7rem; min-height: 1.2rem; }
+.ty-fb .ja { font-family: var(--font-ja-sans); font-size: 1.15rem; }
+.ty-good { color: #1f6b40; font-weight: 700; }
+.ty-wrong { color: #8f2d23; font-weight: 700; }
+
+/* Fehler-Hinweis (Beispiel/typischer Fehler) bei falscher Antwort. */
+.fb-hint { background: var(--surface-2); border-left: 3px solid var(--accent); border-radius: 8px;
+  padding: .55rem .8rem; margin: .8rem auto 0; max-width: 32rem; text-align: left; font-size: .9rem; color: var(--muted); }
+.fb-hint .ja { font-family: var(--font-ja-sans); color: var(--ink); }
+
+/* Profil: schwierige Wörter (Leeches). */
+.f-leech { display: flex; flex-direction: column; gap: .35rem; }
+.f-leech-item { display: flex; align-items: center; gap: .6rem; padding: .35rem 0; border-bottom: 1px solid var(--border-2); }
+.f-leech-jp { font-family: var(--font-ja-sans); font-size: 1.1rem; min-width: 5rem; }
+.f-leech-de { color: var(--muted); flex: 1; }
+.f-leech-n { color: #8f2d23; font-weight: 600; font-size: .85rem; }
 .tr-back { border-top: 1px dashed var(--border); margin-top: 1.1rem; padding-top: 1.1rem; }
 .tr-back .tr-answer-jp { font-family: var(--font-ja-sans); font-size: 1.7rem; font-weight: 600; line-height: 1.7; margin-bottom: .3rem; }
 .tr-back .tr-answer-jp rt { font-size: .5em; }

@@ -30,10 +30,12 @@ beforeEach(() => {
 });
 
 function click(elm) { elm.dispatchEvent(new win.Event('click', { bubbles: true })); }
-// n L1-Vokabeln „angefangen" (Score 20) → unter MASTER_AT → fällig zur Wiederholung.
+// n L1-Vokabeln auf mittlerem Lernstand (55) → fällig (< MASTER_AT) und adaptiv = freier Abruf
+// (verdeckte Karteikarte). So bleibt der Karteikarten-Pfad testbar.
 function makeDue(n) {
+  const today = win.SRS.__test.todayISO();
   const ids = win.SRS.lessonCore(1).filter((c) => c.type === 'vocab').slice(0, n).map((c) => c.id);
-  ids.forEach((id) => win.SRS.grade(id, 1));
+  ids.forEach((id) => win.SRS.__test.setScore(id, 55, today));
   return ids;
 }
 
@@ -123,5 +125,49 @@ describe('Heute im Lernpfad-Modus (?lesson=L)', () => {
     click(next);
     // Richtig erkannt → Lernstand des Worts ist gestartet.
     expect(w.SRS.stats().learned).toBeGreaterThanOrEqual(1);
+  });
+});
+
+describe('Heute (Wiederholung) — adaptive Schwierigkeit', () => {
+  // init() ist an DOMContentLoaded gebunden (JSDOM feuert das asynchron) → kurz auf den Tick warten.
+  function tick() { return new Promise((r) => setTimeout(r, 0)); }
+  // Klick im RICHTIGEN Fenster (jeder Test baut sein eigenes w, nicht das globale win).
+  const clickW = (w, el) => el.dispatchEvent(new w.Event('click', { bubbles: true }));
+  // Frischer Zustand mit genau EINER fälligen Vokabel auf einem gewünschten Lernstand.
+  async function reviewWith(score) {
+    const w = loadScripts(SCRIPTS, { html: BODY });
+    w.SRS._useStorage(fakeStorage());
+    w.Math.random = () => 0;
+    await tick();
+    const today = w.SRS.__test.todayISO();
+    const c = w.SRS.lessonCore(1).filter((x) => x.type === 'vocab')[0];
+    w.SRS.__test.setScore(c.id, score, today); // last=today → kein Zerfall, eff=score, fällig (<80)
+    w.document.getElementById('h-revlimit').value = '30';
+    clickW(w, w.document.getElementById('h-start'));
+    return { w, body: w.document.getElementById('h-body'), data: c.data };
+  }
+
+  it('niedriger Lernstand → Erkennen (Multiple-Choice)', async () => {
+    const { body } = await reviewWith(20);
+    expect(body.querySelector('.rc-card')).toBeTruthy();
+  });
+
+  it('mittlerer Lernstand → freier Abruf (verdeckte Karte)', async () => {
+    const { body } = await reviewWith(55);
+    expect(body.querySelector('.h-reveal')).toBeTruthy();
+    expect(body.querySelector('.rc-card')).toBeFalsy();
+    expect(body.querySelector('.ty-card')).toBeFalsy();
+  });
+
+  it('hoher Lernstand → Produktion (Tippen) und akzeptiert Romaji/Kana/Kanji', async () => {
+    const { w, body, data } = await reviewWith(75);
+    const card = body.querySelector('.ty-card');
+    expect(card).toBeTruthy();
+    const input = body.querySelector('.ty-input');
+    input.value = data.romaji; // Romaji eingeben
+    clickW(w, body.querySelector('.ty-btn')); // prüfen
+    expect(body.querySelector('.ty-input').classList.contains('ty-ok')).toBe(true);
+    clickW(w, body.querySelector('.ty-btn')); // weiter → wertet
+    expect(w.SRS.stats().totalReviews).toBeGreaterThan(0);
   });
 });

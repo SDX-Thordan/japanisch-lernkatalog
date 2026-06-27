@@ -19,6 +19,24 @@
   }
   function randPick(arr) { return arr[Math.floor(Math.random() * arr.length)]; }
 
+  // Normalisieren für Texteingaben: kleinschreiben + Makron-Faltung (über norm) + Leerzeichen weg.
+  function nrm(s) { var K = kat(); var f = K.norm ? K.norm(s) : String(s == null ? '' : s).toLowerCase(); return f.replace(/\s+/g, ''); }
+  // Alle gültigen Schreibformen eines Worts: Kanji, Kana (Furigana), Romaji + Kana→Romaji.
+  function vocabForms(v) {
+    if (!v) return [];
+    var K = kat(), forms = [];
+    if (v.kanji) forms.push(v.kanji);
+    if (v.kana) forms.push(v.kana);
+    if (v.romaji) forms.push(v.romaji);
+    if (v.kana && K.kanaToRomaji) forms.push(K.kanaToRomaji(v.kana));
+    return forms;
+  }
+  // Liberaler Abgleich einer Eingabe gegen ein Wort: Romaji, Kana/Furigana ODER Kanji gelten als richtig.
+  function acceptsVocabInput(input, v) {
+    var t = nrm(input); if (!t) return false;
+    return vocabForms(v).some(function (f) { return nrm(f) === t; });
+  }
+
   var PARTICLES = ['は', 'が', 'を', 'に', 'で', 'へ', 'と', 'も', 'から', 'まで'];
 
   /* ---------- Tag-Index: tag → [Vokabel] ---------- */
@@ -265,5 +283,6 @@
     particleExercise: particleExercise, orderExercise: orderExercise, translateExercise: translateExercise,
     fromTemplate: fromTemplate, gradeAnswer: gradeAnswer, renderExercise: renderExercise,
     meaningMC: meaningMC, buildLessonTest: buildLessonTest,
+    vocabForms: vocabForms, acceptsVocabInput: acceptsVocabInput,
   };
 })();

@@ -809,8 +809,27 @@
       } else {
         // Heute = reine Wiederholung: nur fällige (zerfallene) Items aus allen freigeschalteten Lektionen.
         deck=window.SRS.buildQueue({sources:['kanji','vocab','grammar'],newLimit:0,reviewLimit:clampInt('h-revlimit',30),maxLesson:window.SRS.maxUnlockedLesson()});
+        // Adaptive Schwierigkeit: Übungstyp je Vokabel an den Lernstand koppeln (Erkennen → Abruf → Tippen).
+        deck.forEach(function(c){ if(c.type==='vocab'&&c.mode==null)c.mode=pickVocabMode(c.id); });
       }
       total=deck.length; setup.classList.add('hidden'); done.classList.add('hidden'); stage.classList.remove('hidden'); render();
+    }
+    // Adaptive Modus-Wahl für Vokabeln: leicht → Erkennen, mittel → freier Abruf, fast gemeistert → Produktion (Tippen).
+    function pickVocabMode(id){
+      if(!window.SRS||!window.SRS.effectiveScore)return 'card';
+      const s=window.SRS.effectiveScore(id);
+      if(s<40)return 'recognize';
+      if(s<70)return 'card';
+      return 'type';
+    }
+    // Fehler-Feedback: kurzer Hinweis bei falscher Antwort (Beispiel/Notiz bzw. typischer Grammatikfehler).
+    function mistakeHint(c){
+      if(c.type==='vocab'){ const b=(window.VOKABULAR_BEISPIELE||{})[c.data.kana+'|'+c.data.lesson];
+        return b?'<div class="fb-hint"><span class="ja">'+esc(b.jp)+'</span> — '+esc(b.de)+(b.note?'<div class="v-note">'+esc(b.note)+'</div>':'')+'</div>':''; }
+      if(c.type==='grammar'){ const p=(window.GRAMMATIK_PLUS||{})[c.data.pattern];
+        const f=p&&((p.fehler&&p.fehler[0])||p.erklaerung_lang);
+        return f?'<div class="fb-hint"><b>Tipp:</b> '+esc(String(f))+'</div>':''; }
+      return '';
     }
     function finishItem(grade){ const c=deck[0]; if(grade!=null&&c)window.SRS.grade(c.id,grade); deck.shift(); refreshStats(); render(); }
     function render(){
@@ -830,17 +849,40 @@
         return; }
       const c=deck[0], learned=total-deck.length;
       prog.textContent=(onlyLesson!=null&&c.phase?c.phase+' · ':'')+'Aufgabe '+(learned+1)+' / '+total+(onlyLesson!=null?' · Lektion '+onlyLesson:'');
-      const modeLbl={teach:' · vorstellen',recognize:' · erkennen'}[c.mode];
+      const modeLbl={teach:' · vorstellen',recognize:' · erkennen',type:' · tippen'}[c.mode];
       const reasonLbl=modeLbl||(c.reason==='due'?' · Wiederholung':(c.reason==='example'?' · Beispiel':' · neu'));
       typeTag.textContent=({kanji:'漢字 Kanji',vocab:'語彙 Vokabel',grammar:'文法 Grammatik'}[c.type]||'')+reasonLbl;
       typeTag.className='tag tr-type-'+c.type;
-      // Modus aus dem Kurs (teach/recognize/card/exercise/write) bzw. Auto-Routing in der Wiederholung.
+      // Modus aus dem Kurs/adaptiv (teach/recognize/type/card/exercise/write) bzw. Auto-Routing in der Wiederholung.
       const canWrite=window.KanjiWrite, canEx=window.Exercises&&window.SATZ_TEMPLATES&&window.SATZ_TEMPLATES[c.data.pattern];
       if(c.mode==='teach')renderTeachCard(c);
       else if(c.mode==='recognize')renderRecognizeCard(c);
+      else if(c.mode==='type'&&c.type==='vocab'&&window.Exercises&&window.Exercises.acceptsVocabInput)renderTypeCard(c);
       else if((c.mode==='write'||(c.mode==null&&c.type==='kanji'&&window.SRS.needsWriting(c.id)))&&canWrite)renderWriteCard(c);
       else if((c.mode==='exercise'||(c.mode==null&&c.type==='grammar'))&&canEx)renderExerciseItem(c);
       else renderFlashcard(c);
+    }
+    // TIPPEN (Produktion): Bedeutung → japanisches Wort eingeben. Romaji, Kana/Furigana ODER Kanji gelten als richtig.
+    function renderTypeCard(c){
+      const v=c.data;
+      const forms=[]; if(v.kanji&&v.kanji.length)forms.push(v.kanji); forms.push(v.kana); if(v.romaji)forms.push(v.romaji);
+      body.innerHTML='<div class="tr-card ty-card"><div class="ty-q"><div class="tr-q">Wie heißt dieses Wort auf Japanisch?</div>'+
+        '<div class="ty-de">'+esc(v.de)+'</div>'+(v.pos?'<div class="tc-pos">'+esc(v.pos)+'</div>':'')+'</div>'+
+        '<input class="ex-input ty-input" type="text" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" placeholder="Romaji, Kana oder Kanji …">'+
+        '<div class="ty-fb" aria-live="polite"></div>'+
+        '<div class="tr-controls"><button class="btn-primary ty-btn" type="button">Prüfen</button></div></div>';
+      const input=body.querySelector('.ty-input'), fb=body.querySelector('.ty-fb'), btn=body.querySelector('.ty-btn');
+      let checked=false, ok=false;
+      input.focus();
+      function check(){
+        ok=!!window.Exercises.acceptsVocabInput(input.value,v); checked=true;
+        input.disabled=true; input.classList.add(ok?'ty-ok':'ty-bad');
+        fb.innerHTML=(ok?'<span class="ty-good">Richtig!</span> ':'<span class="ty-wrong">Korrekt:</span> ')+
+          '<span class="ja">'+esc(forms.join(' · '))+'</span>'+(ok?'':mistakeHint(c));
+        btn.textContent='Weiter →';
+      }
+      btn.addEventListener('click',()=>{ if(!checked)check(); else finishItem(ok?1:0); });
+      input.addEventListener('keydown',e=>{ if(e.key==='Enter'){ e.preventDefault(); btn.click(); } });
     }
     // VORSTELLEN: das neue Item komplett zeigen (Wort/Muster + Lesung + Bedeutung + Beispiel) — kein Raten.
     function renderTeachCard(c){
@@ -888,6 +930,7 @@
         const correct=btn.dataset.de===d.de;
         body.querySelectorAll('.rc-opt').forEach(b=>{ b.disabled=true;
           if(b.dataset.de===d.de)b.classList.add('rc-correct'); else if(b===btn)b.classList.add('rc-wrong'); });
+        if(!correct){ const h=mistakeHint(c); if(h)wrap.insertAdjacentHTML('beforebegin',h); }
         const nx=el('button','btn-primary h-next','Weiter →'); nx.type='button';
         nx.addEventListener('click',()=>finishItem(correct?1:0)); wrap.appendChild(nx); nx.focus();
       }));
@@ -981,6 +1024,16 @@
             '<span class="lp-bar-fill" style="height:'+pct+'%"></span><span class="lp-bar-l">'+L+'</span>'+
             (st.testPassed?'<span class="lp-bar-s">'+Math.round(st.bestScore*100)+'</span>':'')+'</div>'; }
         lp.innerHTML=html; }
+      // Schwierige Wörter (Leeches): nur einblenden, wenn es welche gibt.
+      const lpanel=document.getElementById('f-leech-panel'), lbox=document.getElementById('f-leech');
+      if(lbox&&window.SRS.leeches){ const ls=window.SRS.leeches(undefined,{limit:12});
+        if(lpanel)lpanel.hidden=ls.length===0;
+        lbox.innerHTML=ls.map(x=>{ const d=x.data;
+          const jp=x.type==='kanji'?d.k:(x.type==='vocab'?((d.kanji&&d.kanji.length)?d.kanji:d.kana):d.pattern);
+          const de=x.type==='grammar'?(d.title||d.pattern):d.meaning||d.de||'';
+          return '<div class="f-leech-item">'+sakuraSvg(x.score,SCORE_THRESHOLDS,{cls:'sakura-sm'})+
+            '<span class="f-leech-jp ja">'+esc(jp)+'</span><span class="f-leech-de">'+esc(de)+'</span>'+
+            '<span class="f-leech-n" title="Fehlversuche">×'+x.lapses+'</span></div>'; }).join(''); }
     }
     draw();
     const exp=document.getElementById('f-export'); if(exp)exp.addEventListener('click',()=>window.SRS.downloadBackup());

@@ -34,6 +34,7 @@
   var ITEM_DAILY_CAP = 40;   // max. Punktgewinn pro Wort und Tag
   var DAILY_CAP = 500;       // max. Punktgewinn über alle Wörter pro Tag (global)
   var SCORE_THRESHOLDS = [20, 40, 60, 80, 100]; // Blütenblatt je 20 %
+  var LEECH_LAPSES = 4;      // ab so vielen Fehlversuchen gilt ein noch-nicht-beherrschtes Item als „schwierig"
 
   /* ---------- Storage-Backend (injizierbar) ---------- */
   function defaultBackend() {
@@ -271,6 +272,27 @@
     return out;
   }
 
+  // „Schwierige Wörter" (Leeches): häufig verfehlte, noch nicht beherrschte Items — additiv,
+  // greift NICHT ins Score-Modell ein. Liefert {id,type,data,lapses,score} nach lapses sortiert.
+  function leeches(today, opts) {
+    today = today || todayISO();
+    opts = opts || {};
+    var minLapses = opts.minLapses != null ? opts.minLapses : LEECH_LAPSES;
+    var sources = opts.sources || ['vocab', 'grammar', 'kanji'];
+    var out = [];
+    sources.forEach(function (s) {
+      registry(s).forEach(function (x) {
+        var it = store.items[x.id]; if (!it) return;
+        var lap = it.lapses || 0;
+        if (lap >= minLapses && effectiveScore(it, today) < MASTER_AT) {
+          out.push({ id: x.id, type: x.type, data: x.data, lapses: lap, score: effectiveScore(it, today) });
+        }
+      });
+    });
+    out.sort(function (a, b) { return b.lapses - a.lapses || a.score - b.score; });
+    return opts.limit ? out.slice(0, opts.limit) : out;
+  }
+
   /* ---------- geteilte Review-Queue ---------- */
   function buildQueue(opts) {
     opts = opts || {};
@@ -288,8 +310,10 @@
     var perSource = sources.map(function (s) { return registry(s).filter(lessonOk); });
     var all = [].concat.apply([], perSource);
 
+    // Priorität: am stärksten zerfallene UND häufig verfehlte (Leeches) zuerst → niedrigerer Wert = dringender.
+    var prio = function (x) { var it = store.items[x.id]; return effectiveScore(it, today) - 8 * ((it && it.lapses) || 0); };
     var due = all.filter(function (x) { return isDue(x.id, today); })
-      .sort(function (a, b) { return effectiveScore(store.items[a.id], today) - effectiveScore(store.items[b.id], today); }) // am stärksten zerfallene zuerst
+      .sort(function (a, b) { return prio(a) - prio(b); })
       .slice(0, reviewLimit)
       .map(function (x) { return { id: x.id, type: x.type, data: x.data, reason: 'due' }; });
 
@@ -582,7 +606,7 @@
     // Lernpunktzahl 0–100
     effectiveScore: scoreOf, scoreOf: scoreOf, MASTER_AT: MASTER_AT,
     isDue: isDue, dueIds: dueIds,
-    buildQueue: buildQueue, stats: stats, catalogStats: catalogStats,
+    buildQueue: buildQueue, stats: stats, catalogStats: catalogStats, leeches: leeches,
     // Lernpfad / Gating
     isMastered: isMastered, needsWriting: needsWriting,
     kanjiLessonOf: kanjiLessonOf, lessonCore: lessonCore, coreProgress: coreProgress, lessonPlan: lessonPlan,
