@@ -37,8 +37,9 @@
   var LEECH_LAPSES = 4;      // ab so vielen Fehlversuchen gilt ein noch-nicht-beherrschtes Item als „schwierig"
   /* ---------- Teil-Lektionen: lange Lektionen in ~5–10-Min-Häppchen schneiden ---------- */
   var PART_BUDGET = 8;       // Ziel-Kosten je Teil (≈ 5–7 Min)
-  var PART_COST = { vocab: 1, kanji: 1.25, grammar: 2 }; // grobe Aufwands-Gewichte je Item-Typ
-  var PART_MIN_TAIL = 3;     // Mini-Restteil (< diese Kosten) wird in den vorigen Teil gemischt
+  // Grammatik wiegt mehr: pro Muster Vorstellen + mehrere Übungen (umfangreich, ~2–3 Min).
+  var PART_COST = { vocab: 1, kanji: 1.25, grammar: 3 };
+  var PART_MIN_TAIL = 3;     // Mini-Restteil (< diese Kosten oder < 2 Items) wird in den vorigen Teil gemischt
 
   /* ---------- Storage-Backend (injizierbar) ---------- */
   function defaultBackend() {
@@ -513,7 +514,7 @@
     if (parts.length > 1) {
       var last = parts[parts.length - 1];
       var lastCost = last.reduce(function (s, c) { return s + (PART_COST[c.type] || 1); }, 0);
-      if (lastCost < PART_MIN_TAIL) { parts[parts.length - 2] = parts[parts.length - 2].concat(last); parts.pop(); }
+      if (lastCost < PART_MIN_TAIL || last.length < 2) { parts[parts.length - 2] = parts[parts.length - 2].concat(last); parts.pop(); }
     }
     return parts;
   }

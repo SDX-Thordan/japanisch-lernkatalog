@@ -808,16 +808,23 @@
       if(!fresh.length)return [];
       const d=[], step=(c,phase,mode,reason)=>d.push({id:c.id,type:c.type,data:c.data,reason:reason||'new',phase:phase,mode:mode});
       const vocab=fresh.filter(c=>c.type==='vocab'), grammar=fresh.filter(c=>c.type==='grammar'), kanji=fresh.filter(c=>c.type==='kanji');
-      // Beispiel-Phasen nur für Grammatik-Pattern DIESES Teils.
-      const patSet={}; grammar.forEach(c=>{patSet[c.data.pattern]=1;});
-      const ex=lessonGrammarExamples(L).filter(e=>patSet[e.data.pattern]);
       // Vokabeln pädagogisch einführen: erst VORSTELLEN (Wort + Bedeutung + Beispiel), dann ERKENNEN (MC).
       vocab.forEach(c=>{ step(c,'Vokabeln','teach'); step(c,'Vokabeln','recognize'); });
-      grammar.forEach(c=>step(c,'Grammatik','teach'));
-      ex.forEach(c=>d.push({id:c.id,type:'grammar',data:c.data,reason:'example',phase:'Beispiele',mode:'exercise'}));
+      // Grammatik umfangreich: Muster ausführlich VORSTELLEN, dann mit mehreren Übungen FESTIGEN (jedes Muster).
+      grammar.forEach(c=>{ step(c,'Grammatik','teach'); grammarPracticeSteps(c).forEach(s=>d.push(s)); });
       kanji.forEach(c=>step(c,'Kanji','write'));
-      ex.forEach(c=>d.push({id:c.id,type:'grammar',data:c.data,reason:'example',phase:'Beispiele nochmal',mode:'exercise'}));
       return d;
+    }
+    // Übungs-Schritte zu einem Grammatik-Muster: zuerst die GRAMMATIK_PLUS-Aufgaben (mc/cloze) — für JEDES
+    // Muster vorhanden —, dann eine Satzbau-Aufgabe aus SATZ_TEMPLATES, falls es welche gibt.
+    function grammarPracticeSteps(c){
+      const pat=c.data.pattern, out=[];
+      const plus=(window.GRAMMATIK_PLUS||{})[pat], uebs=(plus&&plus.uebungen)||[];
+      uebs.slice(0,3).forEach(u=>out.push({id:c.id,type:'grammar',data:c.data,reason:'practice',phase:'Grammatik üben',mode:'gex',
+        ex:Object.assign({},u,{srsId:c.id})}));
+      if(window.SATZ_TEMPLATES&&window.SATZ_TEMPLATES[pat]&&window.Exercises)
+        out.push({id:c.id,type:'grammar',data:c.data,reason:'example',phase:'Grammatik üben',mode:'exercise'});
+      return out;
     }
     function start(){
       if(onlyLesson!=null){
@@ -877,18 +884,28 @@
       const c=deck[0], learned=total-deck.length;
       const nParts=onlyLesson!=null?(window.SRS.lessonChunks(onlyLesson).length||1):0;
       prog.textContent=(onlyLesson!=null&&c.phase?c.phase+' · ':'')+'Aufgabe '+(learned+1)+' / '+total+(onlyLesson!=null?' · Lektion '+onlyLesson+' · Teil '+lessonPart+'/'+nParts:'');
-      const modeLbl={teach:' · vorstellen',recognize:' · erkennen',type:' · tippen'}[c.mode];
+      const modeLbl={teach:' · vorstellen',recognize:' · erkennen',type:' · tippen',gex:' · üben'}[c.mode];
       const reasonLbl=modeLbl||(c.reason==='due'?' · Wiederholung':(c.reason==='example'?' · Beispiel':' · neu'));
       typeTag.textContent=({kanji:'漢字 Kanji',vocab:'語彙 Vokabel',grammar:'文法 Grammatik'}[c.type]||'')+reasonLbl;
       typeTag.className='tag tr-type-'+c.type;
-      // Modus aus dem Kurs/adaptiv (teach/recognize/type/card/exercise/write) bzw. Auto-Routing in der Wiederholung.
+      // Modus aus dem Kurs/adaptiv (teach/recognize/type/gex/card/exercise/write) bzw. Auto-Routing in der Wiederholung.
       const canWrite=window.KanjiWrite, canEx=window.Exercises&&window.SATZ_TEMPLATES&&window.SATZ_TEMPLATES[c.data.pattern];
       if(c.mode==='teach')renderTeachCard(c);
       else if(c.mode==='recognize')renderRecognizeCard(c);
       else if(c.mode==='type'&&c.type==='vocab'&&window.Exercises&&window.Exercises.acceptsVocabInput)renderTypeCard(c);
+      else if(c.mode==='gex'&&c.ex&&window.Exercises)renderGrammarExercise(c);
       else if((c.mode==='write'||(c.mode==null&&c.type==='kanji'&&window.SRS.needsWriting(c.id)))&&canWrite)renderWriteCard(c);
       else if((c.mode==='exercise'||(c.mode==null&&c.type==='grammar'))&&canEx)renderExerciseItem(c);
       else renderFlashcard(c);
+    }
+    // GRAMMATIK ÜBEN: eine statische GRAMMATIK_PLUS-Aufgabe (mc/cloze) rendern; sie wertet selbst über ex.srsId.
+    function renderGrammarExercise(c){
+      body.innerHTML='<div class="tr-card"><div class="h-ex-pat ja">'+esc(c.data.pattern)+'</div>'+
+        (c.data.title?'<div class="tr-q">'+esc(c.data.title)+'</div>':'')+'<div class="h-ex"></div><div class="h-next-wrap"></div></div>';
+      const mount=body.querySelector('.h-ex'), nextWrap=body.querySelector('.h-next-wrap');
+      window.Exercises.renderExercise(c.ex,mount,{ onResult:(ok)=>{
+        if(ok===false){ const h=mistakeHint(c); if(h)nextWrap.insertAdjacentHTML('beforebegin',h); }
+        const nx=el('button','btn-primary h-next','Weiter →'); nx.type='button'; nx.addEventListener('click',()=>finishItem(null)); nextWrap.appendChild(nx); } });
     }
     // TIPPEN (Produktion): Bedeutung → japanisches Wort eingeben. Romaji, Kana/Furigana ODER Kanji gelten als richtig.
     function renderTypeCard(c){
@@ -926,12 +943,18 @@
           (d.pos?'<div class="tc-pos">'+esc(d.pos)+'</div>':'')+
           (bsp?'<div class="v-bsp"><div class="v-bsp-jp ja">'+esc(bsp.jp)+'</div>'+(bsp.r?'<div class="v-bsp-r">'+esc(bsp.r)+'</div>':'')+'<div class="v-bsp-de">'+esc(bsp.de)+'</div>'+(bsp.note?'<div class="v-note">'+esc(bsp.note)+'</div>':'')+'</div>':'');
       } else { // grammar
+        const plus=(window.GRAMMATIK_PLUS||{})[d.pattern]||{};
+        const exs=(d.beispiele||[]).concat((window.GRAMMATIK_EXTRA||{})[d.pattern]||[]).slice(0,2);
+        const exHtml=exs.map(b=>'<div class="v-bsp"><div class="v-bsp-jp ja">'+furiToRuby(b.jp)+'</div>'+(b.de?'<div class="v-bsp-de">'+esc(b.de)+'</div>':'')+'</div>').join('');
         inner='<div class="tc-badge">Neues Muster</div>'+
           '<div class="tr-big ja">'+esc(d.pattern)+'</div>'+
           (d.title?'<div class="tc-de">'+esc(d.title)+'</div>':'')+
           (d.bildung?'<div class="tc-bildung"><b>Bildung:</b> '+esc(d.bildung)+'</div>':'')+
           (d.erklaerung?'<p class="tc-erk">'+esc(d.erklaerung)+'</p>':'')+
-          (function(){ const b=(d.beispiele||[])[0]; return b?'<div class="v-bsp"><div class="v-bsp-jp ja">'+furiToRuby(b.jp)+'</div>'+(b.de?'<div class="v-bsp-de">'+esc(b.de)+'</div>':'')+'</div>':''; })();
+          (plus.erklaerung_lang?'<p class="tc-erk tc-erk-more">'+esc(plus.erklaerung_lang)+'</p>':'')+
+          exHtml+
+          (plus.kontrast&&plus.kontrast.length?'<div class="tc-note tc-kontrast"><b>Abgrenzung:</b><ul>'+plus.kontrast.slice(0,2).map(k=>'<li><span class="ja">'+esc(k.a)+'</span> ↔ <span class="ja">'+esc(k.b)+'</span> — '+esc(k.note)+'</li>').join('')+'</ul></div>':'')+
+          (plus.fehler&&plus.fehler.length?'<div class="tc-note tc-fehler"><b>Typische Fehler:</b><ul>'+plus.fehler.slice(0,3).map(f=>'<li>'+esc(f)+'</li>').join('')+'</ul></div>':'');
       }
       body.innerHTML='<div class="tr-card tc-card">'+inner+
         '<div class="tr-controls"><button class="btn-primary tc-next" type="button">Verstanden – weiter <span class="kbd">Leertaste</span></button></div></div>';

@@ -135,6 +135,28 @@ describe('Heute im Lernpfad-Modus (?lesson=L)', () => {
   }
   const clickW = (w, el) => el.dispatchEvent(new w.Event('click', { bubbles: true }));
 
+  it('Grammatik wird umfangreich eingeführt UND geübt (nicht nur gezeigt)', async () => {
+    const w = loadScripts(SCRIPTS, { html: BODY, url: 'https://example.test/heute.html?lesson=1&teil=99' });
+    w.SRS._useStorage(fakeStorage());
+    w.Math.random = () => 0;
+    // Vor init() (DOMContentLoaded) die Vorteile erledigen → letzter Teil = Grammatik wird freigeschaltet.
+    const n = w.SRS.lessonChunks(1).length;
+    w.SRS.markPartDone(1, n - 1);
+    await tick();
+    const body = w.document.getElementById('h-body');
+    // Grammatik-VORSTELLEN (umfangreiche Lernkarte).
+    expect(body.querySelector('.tc-card')).toBeTruthy();
+    expect(body.querySelector('.tc-badge').textContent).toContain('Muster');
+    // Weiter → es folgt eine echte ÜBUNG (gex), die das Muster bewertet (nicht bloß die nächste Lernkarte).
+    clickW(w, body.querySelector('.tc-next'));
+    expect(body.querySelector('.h-ex')).toBeTruthy();
+    const opt = body.querySelector('.ex-opt');
+    expect(opt || body.querySelector('.ex-check')).toBeTruthy();
+    const before = w.SRS.stats().totalReviews;
+    if (opt) clickW(w, opt); else { body.querySelector('.ex-input').value = 'x'; clickW(w, body.querySelector('.ex-check')); }
+    expect(w.SRS.stats().totalReviews).toBeGreaterThan(before); // Grammatik-Muster wurde bewertet
+  });
+
   it('Teil 1 lädt nur einen kurzen Teil (nicht die ganze Lektion)', async () => {
     const w = lessonWinAt('https://example.test/heute.html?lesson=1&teil=1');
     await tick();
