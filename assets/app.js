@@ -776,8 +776,18 @@
       prog=document.getElementById('h-prog'), typeTag=document.getElementById('h-type'),
       done=document.getElementById('h-done'), startBtn=document.getElementById('h-start');
     let deck=[], total=0;
-    const lessonParam=parseInt(new URLSearchParams(location.search).get('lesson'),10);
+    const params=new URLSearchParams(location.search);
+    const lessonParam=parseInt(params.get('lesson'),10);
     const onlyLesson=isNaN(lessonParam)?null:lessonParam;
+    // Teil-Lektion: ?teil=k (1-basiert). Fehlt er → nächster offener Teil. Auf den freigeschalteten
+    // Bereich klammern (kein Sprung über die strikte Reihenfolge).
+    let lessonPart=null;
+    if(onlyLesson!=null&&window.SRS.lessonChunks){
+      const n=window.SRS.lessonChunks(onlyLesson).length;
+      const tp=parseInt(params.get('teil'),10);
+      const want=isNaN(tp)?window.SRS.nextPart(onlyLesson):tp;
+      lessonPart=Math.max(1,Math.min(want,window.SRS.nextPart(onlyLesson),n||1));
+    }
     function lessonOf(c){ return c.type==='kanji'?window.SRS.kanjiLessonOf(c.data.level):c.data.lesson; }
     function refreshStats(){ const s=window.SRS.stats(); setText('h-streak',s.streakDays); setText('h-due',s.due); setText('h-learned',s.learned); setHtml('h-streak-flower',sakuraSvg(s.streakDays)); }
     // Grammatik-Items einer Lektion mit Satz-Übungen → Beispiel-Aufgaben für den geführten Kurs.
@@ -785,27 +795,41 @@
       return (window.GRAMMATIK||[]).filter(g=>g.lesson===L && window.SATZ_TEMPLATES && window.SATZ_TEMPLATES[g.pattern])
         .map(g=>({id:window.SRS.srsId('grammar',g),type:'grammar',data:g}));
     }
-    // Geführter Kurs einer Lektion: NUR neue Items, didaktisch geordnet
-    // Vokabeln → Grammatik → Beispiele → Kanji → Beispiele nochmal. Leer, wenn alles gelernt.
-    function buildLessonCourse(L){
-      const plan=window.SRS.lessonPlan(L);
-      if(plan.vocab.length+plan.grammar.length+plan.kanji.length===0)return []; // alles gelernt → Test
+    // Geführter Kurs EINES TEILS einer Lektion (~5–10 Min): NUR neue Items dieses Teils, didaktisch
+    // geordnet Vokabeln → Grammatik → Beispiele → Kanji → Beispiele nochmal. Leer, wenn Teil schon gelernt.
+    function buildLessonCourse(L,part){
+      const chunks=window.SRS.lessonChunks(L); if(!chunks.length)return [];
+      part=part||window.SRS.nextPart(L);
+      const chunk=chunks[part-1]||[];
+      // „Neu" = noch nicht gestartet (kanonisch über lessonPlan); auf die Items dieses Teils einschränken.
+      const plan=window.SRS.lessonPlan(L), newIds={};
+      ['vocab','grammar','kanji'].forEach(t=>plan[t].forEach(c=>{newIds[c.id]=1;}));
+      const fresh=chunk.filter(c=>newIds[c.id]);
+      if(!fresh.length)return [];
       const d=[], step=(c,phase,mode,reason)=>d.push({id:c.id,type:c.type,data:c.data,reason:reason||'new',phase:phase,mode:mode});
-      const ex=lessonGrammarExamples(L);
-      // Vokabeln pädagogisch einführen statt blind abfragen: erst VORSTELLEN (Wort + Bedeutung + Beispiel),
-      // dann ERKENNEN (Multiple-Choice). Der freie Abruf folgt später automatisch in der Wiederholung (Heute).
-      plan.vocab.forEach(c=>{ step(c,'Vokabeln','teach'); step(c,'Vokabeln','recognize'); });
-      // Grammatik: Muster zuerst erklären (vorstellen), dann mit den Beispielsätzen festigen.
-      plan.grammar.forEach(c=>step(c,'Grammatik','teach'));
-      ex.forEach(c=>d.push({id:c.id,type:'grammar',data:c.data,reason:'example',phase:'Beispiele',mode:'exercise'}));
-      plan.kanji.forEach(c=>step(c,'Kanji','write'));
-      ex.forEach(c=>d.push({id:c.id,type:'grammar',data:c.data,reason:'example',phase:'Beispiele nochmal',mode:'exercise'}));
+      const vocab=fresh.filter(c=>c.type==='vocab'), grammar=fresh.filter(c=>c.type==='grammar'), kanji=fresh.filter(c=>c.type==='kanji');
+      // Vokabeln pädagogisch einführen: erst VORSTELLEN (Wort + Bedeutung + Beispiel), dann ERKENNEN (MC).
+      vocab.forEach(c=>{ step(c,'Vokabeln','teach'); step(c,'Vokabeln','recognize'); });
+      // Grammatik umfangreich: Muster ausführlich VORSTELLEN, dann mit mehreren Übungen FESTIGEN (jedes Muster).
+      grammar.forEach(c=>{ step(c,'Grammatik','teach'); grammarPracticeSteps(c).forEach(s=>d.push(s)); });
+      kanji.forEach(c=>step(c,'Kanji','write'));
       return d;
+    }
+    // Übungs-Schritte zu einem Grammatik-Muster: zuerst die GRAMMATIK_PLUS-Aufgaben (mc/cloze) — für JEDES
+    // Muster vorhanden —, dann eine Satzbau-Aufgabe aus SATZ_TEMPLATES, falls es welche gibt.
+    function grammarPracticeSteps(c){
+      const pat=c.data.pattern, out=[];
+      const plus=(window.GRAMMATIK_PLUS||{})[pat], uebs=(plus&&plus.uebungen)||[];
+      uebs.slice(0,3).forEach(u=>out.push({id:c.id,type:'grammar',data:c.data,reason:'practice',phase:'Grammatik üben',mode:'gex',
+        ex:Object.assign({},u,{srsId:c.id})}));
+      if(window.SATZ_TEMPLATES&&window.SATZ_TEMPLATES[pat]&&window.Exercises)
+        out.push({id:c.id,type:'grammar',data:c.data,reason:'example',phase:'Grammatik üben',mode:'exercise'});
+      return out;
     }
     function start(){
       if(onlyLesson!=null){
-        // Lernpfad-Modus: geführter Kurs der Lektion (nur neue Items, in Phasen).
-        deck=buildLessonCourse(onlyLesson);
+        // Lernpfad-Modus: geführter Kurs des aktuellen Teils der Lektion (nur neue Items, in Phasen).
+        deck=buildLessonCourse(onlyLesson,lessonPart);
       } else {
         // Heute = reine Wiederholung: nur fällige (zerfallene) Items aus allen freigeschalteten Lektionen.
         deck=window.SRS.buildQueue({sources:['kanji','vocab','grammar'],newLimit:0,reviewLimit:clampInt('h-revlimit',30),maxLesson:window.SRS.maxUnlockedLesson()});
@@ -837,10 +861,20 @@
         // Tagesaufgabe abgeschlossen → Streak genau einmal pro Tag hochzählen (nicht bei Einzel-Bewertungen).
         if(total>0){ window.SRS.completeDaily(); refreshStats(); }
         if(onlyLesson!=null){
-          // Geführter Kurs: entweder durchgearbeitet oder schon komplett gelernt → zum Lektionstest.
-          done.innerHTML='<div class="tr-done-in">'+(total?'Lektion '+onlyLesson+' durchgearbeitet! 🌸':'Alle Inhalte dieser Lektion sind gelernt.')+
-            '<br>Jetzt im Lernpfad den <b>Lektionstest</b> machen, um die nächste freizuschalten.</div>'+
-            '<a class="btn-primary" href="lernpfad.html"><span class="msi" aria-hidden="true">route</span> Zum Lernpfad</a>';
+          // Teil durchgearbeitet → strikt sequenziell als erledigt markieren (auch wenn er schon gelernt war).
+          const nParts=window.SRS.lessonChunks(onlyLesson).length||1;
+          window.SRS.markPartDone(onlyLesson,lessonPart);
+          if(lessonPart<nParts){
+            // Es gibt noch weitere Teile → direkt zum nächsten anbieten.
+            done.innerHTML='<div class="tr-done-in">Teil '+lessonPart+' von '+nParts+' geschafft! 🌸<br>Weiter mit dem nächsten kurzen Teil oder Pause machen.</div>'+
+              '<a class="btn-primary" href="heute.html?lesson='+onlyLesson+'&teil='+(lessonPart+1)+'"><span class="msi" aria-hidden="true">play_arrow</span> Nächster Teil</a>'+
+              '<a class="btn" href="lernpfad.html"><span class="msi" aria-hidden="true">route</span> Zum Lernpfad</a>';
+          } else {
+            // Letzter Teil → ganze Lektion eingeführt → zum Lektionstest.
+            done.innerHTML='<div class="tr-done-in">'+(total?'Lektion '+onlyLesson+' komplett durchgearbeitet! 🌸':'Alle Inhalte dieser Lektion sind gelernt.')+
+              '<br>Jetzt im Lernpfad den <b>Lektionstest</b> machen, um die nächste freizuschalten.</div>'+
+              '<a class="btn-primary" href="lernpfad.html"><span class="msi" aria-hidden="true">route</span> Zum Lernpfad</a>';
+          }
           return;
         }
         done.innerHTML=(total?'<div class="tr-done-in">Wiederholung geschafft!<br>'+total+' Aufgaben erledigt.</div>':'<div class="tr-done-in">Heute nichts fällig — alles frisch. 🌸</div>')+
@@ -848,19 +882,30 @@
         const a=document.getElementById('h-again'); if(a)a.addEventListener('click',()=>{ done.classList.add('hidden'); setup.classList.remove('hidden'); refreshStats(); });
         return; }
       const c=deck[0], learned=total-deck.length;
-      prog.textContent=(onlyLesson!=null&&c.phase?c.phase+' · ':'')+'Aufgabe '+(learned+1)+' / '+total+(onlyLesson!=null?' · Lektion '+onlyLesson:'');
-      const modeLbl={teach:' · vorstellen',recognize:' · erkennen',type:' · tippen'}[c.mode];
+      const nParts=onlyLesson!=null?(window.SRS.lessonChunks(onlyLesson).length||1):0;
+      prog.textContent=(onlyLesson!=null&&c.phase?c.phase+' · ':'')+'Aufgabe '+(learned+1)+' / '+total+(onlyLesson!=null?' · Lektion '+onlyLesson+' · Teil '+lessonPart+'/'+nParts:'');
+      const modeLbl={teach:' · vorstellen',recognize:' · erkennen',type:' · tippen',gex:' · üben'}[c.mode];
       const reasonLbl=modeLbl||(c.reason==='due'?' · Wiederholung':(c.reason==='example'?' · Beispiel':' · neu'));
       typeTag.textContent=({kanji:'漢字 Kanji',vocab:'語彙 Vokabel',grammar:'文法 Grammatik'}[c.type]||'')+reasonLbl;
       typeTag.className='tag tr-type-'+c.type;
-      // Modus aus dem Kurs/adaptiv (teach/recognize/type/card/exercise/write) bzw. Auto-Routing in der Wiederholung.
+      // Modus aus dem Kurs/adaptiv (teach/recognize/type/gex/card/exercise/write) bzw. Auto-Routing in der Wiederholung.
       const canWrite=window.KanjiWrite, canEx=window.Exercises&&window.SATZ_TEMPLATES&&window.SATZ_TEMPLATES[c.data.pattern];
       if(c.mode==='teach')renderTeachCard(c);
       else if(c.mode==='recognize')renderRecognizeCard(c);
       else if(c.mode==='type'&&c.type==='vocab'&&window.Exercises&&window.Exercises.acceptsVocabInput)renderTypeCard(c);
+      else if(c.mode==='gex'&&c.ex&&window.Exercises)renderGrammarExercise(c);
       else if((c.mode==='write'||(c.mode==null&&c.type==='kanji'&&window.SRS.needsWriting(c.id)))&&canWrite)renderWriteCard(c);
       else if((c.mode==='exercise'||(c.mode==null&&c.type==='grammar'))&&canEx)renderExerciseItem(c);
       else renderFlashcard(c);
+    }
+    // GRAMMATIK ÜBEN: eine statische GRAMMATIK_PLUS-Aufgabe (mc/cloze) rendern; sie wertet selbst über ex.srsId.
+    function renderGrammarExercise(c){
+      body.innerHTML='<div class="tr-card"><div class="h-ex-pat ja">'+esc(c.data.pattern)+'</div>'+
+        (c.data.title?'<div class="tr-q">'+esc(c.data.title)+'</div>':'')+'<div class="h-ex"></div><div class="h-next-wrap"></div></div>';
+      const mount=body.querySelector('.h-ex'), nextWrap=body.querySelector('.h-next-wrap');
+      window.Exercises.renderExercise(c.ex,mount,{ onResult:(ok)=>{
+        if(ok===false){ const h=mistakeHint(c); if(h)nextWrap.insertAdjacentHTML('beforebegin',h); }
+        const nx=el('button','btn-primary h-next','Weiter →'); nx.type='button'; nx.addEventListener('click',()=>finishItem(null)); nextWrap.appendChild(nx); } });
     }
     // TIPPEN (Produktion): Bedeutung → japanisches Wort eingeben. Romaji, Kana/Furigana ODER Kanji gelten als richtig.
     function renderTypeCard(c){
@@ -898,12 +943,18 @@
           (d.pos?'<div class="tc-pos">'+esc(d.pos)+'</div>':'')+
           (bsp?'<div class="v-bsp"><div class="v-bsp-jp ja">'+esc(bsp.jp)+'</div>'+(bsp.r?'<div class="v-bsp-r">'+esc(bsp.r)+'</div>':'')+'<div class="v-bsp-de">'+esc(bsp.de)+'</div>'+(bsp.note?'<div class="v-note">'+esc(bsp.note)+'</div>':'')+'</div>':'');
       } else { // grammar
+        const plus=(window.GRAMMATIK_PLUS||{})[d.pattern]||{};
+        const exs=(d.beispiele||[]).concat((window.GRAMMATIK_EXTRA||{})[d.pattern]||[]).slice(0,2);
+        const exHtml=exs.map(b=>'<div class="v-bsp"><div class="v-bsp-jp ja">'+furiToRuby(b.jp)+'</div>'+(b.de?'<div class="v-bsp-de">'+esc(b.de)+'</div>':'')+'</div>').join('');
         inner='<div class="tc-badge">Neues Muster</div>'+
           '<div class="tr-big ja">'+esc(d.pattern)+'</div>'+
           (d.title?'<div class="tc-de">'+esc(d.title)+'</div>':'')+
           (d.bildung?'<div class="tc-bildung"><b>Bildung:</b> '+esc(d.bildung)+'</div>':'')+
           (d.erklaerung?'<p class="tc-erk">'+esc(d.erklaerung)+'</p>':'')+
-          (function(){ const b=(d.beispiele||[])[0]; return b?'<div class="v-bsp"><div class="v-bsp-jp ja">'+furiToRuby(b.jp)+'</div>'+(b.de?'<div class="v-bsp-de">'+esc(b.de)+'</div>':'')+'</div>':''; })();
+          (plus.erklaerung_lang?'<p class="tc-erk tc-erk-more">'+esc(plus.erklaerung_lang)+'</p>':'')+
+          exHtml+
+          (plus.kontrast&&plus.kontrast.length?'<div class="tc-note tc-kontrast"><b>Abgrenzung:</b><ul>'+plus.kontrast.slice(0,2).map(k=>'<li><span class="ja">'+esc(k.a)+'</span> ↔ <span class="ja">'+esc(k.b)+'</span> — '+esc(k.note)+'</li>').join('')+'</ul></div>':'')+
+          (plus.fehler&&plus.fehler.length?'<div class="tc-note tc-fehler"><b>Typische Fehler:</b><ul>'+plus.fehler.slice(0,3).map(f=>'<li>'+esc(f)+'</li>').join('')+'</ul></div>':'');
       }
       body.innerHTML='<div class="tr-card tc-card">'+inner+
         '<div class="tr-controls"><button class="btn-primary tc-next" type="button">Verstanden – weiter <span class="kbd">Leertaste</span></button></div></div>';
@@ -990,11 +1041,12 @@
     if(onlyLesson!=null){
       const intro=document.querySelector('.page-intro');
       if(intro){
-        const k=intro.querySelector('.kicker'); if(k)k.textContent='学習 · Geführter Kurs';
-        const h=intro.querySelector('h1'); if(h)h.innerHTML='Lektion '+onlyLesson+' lernen <span class="jp">学習</span>';
-        const p=intro.querySelector('p'); if(p)p.innerHTML='Geführter Kurs der Lektion '+onlyLesson+
-          ': erst <b>Vokabeln</b>, dann <b>Grammatik</b>, <b>Beispiele</b>, <b>Kanji</b> und nochmal Beispiele. '+
-          'Es kommen nur <b>neue</b> Inhalte — die <a href="heute.html">Wiederholung</a> läuft separat.';
+        const nParts=window.SRS.lessonChunks(onlyLesson).length||1;
+        const k=intro.querySelector('.kicker'); if(k)k.textContent='学習 · Teil '+lessonPart+'/'+nParts;
+        const h=intro.querySelector('h1'); if(h)h.innerHTML='Lektion '+onlyLesson+' · Teil '+lessonPart+' <span class="jp">学習</span>';
+        const p=intro.querySelector('p'); if(p)p.innerHTML='Kurzer Teil ('+lessonPart+'/'+nParts+') der Lektion '+onlyLesson+
+          ' — ~5–10 Min: erst <b>Vokabeln</b>, dann ggf. <b>Grammatik</b>, <b>Beispiele</b> und <b>Kanji</b>. '+
+          'Nur <b>neue</b> Inhalte — die <a href="heute.html">Wiederholung</a> läuft separat.';
       }
       const srcPick=setup&&setup.querySelector('.src-pick'); if(srcPick)srcPick.classList.add('hidden');
       start();
@@ -1079,10 +1131,29 @@
         '<div class="lp-thema">'+esc(thema)+'</div>';
       if(!st.unlocked){ html+='<div class="lp-hint"><span class="msi" aria-hidden="true">lock</span> Erst die vorige Lektion bestehen.</div>'; card.innerHTML=html; return card; }
       html+='<div class="lp-core"><div class="lp-core-bar"><span style="width:'+Math.round(cp.fraction*100)+'%"></span></div>'+
-        '<span class="lp-core-n">beherrscht '+cp.mastered+' / '+cp.total+'</span></div><div class="lp-actions"></div>';
+        '<span class="lp-core-n">beherrscht '+cp.mastered+' / '+cp.total+'</span></div>';
+      // Teil-Leiste: kurze 5–10-Min-Häppchen, strikt der Reihe nach freigeschaltet.
+      const parts=window.SRS.partsInfo?window.SRS.partsInfo(L):[], np=window.SRS.nextPart?window.SRS.nextPart(L):1;
+      if(parts.length>1){
+        let pills='';
+        parts.forEach(pi=>{
+          const cur=pi.part===np&&!st.coreMastered;
+          const cl='lp-part '+(pi.done?'lp-part-done':(pi.unlocked?'lp-part-cur':'lp-part-lock'))+(cur?' lp-part-now':'');
+          const mins=Math.max(5,Math.round(pi.cost*0.8));
+          const title='Teil '+pi.part+' · '+pi.total+' Items · ~'+mins+' Min'+(pi.unlocked?'':' (gesperrt)');
+          const label=pi.done?'✓':String(pi.part);
+          pills+=pi.unlocked
+            ? '<a class="'+cl+'" href="heute.html?lesson='+L+'&teil='+pi.part+'" title="'+esc(title)+'">'+label+'</a>'
+            : '<span class="'+cl+'" title="'+esc(title)+'">'+label+'</span>';
+        });
+        html+='<div class="lp-parts" aria-label="Teile">'+pills+'</div>'+
+          '<div class="lp-parts-hint">'+parts.length+' Teile · je ~5–10 Min</div>';
+      }
+      html+='<div class="lp-actions"></div>';
       card.innerHTML=html;
       const actions=card.querySelector('.lp-actions');
-      const learn=el('a','btn lp-learn',st.coreMastered?'Weiter üben':'Lektion lernen'); learn.href='heute.html?lesson='+L; actions.appendChild(learn);
+      const learn=el('a','btn lp-learn',st.coreMastered?'Weiter üben':('Teil '+np+' lernen'));
+      learn.href=st.coreMastered?'heute.html':('heute.html?lesson='+L+'&teil='+np); actions.appendChild(learn);
       if(st.coreMastered){ const t=el('button','btn-primary lp-test-btn',st.testPassed?'Test wiederholen':'Test starten'); t.type='button';
         t.addEventListener('click',()=>openLessonTest(L)); actions.appendChild(t); }
       else { actions.appendChild(el('span','lp-need','Erst alle Kern-Items beherrschen, dann Test.')); }

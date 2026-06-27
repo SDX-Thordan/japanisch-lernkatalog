@@ -33,7 +33,7 @@ test('Lernpfad „Lektion lernen": geführter Kurs startet sofort mit Phase „V
   await expect(page.locator('#h-setup')).toBeHidden();
   await expect(page.locator('#h-stage')).toBeVisible();
   await expect(page.locator('#h-prog')).toContainText('Vokabeln');
-  await expect(page.locator('.page-intro h1')).toContainText('Lektion 1 lernen');
+  await expect(page.locator('.page-intro h1')).toContainText('Lektion 1 · Teil 1');
 });
 
 test('Grammatik: ein „Üben"-Knopf öffnet die kombinierte Session', async ({ page }) => {

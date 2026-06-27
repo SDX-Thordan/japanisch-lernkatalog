@@ -34,8 +34,30 @@ describe('Lernpfad-Seite', () => {
     expect(c.length).toBe(25);
     expect(c[0].classList.contains('lp-locked')).toBe(false);
     expect(c[1].classList.contains('lp-locked')).toBe(true);
-    // L1 hat einen „Lektion lernen"-Link.
+    // L1 hat einen „Teil lernen"-Link.
     expect(c[0].querySelector('a.lp-learn')).toBeTruthy();
+  });
+
+  it('L1 zeigt eine Teil-Leiste; Teil 1 ist verlinkt, gesperrte Teile nicht', () => {
+    const c = cards()[0];
+    const learn = c.querySelector('a.lp-learn');
+    expect(learn.textContent).toContain('Teil 1 lernen');
+    expect(learn.getAttribute('href')).toContain('lesson=1&teil=1');
+    const parts = [...c.querySelectorAll('.lp-part')];
+    expect(parts.length).toBeGreaterThan(1);
+    // Teil 1 (current/unlocked) ist ein Link, gesperrte Teile sind <span> ohne href.
+    expect(c.querySelector('a.lp-part')).toBeTruthy();
+    const locked = c.querySelector('.lp-part-lock');
+    expect(locked).toBeTruthy();
+    expect(locked.tagName.toLowerCase()).toBe('span');
+  });
+
+  it('nach markPartDone(1,1) ist Teil 2 freigeschaltet (verlinkt)', () => {
+    win.SRS.markPartDone(1, 1);
+    click(win.document.getElementById('lp-unlockall')); // neu zeichnen
+    const c = cards()[0];
+    const links = [...c.querySelectorAll('a.lp-part')];
+    expect(links.length).toBeGreaterThanOrEqual(2); // Teil 1 + Teil 2 jetzt klickbar
   });
 
   it('„Alle freischalten" entsperrt sichtbar alle Lektionen', () => {

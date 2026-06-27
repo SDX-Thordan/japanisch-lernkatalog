@@ -35,6 +35,11 @@
   var DAILY_CAP = 500;       // max. Punktgewinn über alle Wörter pro Tag (global)
   var SCORE_THRESHOLDS = [20, 40, 60, 80, 100]; // Blütenblatt je 20 %
   var LEECH_LAPSES = 4;      // ab so vielen Fehlversuchen gilt ein noch-nicht-beherrschtes Item als „schwierig"
+  /* ---------- Teil-Lektionen: lange Lektionen in ~5–10-Min-Häppchen schneiden ---------- */
+  var PART_BUDGET = 8;       // Ziel-Kosten je Teil (≈ 5–7 Min)
+  // Grammatik wiegt mehr: pro Muster Vorstellen + mehrere Übungen (umfangreich, ~2–3 Min).
+  var PART_COST = { vocab: 1, kanji: 1.25, grammar: 3 };
+  var PART_MIN_TAIL = 3;     // Mini-Restteil (< diese Kosten oder < 2 Items) wird in den vorigen Teil gemischt
 
   /* ---------- Storage-Backend (injizierbar) ---------- */
   function defaultBackend() {
@@ -492,6 +497,52 @@
     lessonCore(lesson).forEach(function (c) { if (rawScore(store.items[c.id]) <= 0) out[c.type].push(c); });
     return out;
   }
+  /* ---------- Teil-Lektionen (deterministische Sicht auf lessonCore) ---------- */
+  // Schneidet die Kern-Items einer Lektion (in didaktischer Reihenfolge) in Kostenscheiben ~PART_BUDGET.
+  // Rein aus dem statischen Katalog → stabile Teil-Identität (unabhängig vom Fortschritt).
+  function lessonChunks(lesson) {
+    var core = lessonCore(lesson);
+    if (!core.length) return [];
+    var parts = [], cur = [], cost = 0;
+    core.forEach(function (c) {
+      var w = PART_COST[c.type] || 1;
+      if (cur.length && cost + w > PART_BUDGET) { parts.push(cur); cur = []; cost = 0; }
+      cur.push(c); cost += w;
+    });
+    if (cur.length) parts.push(cur);
+    // Mini-Restteil in den vorigen mischen, damit kein 1-Item-Häppchen entsteht.
+    if (parts.length > 1) {
+      var last = parts[parts.length - 1];
+      var lastCost = last.reduce(function (s, c) { return s + (PART_COST[c.type] || 1); }, 0);
+      if (lastCost < PART_MIN_TAIL || last.length < 2) { parts[parts.length - 2] = parts[parts.length - 2].concat(last); parts.pop(); }
+    }
+    return parts;
+  }
+  function partCost(items) { return items.reduce(function (s, c) { return s + (PART_COST[c.type] || 1); }, 0); }
+  // Status je Teil: started/mastered + strikte Freischaltung (Teil k frei, wenn k ≤ partsDone+1).
+  function partsInfo(lesson, today) {
+    var chunks = lessonChunks(lesson);
+    var doneN = lessonRec(lesson).partsDone || 0;
+    return chunks.map(function (items, i) {
+      var part = i + 1, started = 0, mastered = 0;
+      items.forEach(function (c) { if (rawScore(store.items[c.id]) > 0) started++; if (isMastered(c.id, today)) mastered++; });
+      return { part: part, items: items, total: items.length, started: started, mastered: mastered,
+        cost: partCost(items), done: part <= doneN, unlocked: part <= doneN + 1 };
+    });
+  }
+  // Nächster zu lernender Teil (1-basiert): partsDone+1, geklammert auf die Teil-Anzahl.
+  function nextPart(lesson) {
+    var n = lessonChunks(lesson).length; if (!n) return 0;
+    return Math.min((lessonRec(lesson).partsDone || 0) + 1, n);
+  }
+  // Teil als durchgearbeitet markieren (strikt sequenziell, korrektheits-unabhängig).
+  function markPartDone(lesson, part) {
+    store.lessons = store.lessons || {};
+    var rec = store.lessons[lesson] || {};
+    rec.partsDone = Math.max(rec.partsDone || 0, part || 0);
+    store.lessons[lesson] = rec; save();
+    return rec.partsDone;
+  }
   function lessonRec(lesson) { store.lessons = store.lessons || {}; return store.lessons[lesson] || {}; }
   function lessonState(lesson) {
     var rec = lessonRec(lesson);
@@ -610,6 +661,7 @@
     // Lernpfad / Gating
     isMastered: isMastered, needsWriting: needsWriting,
     kanjiLessonOf: kanjiLessonOf, lessonCore: lessonCore, coreProgress: coreProgress, lessonPlan: lessonPlan,
+    lessonChunks: lessonChunks, partsInfo: partsInfo, nextPart: nextPart, markPartDone: markPartDone,
     lessonState: lessonState, maxUnlockedLesson: maxUnlockedLesson, currentLesson: currentLesson,
     canTakeTest: canTakeTest, recordLessonTest: recordLessonTest,
     unlockAll: unlockAll, resetLessons: resetLessons,
