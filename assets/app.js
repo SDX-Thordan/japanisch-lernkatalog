@@ -790,12 +790,15 @@
     function buildLessonCourse(L){
       const plan=window.SRS.lessonPlan(L);
       if(plan.vocab.length+plan.grammar.length+plan.kanji.length===0)return []; // alles gelernt → Test
-      const d=[], push=(arr,phase,mode)=>arr.forEach(c=>d.push({id:c.id,type:c.type,data:c.data,reason:'new',phase:phase,mode:mode}));
+      const d=[], step=(c,phase,mode,reason)=>d.push({id:c.id,type:c.type,data:c.data,reason:reason||'new',phase:phase,mode:mode});
       const ex=lessonGrammarExamples(L);
-      push(plan.vocab,'Vokabeln','card');
-      push(plan.grammar,'Grammatik','card');
+      // Vokabeln pädagogisch einführen statt blind abfragen: erst VORSTELLEN (Wort + Bedeutung + Beispiel),
+      // dann ERKENNEN (Multiple-Choice). Der freie Abruf folgt später automatisch in der Wiederholung (Heute).
+      plan.vocab.forEach(c=>{ step(c,'Vokabeln','teach'); step(c,'Vokabeln','recognize'); });
+      // Grammatik: Muster zuerst erklären (vorstellen), dann mit den Beispielsätzen festigen.
+      plan.grammar.forEach(c=>step(c,'Grammatik','teach'));
       ex.forEach(c=>d.push({id:c.id,type:'grammar',data:c.data,reason:'example',phase:'Beispiele',mode:'exercise'}));
-      push(plan.kanji,'Kanji','write');
+      plan.kanji.forEach(c=>step(c,'Kanji','write'));
       ex.forEach(c=>d.push({id:c.id,type:'grammar',data:c.data,reason:'example',phase:'Beispiele nochmal',mode:'exercise'}));
       return d;
     }
@@ -827,14 +830,67 @@
         return; }
       const c=deck[0], learned=total-deck.length;
       prog.textContent=(onlyLesson!=null&&c.phase?c.phase+' · ':'')+'Aufgabe '+(learned+1)+' / '+total+(onlyLesson!=null?' · Lektion '+onlyLesson:'');
-      const reasonLbl=c.reason==='due'?' · Wiederholung':(c.reason==='example'?' · Beispiel':' · neu');
+      const modeLbl={teach:' · vorstellen',recognize:' · erkennen'}[c.mode];
+      const reasonLbl=modeLbl||(c.reason==='due'?' · Wiederholung':(c.reason==='example'?' · Beispiel':' · neu'));
       typeTag.textContent=({kanji:'漢字 Kanji',vocab:'語彙 Vokabel',grammar:'文法 Grammatik'}[c.type]||'')+reasonLbl;
       typeTag.className='tag tr-type-'+c.type;
-      // Modus aus dem Kurs (card/exercise/write) bzw. Auto-Routing in der Wiederholung.
+      // Modus aus dem Kurs (teach/recognize/card/exercise/write) bzw. Auto-Routing in der Wiederholung.
       const canWrite=window.KanjiWrite, canEx=window.Exercises&&window.SATZ_TEMPLATES&&window.SATZ_TEMPLATES[c.data.pattern];
-      if((c.mode==='write'||(c.mode==null&&c.type==='kanji'&&window.SRS.needsWriting(c.id)))&&canWrite)renderWriteCard(c);
+      if(c.mode==='teach')renderTeachCard(c);
+      else if(c.mode==='recognize')renderRecognizeCard(c);
+      else if((c.mode==='write'||(c.mode==null&&c.type==='kanji'&&window.SRS.needsWriting(c.id)))&&canWrite)renderWriteCard(c);
       else if((c.mode==='exercise'||(c.mode==null&&c.type==='grammar'))&&canEx)renderExerciseItem(c);
       else renderFlashcard(c);
+    }
+    // VORSTELLEN: das neue Item komplett zeigen (Wort/Muster + Lesung + Bedeutung + Beispiel) — kein Raten.
+    function renderTeachCard(c){
+      const d=c.data; let inner;
+      if(c.type==='vocab'){
+        const written=(d.kanji&&d.kanji.length)?d.kanji:d.kana;
+        const showKana=(d.kanji&&d.kanji.length&&d.kanji!==d.kana);
+        const bsp=(window.VOKABULAR_BEISPIELE||{})[d.kana+'|'+d.lesson];
+        inner='<div class="tc-badge">Neues Wort</div>'+
+          '<div class="tr-big ja">'+esc(written)+'</div>'+
+          (showKana?'<div class="tc-reading ja">'+esc(d.kana)+'</div>':'')+
+          '<div class="tc-de">'+esc(d.de)+'</div>'+
+          (d.pos?'<div class="tc-pos">'+esc(d.pos)+'</div>':'')+
+          (bsp?'<div class="v-bsp"><div class="v-bsp-jp ja">'+esc(bsp.jp)+'</div>'+(bsp.r?'<div class="v-bsp-r">'+esc(bsp.r)+'</div>':'')+'<div class="v-bsp-de">'+esc(bsp.de)+'</div>'+(bsp.note?'<div class="v-note">'+esc(bsp.note)+'</div>':'')+'</div>':'');
+      } else { // grammar
+        inner='<div class="tc-badge">Neues Muster</div>'+
+          '<div class="tr-big ja">'+esc(d.pattern)+'</div>'+
+          (d.title?'<div class="tc-de">'+esc(d.title)+'</div>':'')+
+          (d.bildung?'<div class="tc-bildung"><b>Bildung:</b> '+esc(d.bildung)+'</div>':'')+
+          (d.erklaerung?'<p class="tc-erk">'+esc(d.erklaerung)+'</p>':'')+
+          (function(){ const b=(d.beispiele||[])[0]; return b?'<div class="v-bsp"><div class="v-bsp-jp ja">'+furiToRuby(b.jp)+'</div>'+(b.de?'<div class="v-bsp-de">'+esc(b.de)+'</div>':'')+'</div>':''; })();
+      }
+      body.innerHTML='<div class="tr-card tc-card">'+inner+
+        '<div class="tr-controls"><button class="btn-primary tc-next" type="button">Verstanden – weiter <span class="kbd">Leertaste</span></button></div></div>';
+      const nx=body.querySelector('.tc-next'); if(nx)nx.addEventListener('click',()=>finishItem(null)); // Vorstellen wertet nicht
+    }
+    // ERKENNEN: Multiple-Choice (Wort → Bedeutung). Erste echte Abfrage, nachdem das Wort vorgestellt wurde.
+    function renderRecognizeCard(c){
+      const d=c.data, written=(d.kanji&&d.kanji.length)?d.kanji:d.kana;
+      const showKana=(d.kanji&&d.kanji.length&&d.kanji!==d.kana);
+      // Distraktoren: andere Bedeutungen, bevorzugt aus derselben Lektion, sonst aus dem Gesamtwortschatz.
+      const pool=(window.VOKABULAR||[]).filter(v=>v.de&&v.de!==d.de);
+      const sameL=shuffle(pool.filter(v=>v.lesson===d.lesson)).slice(0,3);
+      const fill=shuffle(pool).filter(v=>!sameL.includes(v)).slice(0,3);
+      const seen={}; const distract=sameL.concat(fill).map(v=>v.de).filter(de=>{ if(de===d.de||seen[de])return false; seen[de]=1; return true; }).slice(0,3);
+      const opts=shuffle([d.de].concat(distract));
+      body.innerHTML='<div class="tr-card rc-card"><div class="rc-q"><span class="tr-big ja">'+esc(written)+'</span>'+
+        (showKana?'<span class="rc-reading ja">'+esc(d.kana)+'</span>':'')+'<div class="rc-prompt">Was bedeutet das?</div></div>'+
+        '<div class="rc-opts">'+opts.map(o=>'<button class="rc-opt" type="button" data-de="'+esc(o)+'">'+esc(o)+'</button>').join('')+'</div>'+
+        '<div class="rc-next-wrap"></div></div>';
+      const wrap=body.querySelector('.rc-next-wrap');
+      let answered=false;
+      body.querySelectorAll('.rc-opt').forEach(btn=>btn.addEventListener('click',()=>{
+        if(answered)return; answered=true;
+        const correct=btn.dataset.de===d.de;
+        body.querySelectorAll('.rc-opt').forEach(b=>{ b.disabled=true;
+          if(b.dataset.de===d.de)b.classList.add('rc-correct'); else if(b===btn)b.classList.add('rc-wrong'); });
+        const nx=el('button','btn-primary h-next','Weiter →'); nx.type='button';
+        nx.addEventListener('click',()=>finishItem(correct?1:0)); wrap.appendChild(nx); nx.focus();
+      }));
     }
     function renderWriteCard(c){
       const k=c.data;
@@ -880,9 +936,10 @@
         nx.addEventListener('click',()=>finishItem(null)); nextWrap.appendChild(nx); } });
     }
     document.addEventListener('keydown',e=>{ if(stage.classList.contains('hidden'))return; if(e.code!=='Space')return;
-      const reveal=body.querySelector('.h-reveal'), good=body.querySelector('.h-good');
+      const reveal=body.querySelector('.h-reveal'), good=body.querySelector('.h-good'), advance=body.querySelector('.tc-next, .h-next');
       if(reveal&&!reveal.classList.contains('hidden')){ e.preventDefault(); reveal.click(); }
-      else if(good&&!good.classList.contains('hidden')){ e.preventDefault(); good.click(); } });
+      else if(good&&!good.classList.contains('hidden')){ e.preventDefault(); good.click(); }
+      else if(advance){ e.preventDefault(); advance.click(); } });
     if(startBtn)startBtn.addEventListener('click',start);
     refreshStats();
     // Lernpfad-Modus (?lesson=L): Seite als geführten Lektionskurs darstellen und sofort starten,
