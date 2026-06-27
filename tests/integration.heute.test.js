@@ -99,4 +99,29 @@ describe('Heute im Lernpfad-Modus (?lesson=L)', () => {
     // Die Wiederholungs-Steuerung (max. Aufgaben) ist im Kurs-Modus ausgeblendet.
     expect(w.document.querySelector('.src-pick').classList.contains('hidden')).toBe(true);
   });
+
+  it('führt Vokabeln pädagogisch ein: erst vorstellen, dann erkennen (kein blindes Raten)', async () => {
+    const w = lessonWin();
+    await tick();
+    const body = w.document.getElementById('h-body');
+    // 1) VORSTELLEN: Lernkarte zeigt die Bedeutung offen + „Verstanden"-Button (keine verdeckte Karte).
+    expect(body.querySelector('.tc-card')).toBeTruthy();
+    const de = body.querySelector('.tc-de').textContent;
+    expect(de.length).toBeGreaterThan(0);
+    expect(body.querySelector('.tc-next')).toBeTruthy();
+    expect(body.querySelector('.h-reveal')).toBeFalsy(); // KEINE blinde Karteikarte als erster Schritt
+    click(body.querySelector('.tc-next'));
+    // 2) ERKENNEN: Multiple-Choice mit 4 Optionen für dasselbe Wort.
+    const opts = [...body.querySelectorAll('.rc-opt')];
+    expect(opts.length).toBe(4);
+    const correct = opts.find((o) => o.dataset.de === de);
+    expect(correct).toBeTruthy();
+    click(correct);
+    expect(correct.classList.contains('rc-correct')).toBe(true);
+    const next = body.querySelector('.h-next');
+    expect(next).toBeTruthy();
+    click(next);
+    // Richtig erkannt → Lernstand des Worts ist gestartet.
+    expect(w.SRS.stats().learned).toBeGreaterThanOrEqual(1);
+  });
 });
