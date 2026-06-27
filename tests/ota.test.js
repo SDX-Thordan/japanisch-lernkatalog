@@ -62,13 +62,21 @@ describe('OTA — nativ (gemockt)', () => {
     expect(win.OTA.state().available).toBe(false);
   });
 
-  it('applyUpdate() lädt → setzt → reload und merkt sich die Version', async () => {
+  it('applyUpdate() lädt → setzt → reload (in dieser Reihenfolge)', async () => {
     const calls = [];
     win.APP_VERSION = '1.0.0';
     win.Capacitor = nativeCapacitor('2.0.0', calls);
     await win.OTA.check();
     await win.OTA.applyUpdate();
-    expect(calls).toEqual(['download', 'set', 'reload']);
-    expect(win.localStorage.getItem('katalog_ota_version')).toBe('2.0.0');
+    // notifyAppReady ('ready') kann je nach Tick-Timing dazwischenfunken → herausfiltern.
+    expect(calls.filter((c) => c !== 'ready')).toEqual(['download', 'set', 'reload']);
+  });
+
+  it('vergleicht gegen die laufende APP_VERSION (kein localStorage-Desync nach Rollback)', async () => {
+    // Nach einem Rollback läuft wieder das alte Bundle → APP_VERSION ist alt → Update wird ERNEUT angeboten.
+    win.APP_VERSION = '1.0.0';
+    win.Capacitor = nativeCapacitor('2.0.0');
+    expect(await win.OTA.check()).toBe(true);
+    expect(win.OTA.state().version).toBe('2.0.0');
   });
 });
