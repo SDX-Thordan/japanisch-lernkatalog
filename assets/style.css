@@ -861,6 +861,17 @@ body.drill-open { overflow: hidden; }
 .lp-core-bar > span { display: block; height: 100%; background: linear-gradient(90deg, var(--accent), var(--accent-d)); }
 .lp-card.lp-done .lp-core-bar > span { background: var(--good); }
 .lp-core-n { font-size: .78rem; color: var(--muted); font-weight: 700; }
+/* Teil-Leiste: kurze 5–10-Min-Häppchen, strikt sequenziell. */
+.lp-parts { display: flex; flex-wrap: wrap; gap: .3rem; margin-top: .5rem; }
+.lp-part { display: inline-flex; align-items: center; justify-content: center; min-width: 1.5rem; height: 1.5rem;
+  padding: 0 .35rem; border-radius: 999px; font-size: .78rem; font-weight: 700; text-decoration: none;
+  border: 1px solid var(--border); color: var(--muted); background: var(--surface); }
+a.lp-part:hover { border-color: var(--accent); }
+.lp-part-done { background: var(--good, #2e8b57); border-color: transparent; color: #fff; }
+.lp-part-cur { color: var(--accent-d); border-color: var(--accent); }
+.lp-part-now { box-shadow: 0 0 0 2px var(--accent); }
+.lp-part-lock { color: var(--faint); background: var(--chip); cursor: default; opacity: .7; }
+.lp-parts-hint { font-size: .72rem; color: var(--faint); margin-top: .25rem; }
 .lp-actions { display: flex; flex-wrap: wrap; gap: .5rem; align-items: center; margin-top: .25rem; }
 .lp-need { font-size: .78rem; color: var(--faint); }
 .lp-score { font-size: .8rem; color: var(--good); font-weight: 700; }

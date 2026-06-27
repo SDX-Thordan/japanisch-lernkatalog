@@ -96,8 +96,8 @@ describe('Heute im Lernpfad-Modus (?lesson=L)', () => {
     // Erste Phase ist „Vokabeln" und der Fortschritt nennt die Lektion (nur neue Items).
     expect(w.document.getElementById('h-prog').textContent).toContain('Vokabeln');
     expect(w.document.getElementById('h-prog').textContent).toContain('Lektion 1');
-    // Seite ist als Kurs umbeschriftet, nicht als Wiederholung.
-    expect(w.document.querySelector('.page-intro h1').textContent).toContain('Lektion 1 lernen');
+    // Seite ist als Kurs (Teil-Lektion) umbeschriftet, nicht als Wiederholung.
+    expect(w.document.querySelector('.page-intro h1').textContent).toContain('Lektion 1 · Teil 1');
     // Die Wiederholungs-Steuerung (max. Aufgaben) ist im Kurs-Modus ausgeblendet.
     expect(w.document.querySelector('.src-pick').classList.contains('hidden')).toBe(true);
   });
@@ -125,6 +125,50 @@ describe('Heute im Lernpfad-Modus (?lesson=L)', () => {
     click(next);
     // Richtig erkannt → Lernstand des Worts ist gestartet.
     expect(w.SRS.stats().learned).toBeGreaterThanOrEqual(1);
+  });
+
+  function lessonWinAt(url) {
+    const w = loadScripts(SCRIPTS, { html: BODY, url });
+    w.SRS._useStorage(fakeStorage());
+    w.Math.random = () => 0;
+    return w;
+  }
+  const clickW = (w, el) => el.dispatchEvent(new w.Event('click', { bubbles: true }));
+
+  it('Teil 1 lädt nur einen kurzen Teil (nicht die ganze Lektion)', async () => {
+    const w = lessonWinAt('https://example.test/heute.html?lesson=1&teil=1');
+    await tick();
+    const prog = w.document.getElementById('h-prog').textContent;
+    expect(prog).toContain('Teil 1/');
+    const total = parseInt(prog.match(/\/ (\d+)/)[1], 10);
+    // Ganze Lektion 1 hätte 48 Vokabeln (×2 Schritte) + Grammatik; ein Teil ist deutlich kürzer.
+    expect(total).toBeLessThanOrEqual(20);
+  });
+
+  it('gesperrter Teil wird auf die Reihenfolge geklammert (kein Sprung)', async () => {
+    const w = lessonWinAt('https://example.test/heute.html?lesson=1&teil=5'); // Teil 5 ist anfangs gesperrt
+    await tick();
+    expect(w.document.getElementById('h-prog').textContent).toContain('Teil 1/');
+  });
+
+  it('Teil durcharbeiten → als erledigt markiert, „Nächster Teil" angeboten, Teil 2 frei', async () => {
+    const w = lessonWinAt('https://example.test/heute.html?lesson=1&teil=1');
+    await tick();
+    const body = w.document.getElementById('h-body');
+    const doneEl = w.document.getElementById('h-done');
+    // Karten der Reihe nach abarbeiten (Korrektheit egal — Deck rückt trotzdem vor).
+    for (let i = 0; i < 80 && doneEl.classList.contains('hidden'); i++) {
+      const tc = body.querySelector('.tc-next');
+      if (tc) { clickW(w, tc); continue; }
+      const opt = body.querySelector('.rc-opt');
+      if (opt) { clickW(w, opt); const nx = body.querySelector('.h-next'); if (nx) clickW(w, nx); continue; }
+      const hn = body.querySelector('.h-next'); if (hn) { clickW(w, hn); continue; }
+      break;
+    }
+    expect(doneEl.classList.contains('hidden')).toBe(false);
+    expect(w.SRS.partsInfo(1)[0].done).toBe(true); // Teil 1 erledigt
+    expect(w.SRS.nextPart(1)).toBe(2);             // Teil 2 freigeschaltet
+    expect(doneEl.textContent).toContain('Nächster Teil');
   });
 });
 
