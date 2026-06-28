@@ -19,6 +19,7 @@
   /* ---------- Lernpfad/Gating-Konstanten (leicht justierbar) ---------- */
   var MASTERY_REPS = 2;        // (Alt-Feld, bleibt für Migration/Stats)
   var LESSON_TEST_PASS = 0.8;  // Bestehensgrenze des Lektionstests
+  var LESSON_READY_AT = 40;    // Lektion „erfüllt"/test-bereit, wenn jedes Kern-Item Score ≥ 40 hat
   var LESSON_TEST_N = 10;      // Aufgaben pro Lektionstest
   var MAX_GATED_LESSON = 25;   // Lernpfad umfasst alle Lektionen L1–25
   // Kanji-Stufe → Test-Lektion (Default: letzte Lektion des jeweiligen Stufenblocks)
@@ -472,9 +473,16 @@
     return out;
   }
   function coreProgress(lesson, today) {
-    var core = lessonCore(lesson), mastered = 0, sum = 0;
-    core.forEach(function (c) { if (isMastered(c.id, today)) mastered++; sum += effectiveScore(store.items[c.id], today); });
-    return { mastered: mastered, total: core.length, fraction: core.length ? mastered / core.length : 1,
+    var core = lessonCore(lesson), mastered = 0, ready = 0, sum = 0;
+    core.forEach(function (c) {
+      var eff = effectiveScore(store.items[c.id], today);
+      if (isMastered(c.id, today)) mastered++;            // voll beherrscht (≥ MASTER_AT = 80)
+      if (eff >= LESSON_READY_AT) ready++;                 // erfüllt (≥ 40) → zählt fürs Test-Gate
+      sum += eff;
+    });
+    return { mastered: mastered, ready: ready, total: core.length,
+      fraction: core.length ? mastered / core.length : 1,
+      readyFraction: core.length ? ready / core.length : 1,
       avgScore: core.length ? sum / core.length : 0 };
   }
   // Neue (noch nicht gelernte) Kern-Items einer Lektion, nach Typ gruppiert — Grundlage für den
@@ -559,6 +567,7 @@
     var cp = coreProgress(lesson);
     return {
       lesson: lesson, unlocked: unlocked, coreProgress: cp, coreMastered: cp.fraction >= 1,
+      coreReady: cp.readyFraction >= 1, // erfüllt: jedes Kern-Item ≥ LESSON_READY_AT → test-bereit
       learned: !!rec.learned, // „als gelernt markiert" → test-bereit, auch ohne volle Mastery
       testPassed: !!rec.testPassed, bestScore: rec.bestScore || 0, lastScore: rec.lastScore || 0, testDate: rec.testDate || null,
     };
@@ -575,7 +584,7 @@
     for (var l = 1; l <= max; l++) { if (coreProgress(l).fraction < 1) return l; }
     return max;
   }
-  function canTakeTest(lesson) { var s = lessonState(lesson); return s.unlocked && (s.coreMastered || s.learned); }
+  function canTakeTest(lesson) { var s = lessonState(lesson); return s.unlocked && (s.coreReady || s.learned); }
   function recordLessonTest(lesson, score, today) {
     today = today || todayISO();
     store.lessons = store.lessons || {};

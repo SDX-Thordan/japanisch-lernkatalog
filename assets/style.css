@@ -886,6 +886,7 @@ body.drill-open { overflow: hidden; }
 .lp-core-bar > span { display: block; height: 100%; background: linear-gradient(90deg, var(--accent), var(--accent-d)); }
 .lp-card.lp-done .lp-core-bar > span { background: var(--good); }
 .lp-core-n { font-size: .78rem; color: var(--muted); font-weight: 700; }
+.lp-core-sub { color: var(--faint); font-weight: 500; }
 /* Teil-Leiste: kurze 5–10-Min-Häppchen, strikt sequenziell. */
 .lp-parts { display: flex; flex-wrap: wrap; gap: .3rem; margin-top: .5rem; }
 .lp-part { display: inline-flex; align-items: center; justify-content: center; min-width: 1.5rem; height: 1.5rem;
