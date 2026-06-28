@@ -52,6 +52,21 @@ describe('KanjiWrite.strokeMatches() — strenge Strichbewertung', () => {
   });
 });
 
+describe('KanjiWrite.writeMode() — Schwellen 30/60 am Lernstand', () => {
+  it('unter 30: Snap + Vorlage', () => {
+    expect(KW.writeMode(0)).toEqual({ snap: true, guide: true });
+    expect(KW.writeMode(29)).toEqual({ snap: true, guide: true });
+  });
+  it('30–59: kein Snap, aber Vorlage', () => {
+    expect(KW.writeMode(30)).toEqual({ snap: false, guide: true });
+    expect(KW.writeMode(59)).toEqual({ snap: false, guide: true });
+  });
+  it('ab 60: freihändig (kein Snap, keine Vorlage) — Meistern nur freihändig', () => {
+    expect(KW.writeMode(60)).toEqual({ snap: false, guide: false });
+    expect(KW.writeMode(100)).toEqual({ snap: false, guide: false });
+  });
+});
+
 describe('KanjiVG-Datenabdeckung', () => {
   it('für jedes Kanji im Katalog existiert eine SVG-Datei', () => {
     const missing = (win.KANJI || [])
