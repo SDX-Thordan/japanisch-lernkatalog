@@ -287,10 +287,8 @@
       if(window.SRS)head.appendChild(lessonRepsBadge(L,'vocab'));
       if(listsOn){ const b=el('button','v-add-lesson','＋ Lektion → Liste'); b.type='button'; b.dataset.lesson=String(L); head.appendChild(b); }
       group.appendChild(head);
-      const wrap=el('div','table-wrap'), table=el('table','vocab');
-      table.innerHTML='<thead><tr><th>Japanisch</th><th>Lesung</th><th>Bedeutung</th><th>Wortart</th>'+(listsOn?'<th></th>':'')+'</tr></thead>';
-      const tb=el('tbody'); arr.forEach(w=>tb.appendChild(vocabRow(w,listsOn))); table.appendChild(tb);
-      wrap.appendChild(table); group.appendChild(wrap); content.appendChild(group);
+      const list=el('div','vocab-list'); arr.forEach(w=>list.appendChild(vocabRow(w,listsOn)));
+      group.appendChild(list); content.appendChild(group);
     });
     buildChips(Object.keys(byLesson).map(Number).sort((a,b)=>a-b), L=>'L'+L);
     buildTypeChips();
@@ -299,27 +297,28 @@
         const a=e.target.closest('.v-add'); if(a){ e.stopPropagation(); openListPicker([a.dataset.vid],a.dataset.word); return; }
         const al=e.target.closest('.v-add-lesson'); if(al){ const L=+al.dataset.lesson; const ids=(window.VOKABULAR||[]).filter(v=>v.lesson===L).map(v=>'v:'+v.kana+'|'+v.lesson); openListPicker(ids,'Lektion '+L); return; }
       }
-      // Klick auf die Zeile klappt die erweiterte Bedeutung (Beispiel) auf/zu.
-      const row=e.target.closest('tr.item'); if(row&&row.dataset.ext)row.classList.toggle('expanded');
+      // Klick auf die Karte klappt die erweiterte Bedeutung (Beispiel) auf/zu.
+      const row=e.target.closest('.v-row.item'); if(row&&row.dataset.ext)row.classList.toggle('expanded');
     });
   }
+  // Gestapelte Vokabel-Karte (handytauglich): (Lesung klein) / Wort / Übersetzung; Blüte oben rechts.
   function vocabRow(w,listsOn){
     const written=(w.kanji&&w.kanji.length)?w.kanji:w.kana;
     const showKana=(w.kanji&&w.kanji.length&&w.kanji!==w.kana);
-    const tr=el('tr','item'); tr.dataset.filter=String(w.lesson);
-    tr.dataset.type=vocabType(w.pos);
+    const row=el('div','v-row item'); row.dataset.filter=String(w.lesson);
+    row.dataset.type=vocabType(w.pos);
     const bsp=(window.VOKABULAR_BEISPIELE||{})[w.kana+'|'+w.lesson];
-    tr.dataset.search=norm([w.kanji,w.kana,w.romaji,w.de,w.pos,(bsp?bsp.jp+' '+bsp.de+' '+(bsp.note||''):'')].join(' '));
-    // Erweiterte Bedeutung (Beispielsatz + Notiz) ist verdeckt und klappt per Klick auf die Zeile auf (wie Grammatik).
-    if(bsp)tr.dataset.ext='1';
+    row.dataset.search=norm([w.kanji,w.kana,w.romaji,w.de,w.pos,(bsp?bsp.jp+' '+bsp.de+' '+(bsp.note||''):'')].join(' '));
+    // Erweiterte Bedeutung (Beispielsatz + Notiz) ist verdeckt und klappt per Klick auf die Karte auf.
+    if(bsp)row.dataset.ext='1';
     const ext=bsp?'<span class="v-more" aria-hidden="true" title="Beispiel anzeigen">›</span>'+
       '<div class="v-ext"><div class="v-bsp-inline"><span class="ja">'+esc(bsp.jp)+'</span> — '+esc(bsp.de)+(bsp.note?'<span class="v-note"> · '+esc(bsp.note)+'</span>':'')+'</div></div>':'';
-    tr.innerHTML='<td class="vocab-jp">'+scoreBadgeHtml('v:'+w.kana+'|'+w.lesson)+esc(written)+'</td><td>'+
-      (showKana?'<span class="vocab-reading">'+esc(w.kana)+'</span>':'')+'</td>'+
-      '<td class="de hideable">'+esc(w.de)+ext+
-      '</td><td><span class="pos">'+esc(w.pos)+'</span></td>'+
-      (listsOn?'<td class="vocab-add"><button class="v-add" type="button" title="Zu Liste hinzufügen" data-vid="v:'+esc(w.kana)+'|'+w.lesson+'" data-word="'+esc(written)+'">＋</button></td>':'');
-    return tr;
+    row.innerHTML='<span class="v-score">'+scoreBadgeHtml('v:'+w.kana+'|'+w.lesson)+'</span>'+
+      '<div class="v-main">'+(showKana?'<div class="v-read ja">'+esc(w.kana)+'</div>':'')+'<div class="v-word ja">'+esc(written)+'</div></div>'+
+      '<div class="v-mean de hideable">'+esc(w.de)+ext+'</div>'+
+      '<div class="v-meta"><span class="pos">'+esc(w.pos)+'</span>'+
+      (listsOn?'<button class="v-add" type="button" title="Zu Liste hinzufügen" data-vid="v:'+esc(w.kana)+'|'+w.lesson+'" data-word="'+esc(written)+'">＋</button>':'')+'</div>';
+    return row;
   }
   // Ordnet eine Wortart einer Filter-Kategorie zu.
   function vocabType(pos){ pos=pos||'';
