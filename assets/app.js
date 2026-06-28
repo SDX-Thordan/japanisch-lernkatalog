@@ -730,6 +730,11 @@
     if(cBtn)cBtn.addEventListener('click',()=>{ const on=body.classList.toggle('cards-mode'); setPressed(cBtn,on); lsSet('katalog_cards',on?'on':'off');
       if(on)document.querySelectorAll('.hideable.revealed').forEach(e=>e.classList.remove('revealed')); });
     document.addEventListener('click',e=>{ if(!body.classList.contains('cards-mode'))return; const h=e.target.closest('.hideable'); if(h)h.classList.toggle('revealed'); });
+    // Filter (Standard: eingeklappt) — blendet die Filter-Chips auf dem Handy aus, spart Platz
+    const filtersOpen=lsGet('katalog_filters')==='open';
+    body.classList.toggle('filters-collapsed',!filtersOpen);
+    const fltBtn=document.getElementById('toggle-filters'); setPressed(fltBtn,filtersOpen);
+    if(fltBtn)fltBtn.addEventListener('click',()=>{ const open=!body.classList.toggle('filters-collapsed'); setPressed(fltBtn,open); lsSet('katalog_filters',open?'open':'collapsed'); });
     applyFilter();
   }
   function initSearch(){ const input=document.getElementById('search-input'); if(!input)return; input.addEventListener('input',()=>{ query=input.value; applyFilter(); }); }
