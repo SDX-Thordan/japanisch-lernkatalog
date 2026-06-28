@@ -26,7 +26,7 @@ function click(e) { e.dispatchEvent(new win.Event('click', { bubbles: true })); 
 
 describe('Vokabular — erweiterte Bedeutung aufklappen', () => {
   it('zeigt die einfache Übersetzung, hält das Beispiel aber zunächst verborgen', () => {
-    const row = win.document.querySelector('tr.item[data-ext]');
+    const row = win.document.querySelector('.item[data-ext]');
     expect(row).toBeTruthy();
     // Einfache Übersetzung (de) ist im Text der Zeile vorhanden.
     expect(row.querySelector('.de').textContent.trim().length).toBeGreaterThan(0);
@@ -36,7 +36,7 @@ describe('Vokabular — erweiterte Bedeutung aufklappen', () => {
   });
 
   it('Klick auf die Zeile klappt das Beispiel auf und wieder zu', () => {
-    const row = win.document.querySelector('tr.item[data-ext]');
+    const row = win.document.querySelector('.item[data-ext]');
     click(row);
     expect(row.classList.contains('expanded')).toBe(true);
     click(row);
@@ -46,7 +46,7 @@ describe('Vokabular — erweiterte Bedeutung aufklappen', () => {
   it('nimmt den Beispieltext in den Suchindex der Zeile auf', () => {
     // Eine Zeile finden, deren Beispieltext ein reines ASCII-Wort (≥5) enthält,
     // das norm() unverändert lässt → robuste Teilstring-Prüfung im Suchindex.
-    const rows = [...win.document.querySelectorAll('tr.item[data-ext]')];
+    const rows = [...win.document.querySelectorAll('.item[data-ext]')];
     let found = null;
     for (const r of rows) {
       const w = (r.querySelector('.v-ext').textContent.toLowerCase().match(/[a-z]{5,}/g) || [])[0];

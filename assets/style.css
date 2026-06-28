@@ -44,7 +44,7 @@ body {
 }
 
 /* Japanischer Text */
-.ja, ruby, .kanji-char, .vocab-jp, .ex-w, .gp-pattern {
+.ja, ruby, .kanji-char, .v-word, .ex-w, .gp-pattern {
   font-family: var(--font-ja-sans);
 }
 
@@ -330,27 +330,25 @@ main {
 .ex-de { color: var(--muted); }
 
 /* ---------- Tabelle (Vokabular) ---------- */
-.table-wrap { overflow-x: auto; border-radius: 11px; }
-table.vocab {
-  width: 100%;
-  border-collapse: collapse;
-  background: var(--surface);
-  font-size: .95rem;
+/* Vokabelliste: gestapelte Karten (handytauglich) statt breiter Tabelle. */
+.vocab-list { background: var(--surface); }
+.v-row { position: relative; padding: .6rem .8rem; border-bottom: 1px solid var(--border-2); }
+.v-row:hover { background: var(--surface-2); }
+.v-read { font-family: var(--font-ja-sans); color: var(--indigo); font-size: .9rem; line-height: 1.2; }
+body.furigana-off .v-read { display: none; } /* ausgeblendet = wirklich weg, kein reservierter Platz */
+.v-word { font-family: var(--font-ja-sans); font-size: 1.2rem; font-weight: 600; line-height: 1.3; overflow-wrap: anywhere; }
+.v-mean.de { margin-top: .15rem; color: var(--ink); overflow-wrap: anywhere; }
+.v-meta { display: flex; align-items: center; gap: .6rem; margin-top: .35rem; font-size: .8rem; color: var(--muted); }
+.v-meta .pos { white-space: nowrap; }
+/* Lernstand-Blüte als Float oben rechts in der Ecke (statt vor dem Wort). */
+.v-score { position: absolute; top: .5rem; right: .6rem; line-height: 0; }
+.v-add { margin-left: auto; }
+/* Desktop: zweispaltige, dichtere Liste. */
+@media (min-width: 640px) {
+  .v-row { display: grid; grid-template-columns: minmax(7rem, 14rem) 1fr; column-gap: 1rem; padding-right: 2.4rem; }
+  .v-mean.de { margin-top: 0; }
+  .v-meta { grid-column: 2; }
 }
-table.vocab thead th {
-  background: var(--surface-2);
-  text-align: left;
-  font-size: .78rem;
-  text-transform: uppercase;
-  letter-spacing: .05em;
-  color: var(--muted);
-  padding: .55rem .8rem;
-  border-bottom: 2px solid var(--border);
-}
-table.vocab td { padding: .5rem .8rem; border-bottom: 1px solid var(--border-2); vertical-align: top; }
-table.vocab tr:hover td { background: var(--surface-2); }
-.vocab-jp { font-family: var(--font-ja-sans); font-size: 1.12rem; font-weight: 600; }
-.vocab-reading { font-family: var(--font-ja-sans); color: var(--indigo); }
 .pos {
   font-size: .74rem; font-weight: 700; color: var(--muted);
   background: var(--chip); padding: .12rem .45rem; border-radius: 5px; white-space: nowrap;
@@ -392,7 +390,6 @@ body.searching .collapsible.collapsed .collapse-body { display: block; }
 /* ---------- Furigana / Lesungen-Schalter ---------- */
 ruby rt { font-size: .58em; color: var(--indigo); font-weight: 500; user-select: none; }
 body.furigana-off rt { visibility: hidden; }
-body.furigana-off .vocab-reading { visibility: hidden; }
 
 /* ---------- Karteikarten-Modus ---------- */
 .hideable { transition: filter .12s, background .12s; }
@@ -479,7 +476,6 @@ footer .jp { font-family: var(--font-ja); }
   .kanji-char { font-size: 3rem; }
   .nav { width: 100%; margin-left: 0; }
   .toolbar { top: 0; }
-  table.vocab thead th { top: 0; }
 }
 @media (max-width: 420px) {
   .kanji-grid { grid-template-columns: 1fr; }
@@ -733,8 +729,8 @@ body.drill-open { overflow: hidden; }
   .toolbar { position: static; }
   main { max-width: none; padding: 0; }
   /* Im Druck immer alle Lesungen zeigen */
-  body.furigana-off rt,
-  body.furigana-off .vocab-reading { visibility: visible !important; }
+  body.furigana-off rt { visibility: visible !important; }
+  body.furigana-off .v-read { display: block !important; }
   body.cards-mode .hideable { filter: none !important; background: transparent !important; }
   .vf-rule { display: block !important; }
   .vf-row th::before { display: none; }
@@ -746,7 +742,6 @@ body.drill-open { overflow: hidden; }
   .kanji-card, .gp, .panel, .hero { break-inside: avoid; box-shadow: none; border: 1px solid #ccc; }
   .group-head { break-after: avoid; }
   .kanji-grid { grid-template-columns: repeat(3, 1fr); gap: .5rem; }
-  table.vocab thead th { position: static; }
   a { color: inherit; text-decoration: none; }
   .topbar, .toolbar { position: static; }
 }
