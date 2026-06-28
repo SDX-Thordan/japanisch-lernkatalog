@@ -1,7 +1,7 @@
 {
   "name": "Go! Nihongo",
   "short_name": "Go! Nihongo",
-  "description": "Japanisch lernen (Minna no Nihongo, Lektionen 1–25): Lernpfad, tägliche Aufgaben, Vokabellisten, Grammatik, Kanji-Schreiben und Fortschritt — offline.",
+  "description": "Japanisch lernen (Minna no Nihongo, Lektionen 1–25): Lernpfad, tägliche Aufgaben, Lernlisten, Grammatik, Kanji-Schreiben und Fortschritt — offline.",
   "lang": "de",
   "start_url": "index.html",
   "scope": "./",

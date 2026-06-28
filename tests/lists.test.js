@@ -59,6 +59,17 @@ describe('Listen-Grundfunktionen', () => {
     SRS.addToList(l.id, ['v:〇〇|99', vid(win.VOKABULAR[0])]);
     expect(SRS.listItems(l.id).length).toBe(1);
   });
+
+  it('löst gemischte Einträge auf: Vokabel + Kanji + Grammatik (mit Typ)', () => {
+    const l = SRS.createList('Mix');
+    const v = win.VOKABULAR[0], k = win.KANJI[0], g = win.GRAMMATIK[0];
+    SRS.addToList(l.id, [SRS.srsId('vocab', v), SRS.srsId('kanji', k), SRS.srsId('grammar', g)]);
+    const items = SRS.listItems(l.id);
+    expect(items.length).toBe(3);
+    expect(items.map((o) => o.type).sort()).toEqual(['grammar', 'kanji', 'vocab']);
+    expect(items.find((o) => o.type === 'kanji').data.k).toBe(k.k);
+    expect(items.find((o) => o.type === 'grammar').data.pattern).toBe(g.pattern);
+  });
 });
 
 describe('Export/Import erhält Listen', () => {

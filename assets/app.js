@@ -262,6 +262,7 @@
       group.appendChild(grid); content.appendChild(group);
     });
     buildChips(LEVEL_ORDER.filter(lv=>byLevel[lv]), v=>v);
+    content.addEventListener('click',e=>{ const a=e.target.closest('.kc-add'); if(a&&window.SRS){ openListPicker(['k:'+a.dataset.kanji], a.dataset.word||a.dataset.kanji); } });
   }
   function kanjiCard(k){
     const on=(k.on||[]).join('・'), kun=(k.kun||[]).join('・');
@@ -281,6 +282,7 @@
       (exHtml?'<div class="kc-examples hideable">'+exHtml+'</div>':'')+
       '<div class="kc-foot">'+
         '<span class="kc-writes" title="Lernstand '+Math.round(kScore)+' % (durch Schreiben)">'+sakuraSvg(kScore,SCORE_THRESHOLDS,{cls:'sakura-sm'})+'</span>'+
+        (window.SRS?'<button class="kc-add" type="button" title="Zur Lernliste hinzufügen" data-kanji="'+esc(k.k)+'" data-word="'+esc(k.meaning||k.k)+'">＋</button>':'')+
         '<a class="kc-write" href="schreiben.html?kanji='+encodeURIComponent(k.k)+'" aria-label="Dieses Kanji schreiben üben" title="Schreiben üben"><span class="msi" aria-hidden="true">draw</span></a>'+
       '</div>';
     return card;
@@ -359,7 +361,10 @@
   }
   // Klick auf den Karten-Kopf (.card-toggle) klappt die Karte auf/zu.
   function initCollapse(content){
-    content.addEventListener('click',e=>{ const h=e.target.closest('.card-toggle'); if(!h)return;
+    content.addEventListener('click',e=>{
+      const a=e.target.closest('.gp-add');
+      if(a&&window.SRS){ e.stopPropagation(); const g=(window.GRAMMATIK||[]).find(x=>x.pattern===a.dataset.pattern); openListPicker(['g:'+a.dataset.pattern], g?(g.title||g.pattern):a.dataset.pattern); return; }
+      const h=e.target.closest('.card-toggle'); if(!h)return;
       const card=h.closest('.collapsible'); if(card)card.classList.toggle('collapsed'); });
   }
   function gpTable(t){
@@ -394,6 +399,7 @@
       btn.addEventListener('click',()=>openGrammarPractice(g));
       card.querySelector('.collapse-body').appendChild(btn);
     }
+    if(window.SRS){ const addb=el('button','gp-add btn','＋ Lernliste'); addb.type='button'; addb.dataset.pattern=g.pattern; card.querySelector('.collapse-body').appendChild(addb); }
     return card;
   }
   // Additiver „Mehr erklären"-Block + Übungen (window.Exercises) für Muster mit GRAMMATIK_PLUS.
@@ -1303,6 +1309,41 @@
     p.ov.hidden=false;
   }
 
+  /* ============================================================  ZENTRALER ÜBUNGS-RENDERER (für jeden Modus)
+     Rendert einen Übungs-Deskriptor aus der Registry: Kanji-Zeichnen über KanjiWrite (mit Vergleich),
+     alles andere über Exercises.renderExercise. opts.onDone(correct) signalisiert „beantwortet". */
+  function renderAnyExercise(ex, mount, opts){
+    opts=opts||{};
+    if(!ex){ if(opts.onDone)opts.onDone(null); return; }
+    if(ex.typ==='write'){ return renderWriteExercise(ex.data, mount, opts); }
+    window.Exercises.renderExercise(ex, mount, { onResult: opts.onDone });
+  }
+  function renderWriteExercise(k, mount, opts){
+    opts=opts||{};
+    mount.innerHTML='<div class="kw-card"><div class="kw-head"><span class="tr-big ja">'+esc(k.k)+'</span>'+
+      '<span class="tr-q">'+esc(k.meaning||'')+' — schreibe das Kanji in richtiger Strichreihenfolge</span></div>'+
+      '<div class="kw-stage"></div><div class="kw-compare-host"></div><div class="kw-msg" aria-live="polite"></div>'+
+      '<div class="tr-controls"><button class="btn h-kw-guide" type="button">Vorlage</button>'+
+      '<button class="btn h-kw-play" type="button"><span class="msi" aria-hidden="true">play_arrow</span> Reihenfolge</button>'+
+      '<button class="btn h-kw-clear" type="button">Löschen</button></div></div>';
+    const stage=mount.querySelector('.kw-stage'), msg=mount.querySelector('.kw-msg'), cmp=mount.querySelector('.kw-compare-host');
+    const size=Math.min(300,(mount.clientWidth||320)-20);
+    const m=window.KanjiWrite.writeMode(window.SRS&&window.SRS.scoreOf?window.SRS.scoreOf('k:'+k.k):0);
+    let doneCalled=false;
+    fetch('assets/kanjivg/'+window.KanjiWrite.cpFile(k.k)).then(r=>r.text()).then(svg=>{
+      const w=window.KanjiWrite.create(stage,{svgText:svg,size:size,snap:m.snap,guide:m.guide,
+        onProgress:(i,n)=>{ cmp.innerHTML=''; msg.textContent='Strich '+i+' / '+n; },
+        onMistake:(no)=>{ msg.textContent='✗ Strich '+no+' passt nicht — nochmal'; },
+        onComplete:(clean)=>{
+          if(clean){ msg.textContent='✓ Sauber geschrieben!'; if(window.SRS&&window.SRS.grade)window.SRS.grade('k:'+k.k,1); }
+          else { msg.textContent='✗ Mit Fehlern — Vergleich unten.'; w.showComparison(cmp); }
+          if(!doneCalled){ doneCalled=true; if(opts.onDone)opts.onDone(clean); } }});
+      mount.querySelector('.h-kw-guide').addEventListener('click',()=>w.toggleGuide());
+      mount.querySelector('.h-kw-play').addEventListener('click',()=>w.play());
+      mount.querySelector('.h-kw-clear').addEventListener('click',()=>{ w.clear(); cmp.innerHTML=''; });
+    }).catch(()=>{ msg.textContent='SVG konnte nicht geladen werden.'; if(!doneCalled){ doneCalled=true; if(opts.onDone)opts.onDone(null); } });
+  }
+
   /* ============================================================  FREIES ÜBEN (Zufallskarten je Quelle, ungated)  */
   const FREE_SRC={
     kanji:{ data:()=>window.KANJI||[], label:'漢字 Kanji' },
@@ -1380,6 +1421,10 @@
     const nameInp=document.getElementById('lst-create-name'), createBtn=document.getElementById('lst-create');
 
     function vocabFront(v){ const w=(v.kanji&&v.kanji.length)?v.kanji:v.kana; return ruby(w,v.kana); }
+    // Vorderseite/Glyph je Item-Typ (für die Item-Liste und den Karteikarten-Fallback).
+    function itemGlyph(o){ return o.type==='kanji'?o.data.k:(o.type==='grammar'?o.data.pattern:((o.data.kanji&&o.data.kanji.length)?o.data.kanji:o.data.kana)); }
+    function itemMeaning(o){ return o.type==='kanji'?(o.data.meaning||''):(o.type==='grammar'?(o.data.title||''):o.data.de); }
+    function itemFrontHtml(o){ return o.type==='vocab'?vocabFront(o.data):esc(itemGlyph(o)); }
     function draw(){
       const ls=window.SRS.lists();
       root.innerHTML='';
@@ -1387,12 +1432,12 @@
       ls.forEach(l=>{
         const items=window.SRS.listItems(l.id);
         const card=el('article','lst-card');
-        card.innerHTML='<div class="lst-head"><span class="lst-name">'+esc(l.name)+'</span><span class="lst-count">'+items.length+' Wörter</span></div>'+
+        card.innerHTML='<div class="lst-head"><span class="lst-name">'+esc(l.name)+'</span><span class="lst-count">'+items.length+' Einträge</span></div>'+
           '<div class="lst-actions"></div><div class="lst-items hidden"></div>';
         const actions=card.querySelector('.lst-actions');
         const train=el('button','btn-primary lst-train','<span class="msi" aria-hidden="true">play_arrow</span> Üben'); train.type='button'; train.disabled=!items.length;
         train.addEventListener('click',()=>openTrainer(l));
-        const show=el('button','btn lst-show',(items.length?'Wörter ('+items.length+')':'Wörter')); show.type='button';
+        const show=el('button','btn lst-show',(items.length?'Einträge ('+items.length+')':'Einträge')); show.type='button';
         const itemsBox=card.querySelector('.lst-items');
         show.addEventListener('click',()=>{ itemsBox.classList.toggle('hidden'); if(!itemsBox.dataset.built){ buildItems(itemsBox,l,items); itemsBox.dataset.built='1'; } });
         const ren=el('button','btn lst-ren','<span class="msi" aria-hidden="true">edit</span> Umbenennen'); ren.type='button';
@@ -1406,68 +1451,58 @@
     function buildItems(box,l,items){
       box.innerHTML='';
       items.forEach(o=>{ const row=el('div','lst-item');
-        const bsp=(window.VOKABULAR_BEISPIELE||{})[o.data.kana+'|'+o.data.lesson];
-        // Erweiterte Bedeutung (Beispiel + Notiz) klappt per Klick auf die Zeile auf.
+        const bsp=o.type==='vocab'?(window.VOKABULAR_BEISPIELE||{})[o.data.kana+'|'+o.data.lesson]:null;
+        // Erweiterte Bedeutung (Beispiel + Notiz) klappt per Klick auf die Zeile auf (nur Vokabeln).
         const ext=bsp?'<span class="v-more" aria-hidden="true" title="Beispiel anzeigen">›</span>'+
           '<div class="v-ext"><div class="v-bsp-inline"><span class="ja">'+esc(bsp.jp)+'</span> — '+esc(bsp.de)+(bsp.note?'<span class="v-note"> · '+esc(bsp.note)+'</span>':'')+'</div></div>':'';
-        row.innerHTML='<span class="lst-jp ja">'+vocabFront(o.data)+'</span><span class="lst-de">'+esc(o.data.de)+ext+'</span>';
+        const tag=o.type!=='vocab'?'<span class="lst-tag">'+(o.type==='kanji'?'漢字':'文法')+'</span>':'';
+        row.innerHTML='<span class="lst-jp ja">'+itemFrontHtml(o)+'</span><span class="lst-de">'+tag+esc(itemMeaning(o))+ext+'</span>';
         if(bsp){ row.dataset.ext='1'; row.addEventListener('click',e=>{ if(e.target.closest('.lst-rm'))return; row.classList.toggle('expanded'); }); }
         const rm=el('button','lst-rm','<span class="msi" aria-hidden="true">close</span>'); rm.type='button'; rm.title='Aus Liste entfernen';
         rm.addEventListener('click',()=>{ window.SRS.removeFromList(l.id,[o.id]); draw(); });
         row.appendChild(rm); box.appendChild(row); });
     }
 
-    /* ----- Trainer (Karteikarten, Richtung de↔jp) ----- */
-    let tov=null, dir='jp2de';
+    /* ----- Trainer: gemischte, adaptive Übungen aus der zentralen Registry ----- */
+    let tov=null;
     function ensureTrainer(){
       if(tov)return tov;
       tov=el('div','lt-overlay'); tov.hidden=true;
-      tov.innerHTML='<div class="lt-modal" role="dialog" aria-modal="true" aria-label="Liste trainieren">'+
+      tov.innerHTML='<div class="lt-modal" role="dialog" aria-modal="true" aria-label="Liste üben">'+
         '<div class="lt-head"><span class="lt-title"></span>'+
-          '<button class="lt-dir btn" type="button"></button>'+
           '<button class="drill-close lt-close" type="button" aria-label="Schließen"><span class="msi" aria-hidden="true">close</span></button></div>'+
         '<div class="lt-top"><span class="lt-prog"></span></div>'+
-        '<div class="lt-card"><div class="lt-front"></div><div class="lt-back hidden"></div>'+
-          '<div class="lt-controls"><button class="btn-primary lt-reveal" type="button">Aufdecken <span class="kbd">Leertaste</span></button>'+
-          '<button class="btn btn-again lt-again hidden" type="button"><span class="msi" aria-hidden="true">refresh</span> Nochmal</button>'+
-          '<button class="btn btn-next lt-good hidden" type="button">Gewusst →</button></div></div>'+
+        '<div class="lt-card"><div class="lt-ex"></div><div class="lt-next-wrap"></div></div>'+
         '<div class="lt-done hidden"></div></div>';
       document.body.appendChild(tov);
       tov.querySelector('.lt-close').addEventListener('click',()=>{ tov.hidden=true; });
       tov.addEventListener('click',e=>{ if(e.target===tov)tov.hidden=true; });
       document.addEventListener('keydown',e=>{ if(tov.hidden)return;
         if(e.key==='Escape'){ tov.hidden=true; return; }
-        if(e.code==='Space'){ e.preventDefault(); const good=tov.querySelector('.lt-good'), rev=tov.querySelector('.lt-reveal');
-          if(good&&!good.classList.contains('hidden'))good.click(); else if(rev&&!rev.classList.contains('hidden'))rev.click(); } });
+        if(e.code==='Space'){ const nx=tov.querySelector('.lt-next'); if(nx){ e.preventDefault(); nx.click(); } } });
       return tov;
     }
     function openTrainer(l){
       const ov=ensureTrainer();
       const q=s=>ov.querySelector(s);
-      const title=q('.lt-title'), dirBtn=q('.lt-dir'), prog=q('.lt-prog'),
-        card=q('.lt-card'), front=q('.lt-front'), back=q('.lt-back'), done=q('.lt-done'),
-        reveal=q('.lt-reveal'), again=q('.lt-again'), good=q('.lt-good');
+      const title=q('.lt-title'), prog=q('.lt-prog'), card=q('.lt-card'),
+        exMount=q('.lt-ex'), nextWrap=q('.lt-next-wrap'), done=q('.lt-done');
       title.textContent=l.name;
       let deck=[], total=0;
-      function dirLabel(){ return dir==='jp2de'?'日本語 → Deutsch':'Deutsch → 日本語'; }
-      function start(){ const items=window.SRS.listItems(l.id); deck=shuffle(items.slice()); total=deck.length; done.classList.add('hidden'); card.classList.remove('hidden'); render(); }
+      function start(){ deck=shuffle(window.SRS.listItems(l.id).slice()); total=deck.length; done.classList.add('hidden'); card.classList.remove('hidden'); render(); }
+      function addNext(){ if(nextWrap.querySelector('.lt-next'))return; const nx=el('button','btn-primary lt-next','Weiter →'); nx.type='button'; nx.addEventListener('click',()=>{ deck.shift(); render(); }); nextWrap.appendChild(nx); nx.focus(); }
       function render(){
         if(!deck.length){ card.classList.add('hidden'); done.classList.remove('hidden');
-          done.innerHTML=total?'<div class="tr-done-in">Geschafft!<br>Alle '+total+' Karten durch.</div><button class="btn-primary lt-restart" type="button"><span class="msi" aria-hidden="true">refresh</span> Nochmal</button>':'<div class="tr-done-in">Diese Liste ist leer.</div>';
+          done.innerHTML=total?'<div class="tr-done-in">Geschafft!<br>Alle '+total+' Einträge durch.</div><button class="btn-primary lt-restart" type="button"><span class="msi" aria-hidden="true">refresh</span> Nochmal</button>':'<div class="tr-done-in">Diese Liste ist leer.</div>';
           const rs=done.querySelector('.lt-restart'); if(rs)rs.addEventListener('click',start); return; }
-        const learned=total-deck.length; prog.textContent='Karte '+(learned+1)+' / '+total;
-        const o=deck[0], v=o.data;
-        const jp='<div class="lt-jp ja">'+vocabFront(v)+'</div>', de='<div class="lt-de">'+esc(v.de)+'</div>';
-        const reading='<div class="lt-reading ja">'+esc(v.kana)+'</div>';
-        if(dir==='jp2de'){ front.innerHTML=jp; back.innerHTML=de+reading; }
-        else { front.innerHTML=de; back.innerHTML=jp+reading; }
-        back.classList.add('hidden'); reveal.classList.remove('hidden'); again.classList.add('hidden'); good.classList.add('hidden');
+        const learned=total-deck.length; prog.textContent='Aufgabe '+(learned+1)+' / '+total;
+        exMount.innerHTML=''; nextWrap.innerHTML='';
+        const o=deck[0];
+        const score=(window.SRS&&window.SRS.scoreOf)?window.SRS.scoreOf(o.id):0;
+        const ex=(window.Exercises&&window.Exercises.pickExercise)?window.Exercises.pickExercise({id:o.id,type:o.type,data:o.data},{score}):null;
+        if(!ex){ exMount.innerHTML='<div class="lt-jp ja">'+itemFrontHtml(o)+'</div><div class="lt-de">'+esc(itemMeaning(o))+'</div>'; addNext(); return; }
+        renderAnyExercise(ex, exMount, { onDone:()=>{ addNext(); } });
       }
-      reveal.onclick=()=>{ back.classList.remove('hidden'); reveal.classList.add('hidden'); again.classList.remove('hidden'); good.classList.remove('hidden'); };
-      good.onclick=()=>{ const o=deck.shift(); if(window.SRS.get(o.id)||true)window.SRS.grade(o.id,1); render(); };
-      again.onclick=()=>{ const o=deck.shift(); window.SRS.grade(o.id,0); deck.push(o); render(); };
-      dirBtn.textContent=dirLabel();
-      dirBtn.onclick=()=>{ dir=dir==='jp2de'?'de2jp':'jp2de'; dirBtn.textContent=dirLabel(); start(); };
       ov.hidden=false; start();
     }
 

@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <!-- OTA so früh wie möglich bestätigen (capgo notifyAppReady), bevor große Daten-Skripte laden. -->
 <script src="assets/ota.js"></script>
-<title>Listen · 単語帳 — Go! Nihongo</title>
+<title>Lernlisten · 単語帳 — Go! Nihongo</title>
 <link rel="stylesheet" href="assets/style.css">
 <link rel="icon" href="assets/icons/icon-192.png">
 <link rel="manifest" href="manifest.webmanifest">
@@ -23,29 +23,38 @@
 
 <main>
   <div class="page-intro">
-    <span class="kicker">単語帳 · Eigene Vokabellisten</span>
-    <h1>Listen <span class="jp">単語帳</span></h1>
-    <p>Stelle dir eigene Vokabellisten zusammen und trainiere sie als Karteikarten in beide
-       Richtungen (<span class="jp">日本語</span>→Deutsch und Deutsch→<span class="jp">日本語</span>).
-       Wörter fügst du hier oder direkt auf der <a href="vokabular.html">Vokabular-Seite</a> hinzu
-       (einzeln oder ganze Lektionen).</p>
+    <span class="kicker">単語帳 · Eigene Lernlisten</span>
+    <h1>Lernlisten <span class="jp">単語帳</span></h1>
+    <p>Stelle dir eigene Lernlisten aus Vokabeln, Kanji und Grammatik zusammen und übe sie mit
+       gemischten, automatisch passenden Aufgaben. Einträge fügst du hier oder direkt auf den
+       Seiten <a href="vokabular.html">Vokabular</a>, <a href="kanji.html">Kanji</a> und
+       <a href="grammatik.html">Grammatik</a> hinzu (einzeln oder ganze Lektionen).</p>
   </div>
 
   <div class="lst-create">
     <input id="lst-create-name" type="text" placeholder="Name der neuen Liste …" aria-label="Name der neuen Liste">
-    <button class="btn-primary" id="lst-create" type="button">＋ Liste anlegen</button>
+    <button class="btn-primary" id="lst-create" type="button">＋ Lernliste anlegen</button>
   </div>
 
   <div id="lst-root"></div>
 </main>
 
 <footer>
-  <span class="brand-name">Go! Nihongo</span> · Persönliche Vokabellisten — Training in beide Richtungen, Tastatur: <span class="kbd">Leertaste</span>.
+  <span class="brand-name">Go! Nihongo</span> · Persönliche Lernlisten — gemischte Übungen aus Vokabeln, Kanji & Grammatik, Tastatur: <span class="kbd">Leertaste</span>.
 </footer>
 
+<script src="assets/data/kanji.js"></script>
 <script src="assets/data/vokabular.js"></script>
 <script src="assets/data/vokabular_beispiele.js"></script>
+<script src="assets/data/vokabular_tags.js"></script>
+<script src="assets/data/grammatik.js"></script>
+<script src="assets/data/grammatik_extra.js"></script>
+<script src="assets/data/grammatik_furigana.js"></script>
+<script src="assets/data/grammatik_plus.js"></script>
+<script src="assets/data/saetze.js"></script>
 <script src="assets/srs.js"></script>
+<script src="assets/exercises.js"></script>
+<script src="assets/kanji-write.js"></script>
 <script src="assets/version.js"></script>
 <script src="assets/app.js"></script>
 </body>
