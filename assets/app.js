@@ -78,7 +78,7 @@
     for(let k=0;k<5;k++){
       const ang=(-90+k*72).toFixed(1);
       const g='<g transform="translate(24 24) rotate('+ang+')"><path d="'+PETAL+'" ';
-      if(k<n) petals+=g+'fill="url(#'+gid+')" stroke="#e2548a" stroke-width="0.5"/></g>';
+      if(k<n) petals+=g+'fill="url(#'+gid+')" stroke="#f3b6cf" stroke-width="0.5"/></g>';
       else   locked +=g+'fill="#e7e3e5" stroke="#d7d1d4" stroke-width="0.5"/></g>';
     }
     // Sternförmige Mitte (5-zackig) + Staubgefäß-Punkte; bei n≥1 rosa/golden, sonst grau.
@@ -95,7 +95,7 @@
       dots+='<circle cx="'+(24+4.2*Math.cos(a)).toFixed(2)+'" cy="'+(24+4.2*Math.sin(a)).toFixed(2)+'" r="0.75" fill="#f7d35a"/>';
     }
     const defs='<defs><radialGradient id="'+gid+'" gradientUnits="userSpaceOnUse" cx="24" cy="24" r="19">'+
-      '<stop offset="0" stop-color="#ffdcec"/><stop offset="0.5" stop-color="#f48cb6"/><stop offset="1" stop-color="#ea5292"/></radialGradient></defs>';
+      '<stop offset="0" stop-color="#fff7fb"/><stop offset="0.55" stop-color="#fce6ef"/><stop offset="1" stop-color="#f9ccde"/></radialGradient></defs>';
     const aria=open?('Blüte: '+n+' von 5 Blütenblättern'):'Knospe (noch keine Blüte)';
     return '<svg class="'+cls+'" viewBox="0 0 48 48" role="img" aria-label="'+aria+'">'+defs+locked+petals+star+dots+'</svg>';
   }
