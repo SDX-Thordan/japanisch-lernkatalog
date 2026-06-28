@@ -5,7 +5,7 @@
   "plugins": {
     "CapacitorUpdater": {
       "autoUpdate": false,
-      "appReadyTimeout": 10000
+      "appReadyTimeout": 30000
     }
   }
 }

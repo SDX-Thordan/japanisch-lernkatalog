@@ -17,9 +17,10 @@ function nativeCapacitor(manifestVersion, calls) {
     Plugins: {
       CapacitorHttp: { get: () => Promise.resolve({ data: JSON.stringify({ version: manifestVersion }) }) },
       CapacitorUpdater: {
-        notifyAppReady: () => { (calls || []).push('ready'); },
-        download: () => { (calls || []).push('download'); return Promise.resolve({ id: 'b1' }); },
-        set: () => { (calls || []).push('set'); return Promise.resolve(); },
+        notifyAppReady: () => { (calls || []).push('ready'); return Promise.resolve(); },
+        download: () => { (calls || []).push('download'); return Promise.resolve({ id: 'b1', version: '2.0.0' }); },
+        // set() ist terminal (lädt neu); wir prüfen, dass es die BundleId {id} bekommt.
+        set: (opts) => { (calls || []).push('set:' + (opts && opts.id)); return Promise.resolve(); },
         reload: () => { (calls || []).push('reload'); return Promise.resolve(); },
       },
     },
@@ -62,13 +63,22 @@ describe('OTA — nativ (gemockt)', () => {
     expect(win.OTA.state().available).toBe(false);
   });
 
-  it('applyUpdate() lädt → setzt → reload und merkt sich die Version', async () => {
+  it('applyUpdate() lädt das Bundle und ruft set() mit der BundleId {id} (terminal, kein reload)', async () => {
     const calls = [];
     win.APP_VERSION = '1.0.0';
     win.Capacitor = nativeCapacitor('2.0.0', calls);
     await win.OTA.check();
     await win.OTA.applyUpdate();
-    expect(calls).toEqual(['download', 'set', 'reload']);
-    expect(win.localStorage.getItem('katalog_ota_version')).toBe('2.0.0');
+    // notifyAppReady ('ready') kann je nach Tick-Timing dazwischenfunken → herausfiltern.
+    // set() startet selbst neu → KEIN separates reload(); set bekommt {id} der heruntergeladenen Bundle.
+    expect(calls.filter((c) => c !== 'ready')).toEqual(['download', 'set:b1']);
+  });
+
+  it('vergleicht gegen die laufende APP_VERSION (kein localStorage-Desync nach Rollback)', async () => {
+    // Nach einem Rollback läuft wieder das alte Bundle → APP_VERSION ist alt → Update wird ERNEUT angeboten.
+    win.APP_VERSION = '1.0.0';
+    win.Capacitor = nativeCapacitor('2.0.0');
+    expect(await win.OTA.check()).toBe(true);
+    expect(win.OTA.state().version).toBe('2.0.0');
   });
 });
