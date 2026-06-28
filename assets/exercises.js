@@ -144,11 +144,13 @@
     function finish(correct) {
       if (finished) return; finished = true;
       if (typeof opts.onResult === 'function') opts.onResult(correct);
-      if (window.SRS && ex.srsId && correct !== null) window.SRS.grade(ex.srsId, correct ? 1 : 0);
+      // gradeOpts (z. B. {gainCeiling, gainScale}) erlauben pro Übung andere Score-Regeln (Kanji-MC).
+      if (window.SRS && ex.srsId && correct !== null) window.SRS.grade(ex.srsId, correct ? 1 : 0, undefined, ex.gradeOpts);
     }
     if (ex.typ === 'mc') return renderMC(ex, mount, finish);
     if (ex.typ === 'cloze') return renderCloze(ex, mount, finish);
     if (ex.typ === 'order') return renderOrder(ex, mount, finish);
+    if (ex.typ === 'input') return renderInput(ex, mount, finish);
     if (ex.typ === 'translate') return renderTranslate(ex, mount, finish);
   }
 
@@ -158,10 +160,11 @@
   }
 
   function renderMC(ex, mount, finish) {
-    mount.appendChild(el('div', 'ex-frage ja', esc(ex.frage)));
+    // Sprache je Richtung: Frage standardmäßig japanisch; Optionen nur „ja", wenn sie japanisch sind.
+    mount.appendChild(el('div', ex.frageJa === false ? 'ex-frage' : 'ex-frage ja', esc(ex.frage)));
     var opts = el('div', 'ex-options');
     ex.optionen.forEach(function (o, i) {
-      var b = el('button', 'ex-opt', esc(o)); b.type = 'button';
+      var b = el('button', ex.optJa ? 'ex-opt ja' : 'ex-opt', esc(o)); b.type = 'button';
       b.addEventListener('click', function () {
         if (mount.querySelector('.ex-feedback')) return;
         var ok = (i === ex.richtig);
@@ -188,6 +191,26 @@
       inp.disabled = true; feedback(mount, ok, ex.erkl || ('Lösung: ' + ex.luecke));
       finish(ok);
     });
+    mount.appendChild(inp); mount.appendChild(btn);
+  }
+
+  // Tippen (Produktion): Bedeutung → japanisch eingeben; akzeptiert Kanji/Kana/Rōmaji (acceptsVocabInput).
+  function renderInput(ex, mount, finish) {
+    mount.appendChild(el('div', 'ex-prompt', esc(ex.prompt)));
+    var inp = el('input', 'ex-input'); inp.type = 'text';
+    inp.setAttribute('autocomplete', 'off'); inp.setAttribute('autocapitalize', 'off');
+    inp.setAttribute('autocorrect', 'off'); inp.setAttribute('spellcheck', 'false');
+    inp.setAttribute('aria-label', 'Antwort'); inp.placeholder = 'Rōmaji, Kana oder Kanji …';
+    var btn = el('button', 'btn-primary ex-check', 'Prüfen'); btn.type = 'button';
+    function check() {
+      if (mount.querySelector('.ex-feedback')) return;
+      var ok = acceptsVocabInput(inp.value, ex.accept);
+      inp.disabled = true;
+      feedback(mount, ok, ok ? '' : ('Lösung: ' + vocabForms(ex.accept).join(' · ')));
+      finish(ok);
+    }
+    btn.addEventListener('click', check);
+    inp.addEventListener('keydown', function (e) { if (e.key === 'Enter') check(); });
     mount.appendChild(inp); mount.appendChild(btn);
   }
 
@@ -278,11 +301,107 @@
     return shuffle(qs).slice(0, n);
   }
 
+  /* ============================================================
+     Zentrale Übungs-Registry: für jedes Item (Vokabel/Kanji/Grammatik)
+     alle sinnvollen Übungstypen erzeugen + adaptiv eine auswählen.
+     exercisesFor(item) liefert FABRIKEN (frische, randomisierte Übung pro Aufruf).
+     ============================================================ */
+  var KANJI_GRADE_OPTS = { gainCeiling: 70, gainScale: 0.5 }; // Kanji-MC: weniger Gewinn, ab 70 keiner; Strafe normal.
+
+  function vocabId(v) { return 'v:' + v.kana + '|' + v.lesson; }
+  function vocabWritten(v) { return (v.kanji && v.kanji.length) ? v.kanji : v.kana; }
+  function vocabMeaningPool(v, core) {
+    var pool = (core || []).filter(function (c) { return c.type === 'vocab'; }).map(function (c) { return c.data.de; });
+    if (pool.length < 4) pool = pool.concat((window.VOKABULAR || []).filter(function (x) { return x.pos === v.pos; }).map(function (x) { return x.de; }));
+    if (pool.length < 4) pool = pool.concat((window.VOKABULAR || []).map(function (x) { return x.de; }));
+    return pool;
+  }
+  // Vokabel MC JP→DE (Erkennen).
+  function vocabRecognizeMC(v, core) {
+    var ex = meaningMC(vocabWritten(v), v.de, vocabMeaningPool(v, core));
+    ex.srsId = vocabId(v); ex.mode = 'vocab-recognize'; return ex;
+  }
+  // Vokabel MC DE→JP (Produktion: japanische Schreibung wählen).
+  function vocabProduceMC(v, core) {
+    var correct = vocabWritten(v);
+    var pool = (core || []).filter(function (c) { return c.type === 'vocab'; }).map(function (c) { return vocabWritten(c.data); });
+    if (pool.length < 4) pool = pool.concat((window.VOKABULAR || []).filter(function (x) { return x.pos === v.pos; }).map(vocabWritten));
+    if (pool.length < 4) pool = pool.concat((window.VOKABULAR || []).map(vocabWritten));
+    var distract = uniqueSample(pool.filter(function (f) { return f && f !== correct; }), 3);
+    var optionen = shuffle([correct].concat(distract));
+    return { typ: 'mc', srsId: vocabId(v), frage: v.de, frageJa: false, optJa: true,
+      optionen: optionen, richtig: optionen.indexOf(correct), erkl: v.de + ' = ' + correct, mode: 'vocab-produce' };
+  }
+  // Vokabel Tippen (Produktion, freie Eingabe).
+  function vocabInput(v) {
+    return { typ: 'input', srsId: vocabId(v), prompt: v.de, accept: v, erkl: v.de + ' = ' + vocabWritten(v), mode: 'vocab-input' };
+  }
+  // Kanji MC Bedeutung (Glyph → Bedeutung), gedeckelte Score-Regel.
+  function kanjiMeaningMC(k, core) {
+    var ex = kanjiMC(k, core); ex.srsId = 'k:' + k.k; ex.gradeOpts = KANJI_GRADE_OPTS; ex.mode = 'kanji-meaning'; return ex;
+  }
+  // Kanji MC „richtiges Kanji wählen" (Bedeutung → Glyph), gedeckelte Score-Regel.
+  function kanjiPickMC(k, pool) {
+    var correct = k.k;
+    var glyphs = (pool || window.KANJI || []).filter(function (x) { return x.level === k.level && x.k !== correct; }).map(function (x) { return x.k; });
+    if (glyphs.length < 3) glyphs = glyphs.concat((window.KANJI || []).filter(function (x) { return x.k !== correct; }).map(function (x) { return x.k; }));
+    var distract = uniqueSample(glyphs, 3);
+    var optionen = shuffle([correct].concat(distract));
+    return { typ: 'mc', srsId: 'k:' + k.k, frage: k.meaning, frageJa: false, optJa: true,
+      optionen: optionen, richtig: optionen.indexOf(correct), erkl: k.meaning + ' = ' + correct, gradeOpts: KANJI_GRADE_OPTS, mode: 'kanji-pick' };
+  }
+  // Kanji Zeichnen — Deskriptor (Host rendert via KanjiWrite; Schreiben bewertet ungedeckelt = Meister-Pfad).
+  function kanjiWriteEx(k) { return { typ: 'write', srsId: 'k:' + k.k, data: k, mode: 'kanji-write' }; }
+  // Grammatik: Fabriken aus Satz-Vorlagen (Satzbau/Partikel/Übersetzen) + GRAMMATIK_PLUS (mc/cloze).
+  function grammarExercises(g) {
+    var out = [];
+    var T = (window.SATZ_TEMPLATES || {})[g.pattern];
+    if (T && T.length) {
+      out.push(function () { return fromTemplate(randPick(T), { type: 'order' }); });
+      out.push(function () { return fromTemplate(randPick(T), { type: 'mc' }); });
+      out.push(function () { return fromTemplate(randPick(T), { type: 'translate' }); });
+    }
+    var plus = (window.GRAMMATIK_PLUS || {})[g.pattern];
+    if (plus && plus.uebungen && plus.uebungen.length) {
+      out.push(function () { var u = randPick(plus.uebungen), ex = {}; for (var key in u) ex[key] = u[key]; ex.srsId = 'g:' + g.pattern; return ex; });
+    }
+    if (!out.length) {
+      var b = (g.beispiele || [])[0];
+      if (b && b.jp && b.de) out.push(function () { return { typ: 'translate', srsId: 'g:' + g.pattern, prompt: b.de, jp: b.jp, de: b.de }; });
+    }
+    return out;
+  }
+  // Alle Übungs-Fabriken für ein Item {id,type,data}.
+  function exercisesFor(item) {
+    if (!item) return [];
+    var t = item.type, d = item.data;
+    if (t === 'vocab') return [function () { return vocabRecognizeMC(d); }, function () { return vocabProduceMC(d); }, function () { return vocabInput(d); }];
+    if (t === 'kanji') return [function () { return kanjiMeaningMC(d); }, function () { return kanjiPickMC(d); }, function () { return kanjiWriteEx(d); }];
+    if (t === 'grammar') return grammarExercises(d);
+    return [];
+  }
+  // Adaptive Auswahl je Item + Lernstand. Vokabel: <40 Erkennen · 40–70 Produktion-MC · >70 Tippen.
+  // Kanji: ≥70 Schreiben (MC bringt keinen Gewinn mehr), sonst gemischt. Grammatik: gemischt.
+  function pickExercise(item, opts) {
+    opts = opts || {}; var rng = opts.rng || Math.random; var score = opts.score || 0;
+    var fac = exercisesFor(item); if (!fac.length) return null;
+    var idx;
+    if (item.type === 'vocab') { idx = score < 40 ? 0 : (score < 70 ? 1 : 2); idx = Math.min(idx, fac.length - 1); }
+    else if (item.type === 'kanji') { idx = score >= 70 ? (fac.length - 1) : Math.floor(rng() * fac.length); }
+    else { idx = Math.floor(rng() * fac.length); }
+    return fac[idx]();
+  }
+
   window.Exercises = {
     buildTagIndex: buildTagIndex, fillTemplate: fillTemplate, patternOf: patternOf,
     particleExercise: particleExercise, orderExercise: orderExercise, translateExercise: translateExercise,
     fromTemplate: fromTemplate, gradeAnswer: gradeAnswer, renderExercise: renderExercise,
     meaningMC: meaningMC, buildLessonTest: buildLessonTest,
     vocabForms: vocabForms, acceptsVocabInput: acceptsVocabInput,
+    // Zentrale Registry + neue Builder
+    exercisesFor: exercisesFor, pickExercise: pickExercise,
+    vocabRecognizeMC: vocabRecognizeMC, vocabProduceMC: vocabProduceMC, vocabInput: vocabInput,
+    kanjiMeaningMC: kanjiMeaningMC, kanjiPickMC: kanjiPickMC, kanjiWriteEx: kanjiWriteEx,
+    grammarExercises: grammarExercises,
   };
 })();

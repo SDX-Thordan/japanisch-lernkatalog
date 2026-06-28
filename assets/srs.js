@@ -182,8 +182,11 @@
   // Bewertung über die 0–100-Lernpunktzahl (ersetzt SM-2): Zerfall wird realisiert, dann
   // +GAIN (gedeckelt pro Wort & global) bzw. −PENALTY (max. 1×/Tag); nach einem Fehler ist
   // das Wort für den Rest des Tages eingefroren (kein weiterer Gain). reps/history bleiben.
-  function grade(id, g, today) {
+  // opts (optional): { gainCeiling } — Gewinn nur bis zu dieser Punktzahl (darüber 0);
+  //                   { gainScale }   — kleinerer Gewinn (z. B. 0.5). Strafe bleibt davon unberührt.
+  function grade(id, g, today, opts) {
     today = today || todayISO();
+    opts = opts || {};
     var item = store.items[id] || defaultItem();
     var d = dailyToday(today);
     var cur = effectiveScore(item, today);
@@ -192,7 +195,9 @@
       item.lapses = (item.lapses || 0) + 1; item.streak = 0;
     } else {
       if (!d.pen[id]) {
-        var allowed = Math.min(GAIN, ITEM_DAILY_CAP - (d.item[id] || 0), DAILY_CAP - d.gain);
+        var gain = GAIN * (opts.gainScale != null ? opts.gainScale : 1);
+        var allowed = Math.min(gain, ITEM_DAILY_CAP - (d.item[id] || 0), DAILY_CAP - d.gain);
+        if (opts.gainCeiling != null) allowed = Math.min(allowed, Math.max(0, opts.gainCeiling - cur));
         if (allowed > 0) { cur = clamp(cur + allowed, 0, 100); d.item[id] = (d.item[id] || 0) + allowed; d.gain += allowed; }
       }
       item.reps = (item.reps || 0) + 1; item.streak = (item.streak || 0) + 1;
