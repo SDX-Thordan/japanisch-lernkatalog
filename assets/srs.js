@@ -496,8 +496,13 @@
       var it = store.items[c.id] || defaultItem();
       if (rawScore(it) < LEARNED_SCORE) { it.score = LEARNED_SCORE; it.last = today; store.items[c.id] = it; n++; }
     });
+    // Alle Teile als erledigt markieren und die Lektion als gelernt/test-bereit kennzeichnen.
+    // Die nächste Lektion wird NICHT automatisch frei — dafür muss der Test bestanden werden (Fail-safe).
+    var nChunks = lessonChunks(lesson).length;
     store.lessons = store.lessons || {};
-    var rec = store.lessons[lesson] || {}; rec.unlocked = true; store.lessons[lesson] = rec;
+    var rec = store.lessons[lesson] || {};
+    rec.unlocked = true; rec.learned = true; rec.partsDone = Math.max(rec.partsDone || 0, nChunks);
+    store.lessons[lesson] = rec;
     save();
     return n;
   }
@@ -554,6 +559,7 @@
     var cp = coreProgress(lesson);
     return {
       lesson: lesson, unlocked: unlocked, coreProgress: cp, coreMastered: cp.fraction >= 1,
+      learned: !!rec.learned, // „als gelernt markiert" → test-bereit, auch ohne volle Mastery
       testPassed: !!rec.testPassed, bestScore: rec.bestScore || 0, lastScore: rec.lastScore || 0, testDate: rec.testDate || null,
     };
   }
@@ -569,7 +575,7 @@
     for (var l = 1; l <= max; l++) { if (coreProgress(l).fraction < 1) return l; }
     return max;
   }
-  function canTakeTest(lesson) { var s = lessonState(lesson); return s.unlocked && s.coreMastered; }
+  function canTakeTest(lesson) { var s = lessonState(lesson); return s.unlocked && (s.coreMastered || s.learned); }
   function recordLessonTest(lesson, score, today) {
     today = today || todayISO();
     store.lessons = store.lessons || {};

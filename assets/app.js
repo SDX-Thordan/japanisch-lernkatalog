@@ -1178,8 +1178,9 @@
 
     function lessonCard(L){
       const st=window.SRS.lessonState(L), cp=st.coreProgress, thema=(LESSON[L]||{}).thema||'';
-      const cls=st.testPassed?'lp-done':(st.unlocked?(st.coreMastered?'lp-test':'lp-open'):'lp-locked');
-      const badge=st.testPassed?icon('check_circle'):(st.unlocked?(st.coreMastered?icon('quiz'):icon('play_arrow')):icon('lock'));
+      const ready=st.coreMastered||st.learned; // test-bereit: voll gemeistert ODER „als gelernt" markiert
+      const cls=st.testPassed?'lp-done':(st.unlocked?(ready?'lp-test':'lp-open'):'lp-locked');
+      const badge=st.testPassed?icon('check_circle'):(st.unlocked?(ready?icon('quiz'):icon('play_arrow')):icon('lock'));
       const card=el('article','lp-card '+cls);
       let html='<div class="lp-top"><span class="lp-num">Lektion '+L+'</span><span class="lp-badge">'+badge+'</span></div>'+
         '<div class="lp-thema">'+esc(thema)+'</div>';
@@ -1191,7 +1192,7 @@
       if(parts.length>1){
         let pills='';
         parts.forEach(pi=>{
-          const cur=pi.part===np&&!st.coreMastered;
+          const cur=pi.part===np&&!ready;
           const cl='lp-part '+(pi.done?'lp-part-done':(pi.unlocked?'lp-part-cur':'lp-part-lock'))+(cur?' lp-part-now':'');
           const mins=Math.max(5,Math.round(pi.cost*0.8));
           const title='Teil '+pi.part+' · '+pi.total+' Items · ~'+mins+' Min'+(pi.unlocked?'':' (gesperrt)');
@@ -1206,15 +1207,19 @@
       html+='<div class="lp-actions"></div>';
       card.innerHTML=html;
       const actions=card.querySelector('.lp-actions');
-      const learn=el('a','btn lp-learn',st.coreMastered?'Weiter üben':('Teil '+np+' lernen'));
-      learn.href=st.coreMastered?'heute.html':('heute.html?lesson='+L+'&teil='+np); actions.appendChild(learn);
-      if(st.coreMastered){ const t=el('button','btn-primary lp-test-btn',st.testPassed?'Test wiederholen':'Test starten'); t.type='button';
-        t.addEventListener('click',()=>openLessonTest(L)); actions.appendChild(t); }
+      const learn=el('a','btn lp-learn',ready?'Weiter üben':('Teil '+np+' lernen'));
+      learn.href=ready?'heute.html':('heute.html?lesson='+L+'&teil='+np); actions.appendChild(learn);
+      if(ready){ const t=el('button','btn-primary lp-test-btn',st.testPassed?'Test wiederholen':'Test starten'); t.type='button';
+        t.addEventListener('click',()=>openLessonTest(L)); actions.appendChild(t);
+        // „als gelernt" markiert, aber noch nicht voll gemeistert und Test noch nicht bestanden → Hinweis aufs Gate.
+        if(st.learned&&!st.coreMastered&&!st.testPassed)
+          actions.appendChild(el('span','lp-need','Als gelernt markiert — bestehe den Test, um die nächste Lektion freizuschalten.'));
+      }
       else {
         const mk=el('button','btn lp-mark-learned','Als gelernt markieren'); mk.type='button';
-        mk.title='Alle Inhalte dieser Lektion als gelernt markieren — sie kommen sofort in die Wiederholung.';
+        mk.title='Alle Inhalte dieser Lektion als gelernt markieren — Teile werden erledigt, Inhalte kommen in die Wiederholung.';
         mk.addEventListener('click',()=>{
-          if(window.confirm('Ganze Lektion '+L+' als gelernt markieren?\nAlle Vokabeln, Grammatik und Kanji dieser Lektion landen sofort in der Wiederholung.')){
+          if(window.confirm('Ganze Lektion '+L+' als gelernt markieren?\nAlle Vokabeln, Grammatik und Kanji landen in der Wiederholung und alle Teile gelten als erledigt.\nMit dem Test schaltest du danach die nächste Lektion frei.')){
             window.SRS.markLessonLearned(L); draw();
           }
         });
