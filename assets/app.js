@@ -1173,7 +1173,17 @@
       learn.href=st.coreMastered?'heute.html':('heute.html?lesson='+L+'&teil='+np); actions.appendChild(learn);
       if(st.coreMastered){ const t=el('button','btn-primary lp-test-btn',st.testPassed?'Test wiederholen':'Test starten'); t.type='button';
         t.addEventListener('click',()=>openLessonTest(L)); actions.appendChild(t); }
-      else { actions.appendChild(el('span','lp-need','Erst alle Kern-Items beherrschen, dann Test.')); }
+      else {
+        const mk=el('button','btn lp-mark-learned','Als gelernt markieren'); mk.type='button';
+        mk.title='Alle Inhalte dieser Lektion als gelernt markieren — sie kommen sofort in die Wiederholung.';
+        mk.addEventListener('click',()=>{
+          if(window.confirm('Ganze Lektion '+L+' als gelernt markieren?\nAlle Vokabeln, Grammatik und Kanji dieser Lektion landen sofort in der Wiederholung.')){
+            window.SRS.markLessonLearned(L); draw();
+          }
+        });
+        actions.appendChild(mk);
+        actions.appendChild(el('span','lp-need','Oder Kern-Items üben, bis sie beherrscht sind — dann Test.'));
+      }
       if(st.testPassed)actions.appendChild(el('span','lp-score','Bestes Ergebnis: '+Math.round(st.bestScore*100)+'%'));
       return card;
     }

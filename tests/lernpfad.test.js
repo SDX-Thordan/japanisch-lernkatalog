@@ -107,6 +107,36 @@ describe('Freischalten: Kern beherrschen + Test bestehen', () => {
   });
 });
 
+describe('Ganze Lektion als gelernt markieren', () => {
+  it('setzt neue Kern-Items auf fällig, schaltet die Lektion frei und lässt höhere Scores unangetastet', () => {
+    const core = SRS.lessonCore(1);
+    expect(core.length).toBeGreaterThan(0);
+    // Ein Item bereits beherrscht (100) — darf nicht abgesenkt werden.
+    const mastered = core.find((c) => c.type === 'vocab');
+    SRS.__test.setScore(mastered.id, 100);
+
+    const n = SRS.markLessonLearned(1, '2026-06-10');
+    expect(n).toBe(core.length - 1); // alle außer dem schon beherrschten
+
+    // Neue Items sind nun gestartet UND fällig (Score 60 < MASTER_AT) → direkt in der Wiederholung.
+    core.filter((c) => c.id !== mastered.id).forEach((c) => {
+      expect(SRS.scoreOf(c.id, '2026-06-10')).toBe(60);
+      expect(SRS.isDue(c.id, '2026-06-10')).toBe(true);
+    });
+    // Bereits beherrschtes Item bleibt bei 100 und ist nicht fällig.
+    expect(SRS.scoreOf(mastered.id, '2026-06-10')).toBe(100);
+    expect(SRS.isDue(mastered.id, '2026-06-10')).toBe(false);
+
+    // Freigeschaltet, damit „Heute" die Wiederholung auch erreicht.
+    expect(SRS.lessonState(1).unlocked).toBe(true);
+  });
+
+  it('nochmaliges Markieren hebt nichts weiter an (idempotent über dem Startwert)', () => {
+    SRS.markLessonLearned(1, '2026-06-10');
+    expect(SRS.markLessonLearned(1, '2026-06-10')).toBe(0);
+  });
+});
+
 describe('buildLessonTest', () => {
   it('liefert Aufgaben mit gültigen MC-Indizes', () => {
     const test = win.Exercises.buildLessonTest(6, 10);

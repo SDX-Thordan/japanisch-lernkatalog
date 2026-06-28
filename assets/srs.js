@@ -32,7 +32,8 @@
   var GRACE_DAYS = 3;        // so viele Tage kein Zerfall nach der letzten Übung
   var DECAY_PER_DAY = 2;     // danach Punkte/Tag Zerfall (sanft)
   var ITEM_DAILY_CAP = 40;   // max. Punktgewinn pro Wort und Tag
-  var DAILY_CAP = 500;       // max. Punktgewinn über alle Wörter pro Tag (global)
+  var DAILY_CAP = 800;       // max. Punktgewinn über alle Wörter pro Tag (global = „Lernlimit")
+  var LEARNED_SCORE = 60;    // „ganze Lektion als gelernt" setzt Items hierher (unter MASTER_AT → sofort fällig)
   var SCORE_THRESHOLDS = [20, 40, 60, 80, 100]; // Blütenblatt je 20 %
   var LEECH_LAPSES = 4;      // ab so vielen Fehlversuchen gilt ein noch-nicht-beherrschtes Item als „schwierig"
   /* ---------- Teil-Lektionen: lange Lektionen in ~5–10-Min-Häppchen schneiden ---------- */
@@ -497,6 +498,23 @@
     lessonCore(lesson).forEach(function (c) { if (rawScore(store.items[c.id]) <= 0) out[c.type].push(c); });
     return out;
   }
+  // Ganze Lektion „als gelernt" markieren: alle Kern-Items (Vokabeln, Grammatik, Kanji), die noch unter
+  // dem Lern-Startwert liegen, auf LEARNED_SCORE setzen (unter MASTER_AT → sofort fällig). So landet die
+  // Lektion direkt in der Wiederholung, ohne den geführten Lernkurs durchlaufen zu müssen. Bereits weiter
+  // fortgeschrittene/beherrschte Items bleiben unangetastet; die Lektion wird freigeschaltet, damit „Heute"
+  // sie auch erreicht. Liefert die Anzahl angehobener Items.
+  function markLessonLearned(lesson, today) {
+    today = today || todayISO();
+    var n = 0;
+    lessonCore(lesson).forEach(function (c) {
+      var it = store.items[c.id] || defaultItem();
+      if (rawScore(it) < LEARNED_SCORE) { it.score = LEARNED_SCORE; it.last = today; store.items[c.id] = it; n++; }
+    });
+    store.lessons = store.lessons || {};
+    var rec = store.lessons[lesson] || {}; rec.unlocked = true; store.lessons[lesson] = rec;
+    save();
+    return n;
+  }
   /* ---------- Teil-Lektionen (deterministische Sicht auf lessonCore) ---------- */
   // Schneidet die Kern-Items einer Lektion (in didaktischer Reihenfolge) in Kostenscheiben ~PART_BUDGET.
   // Rein aus dem statischen Katalog → stabile Teil-Identität (unabhängig vom Fortschritt).
@@ -662,6 +680,7 @@
     isMastered: isMastered, needsWriting: needsWriting,
     kanjiLessonOf: kanjiLessonOf, lessonCore: lessonCore, coreProgress: coreProgress, lessonPlan: lessonPlan,
     lessonChunks: lessonChunks, partsInfo: partsInfo, nextPart: nextPart, markPartDone: markPartDone,
+    markLessonLearned: markLessonLearned,
     lessonState: lessonState, maxUnlockedLesson: maxUnlockedLesson, currentLesson: currentLesson,
     canTakeTest: canTakeTest, recordLessonTest: recordLessonTest,
     unlockAll: unlockAll, resetLessons: resetLessons,
