@@ -153,6 +153,32 @@ describe('Ganze Lektion als gelernt markieren', () => {
   });
 });
 
+describe('Test-Gate ab Lernstand ≥ 40 (erfüllt, nicht voll gemeistert)', () => {
+  function setAll(L, score) {
+    const today = SRS.__test.todayISO();
+    SRS.lessonCore(L).forEach((c) => SRS.__test.setScore(c.id, score, today));
+  }
+  it('alle Kern-Items ≥ 40 → erfüllt + test-bereit, aber nicht beherrscht', () => {
+    setAll(1, 40);
+    const cp = SRS.coreProgress(1);
+    expect(cp.readyFraction).toBe(1);
+    expect(cp.ready).toBe(cp.total);
+    expect(cp.fraction).toBe(0); // noch nichts „beherrscht" (≥80)
+    const st = SRS.lessonState(1);
+    expect(st.coreReady).toBe(true);
+    expect(st.coreMastered).toBe(false);
+    expect(SRS.canTakeTest(1)).toBe(true);
+    // Items bleiben fällig (Wiederholung bis 80)
+    expect(SRS.isDue(SRS.lessonCore(1)[0].id)).toBe(true);
+  });
+  it('ein Item < 40 → nicht test-bereit', () => {
+    setAll(1, 40);
+    SRS.__test.setScore(SRS.lessonCore(1)[0].id, 30, SRS.__test.todayISO());
+    expect(SRS.lessonState(1).coreReady).toBe(false);
+    expect(SRS.canTakeTest(1)).toBe(false);
+  });
+});
+
 describe('buildLessonTest', () => {
   it('liefert Aufgaben mit gültigen MC-Indizes', () => {
     const test = win.Exercises.buildLessonTest(6, 10);

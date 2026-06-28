@@ -1178,15 +1178,15 @@
 
     function lessonCard(L){
       const st=window.SRS.lessonState(L), cp=st.coreProgress, thema=(LESSON[L]||{}).thema||'';
-      const ready=st.coreMastered||st.learned; // test-bereit: voll gemeistert ODER „als gelernt" markiert
+      const ready=st.coreReady||st.learned; // test-bereit: jedes Kern-Item ≥ 40 (erfüllt) ODER „als gelernt" markiert
       const cls=st.testPassed?'lp-done':(st.unlocked?(ready?'lp-test':'lp-open'):'lp-locked');
       const badge=st.testPassed?icon('check_circle'):(st.unlocked?(ready?icon('quiz'):icon('play_arrow')):icon('lock'));
       const card=el('article','lp-card '+cls);
       let html='<div class="lp-top"><span class="lp-num">Lektion '+L+'</span><span class="lp-badge">'+badge+'</span></div>'+
         '<div class="lp-thema">'+esc(thema)+'</div>';
       if(!st.unlocked){ html+='<div class="lp-hint"><span class="msi" aria-hidden="true">lock</span> Erst die vorige Lektion bestehen.</div>'; card.innerHTML=html; return card; }
-      html+='<div class="lp-core"><div class="lp-core-bar"><span style="width:'+Math.round(cp.fraction*100)+'%"></span></div>'+
-        '<span class="lp-core-n">beherrscht '+cp.mastered+' / '+cp.total+'</span></div>';
+      html+='<div class="lp-core"><div class="lp-core-bar"><span style="width:'+Math.round(cp.readyFraction*100)+'%"></span></div>'+
+        '<span class="lp-core-n">erfüllt '+cp.ready+' / '+cp.total+' <span class="lp-core-sub">(≥40)</span></span></div>';
       // Teil-Leiste: kurze 5–10-Min-Häppchen, strikt der Reihe nach freigeschaltet.
       const parts=window.SRS.partsInfo?window.SRS.partsInfo(L):[], np=window.SRS.nextPart?window.SRS.nextPart(L):1;
       if(parts.length>1){
