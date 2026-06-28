@@ -129,6 +129,28 @@ describe('Ganze Lektion als gelernt markieren', () => {
     SRS.markLessonLearned(1, '2026-06-10');
     expect(SRS.markLessonLearned(1, '2026-06-10')).toBe(0);
   });
+
+  it('markiert alle Teile als erledigt und macht die Lektion test-bereit', () => {
+    SRS.markLessonLearned(1, '2026-06-10');
+    // a) alle Teile erledigt
+    expect(SRS.partsInfo(1).every((p) => p.done)).toBe(true);
+    // test-bereit, auch ohne volle Mastery (Items bei 60)
+    expect(SRS.lessonState(1).learned).toBe(true);
+    expect(SRS.lessonState(1).coreMastered).toBe(false);
+    expect(SRS.canTakeTest(1)).toBe(true);
+  });
+
+  it('Fail-safe: nächste Lektion erst nach bestandenem Test frei', () => {
+    SRS.markLessonLearned(1, '2026-06-10');
+    // b/c) „als gelernt" allein schaltet L2 NICHT frei
+    expect(SRS.lessonState(2).unlocked).toBe(false);
+    // Durchgefallen → L2 bleibt gesperrt
+    SRS.recordLessonTest(1, 0.5);
+    expect(SRS.lessonState(2).unlocked).toBe(false);
+    // Bestanden → L2 frei (Test ist das Gate)
+    SRS.recordLessonTest(1, 0.9);
+    expect(SRS.lessonState(2).unlocked).toBe(true);
+  });
 });
 
 describe('buildLessonTest', () => {
