@@ -629,14 +629,20 @@
     return Object.keys(store.lists).map(function (k) { return store.lists[k]; })
       .sort(function (a, b) { return (parseInt(a.id.slice(1), 10) || 0) - (parseInt(b.id.slice(1), 10) || 0); });
   }
-  // Vokabel-IDs einer Liste zu Daten auflösen (nicht auflösbare IDs werden übersprungen).
-  function vocabIndex() {
-    var idx = {}; (window.VOKABULAR || []).forEach(function (v) { idx[srsId('vocab', v)] = v; }); return idx;
+  // Alle Items (Vokabel/Kanji/Grammatik) als Index id → {type, data} — für gemischte Lernlisten.
+  function itemIndex() {
+    var idx = {};
+    (window.VOKABULAR || []).forEach(function (v) { idx[srsId('vocab', v)] = { type: 'vocab', data: v }; });
+    (window.KANJI || []).forEach(function (k) { idx[srsId('kanji', k)] = { type: 'kanji', data: k }; });
+    (window.GRAMMATIK || []).forEach(function (g) { idx[srsId('grammar', g)] = { type: 'grammar', data: g }; });
+    return idx;
   }
+  // Listen-IDs zu Daten auflösen (Vokabel/Kanji/Grammatik); nicht auflösbare IDs werden übersprungen.
   function listItems(id) {
     var l = store.lists && store.lists[id]; if (!l) return [];
-    var idx = vocabIndex();
-    return l.items.map(function (x) { return { id: x, data: idx[x] || null }; }).filter(function (o) { return o.data; });
+    var idx = itemIndex();
+    return l.items.map(function (x) { var it = idx[x]; return { id: x, type: it ? it.type : typeOf(x), data: it ? it.data : null }; })
+      .filter(function (o) { return o.data; });
   }
 
   /* ---------- UI-Komfort: Download/Upload im Browser ---------- */

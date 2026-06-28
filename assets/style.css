@@ -128,6 +128,14 @@ body {
 .kc-write { display: inline-flex; align-items: center; justify-content: center; width: 2rem; height: 2rem; border-radius: 8px; color: var(--accent); background: #f6e7e2; text-decoration: none; }
 .kc-write:hover { background: var(--accent); color: #fff; }
 .kc-write .msi { font-size: 1.2rem; }
+/* „＋ Lernliste" auf Kanji-/Grammatik-Karten */
+.kc-add { margin-left: auto; border: 1px solid var(--border); background: var(--surface); color: var(--accent); border-radius: 7px; width: 1.9rem; height: 1.9rem; font-size: 1rem; line-height: 1; cursor: pointer; font-weight: 700; }
+.kc-add:hover { border-color: var(--accent); background: var(--surface-2); }
+.gp-add { margin-top: .6rem; }
+/* Lernlisten: Typ-Markierung + Übungsfläche im Trainer */
+.lst-tag { display: inline-block; font-size: .68rem; font-weight: 700; color: var(--muted); background: var(--chip); padding: .05rem .35rem; border-radius: 5px; margin-right: .4rem; vertical-align: middle; }
+.lt-ex { min-height: 8rem; display: flex; flex-direction: column; gap: .5rem; }
+.lt-next-wrap { margin-top: .8rem; text-align: center; }
 
 /* ---------- Wiederhol-Blüte je Lektion (Vokabular/Grammatik) ---------- */
 .grp-flower { display: inline-flex; align-items: center; margin-left: .15rem; }
