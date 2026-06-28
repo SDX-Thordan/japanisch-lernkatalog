@@ -12,7 +12,8 @@
   'use strict';
   var NS = 'http://www.w3.org/2000/svg';
   var BOX = 109;            // KanjiVG-Koordinatensystem
-  var HIT = 24;             // Toleranz (in BOX-Einheiten) für Start/Endpunkt
+  var HIT = 20;             // Toleranz (in BOX-Einheiten) für Start/Endpunkt
+  var HIT_MID = 30;         // Toleranz für den Mittelpunkt (fängt grob fehlplatzierte/falsch geformte Striche)
   var SNAP_UNTIL = 3;       // bis < so vielen korrekten Schreibungen: Striche „einrasten" (geführt)
 
   function cpFile(k) { return k.codePointAt(0).toString(16).padStart(5, '0') + '.svg'; }
@@ -43,11 +44,14 @@
   }
   function dist(a, b) { return Math.hypot(a.x - b.x, a.y - b.y); }
 
-  // Prüft, ob der gezeichnete Strich grob zum erwarteten passt (Start/Ende/Richtung).
+  // Prüft, ob der gezeichnete Strich zum erwarteten passt (Start/Ende/Mitte/Richtung).
+  // Strenger als bloße Endpunkt-Nähe: ein komplett falsch platzierter Strich (z. B. 一 zu tief)
+  // verfehlt Start/Ende oder die Mitte und gilt damit als Fehler.
   function strokeMatches(userPts, info) {
     if (!info || userPts.length < 2) return true; // ohne Geometrie: nachsichtig
     var us = userPts[0], ue = userPts[userPts.length - 1];
     if (dist(us, info.start) > HIT || dist(ue, info.end) > HIT) return false;
+    if (info.mid) { var um = userPts[Math.floor((userPts.length - 1) / 2)]; if (dist(um, info.mid) > HIT_MID) return false; }
     var ev = { x: info.end.x - info.start.x, y: info.end.y - info.start.y };
     var uv = { x: ue.x - us.x, y: ue.y - us.y };
     var dot = ev.x * uv.x + ev.y * uv.y;
@@ -72,6 +76,7 @@
     var cur = [];           // aktueller Strich
     var idx = 0;            // erwarteter Strich
     var drawing = false;
+    var mistakes = 0;       // komplett falsche Striche in diesem Durchgang
 
     function toBox(ev) {
       var r = canvas.getBoundingClientRect();
@@ -107,7 +112,8 @@
         ctx.beginPath(); pts.forEach(function (p, i) { var x = p.x * scale, y = p.y * scale; i ? ctx.lineTo(x, y) : ctx.moveTo(x, y); }); ctx.stroke();
       });
     }
-    function startDraw(ev) { ev.preventDefault(); drawing = true; cur = [toBox(ev)]; }
+    // Nach dem letzten Strich ist das Feld gesperrt (erst clear()/„Nochmal" gibt es wieder frei).
+    function startDraw(ev) { if (idx >= strokes.length) return; ev.preventDefault(); drawing = true; cur = [toBox(ev)]; }
     function moveDraw(ev) { if (!drawing) return; ev.preventDefault(); cur.push(toBox(ev)); redraw(); }
     function endDraw() {
       if (!drawing) return; drawing = false;
@@ -118,9 +124,12 @@
         var rec = cur.slice();
         if (opts.snap) { var ref = refStrokePoints(strokes[idx]); if (ref && ref.length >= 2) rec = ref; }
         done.push(rec); idx++; if (opts.onProgress) opts.onProgress(idx, strokes.length);
+      } else if (cur.length >= 2) {
+        // Komplett falscher Strich → als Fehler werten (kein Fortschritt), Strich verwerfen.
+        mistakes++; if (opts.onMistake) opts.onMistake(idx + 1, mistakes);
       }
       cur = []; redraw();
-      if (ok && idx >= strokes.length && opts.onComplete) opts.onComplete();
+      if (ok && idx >= strokes.length && opts.onComplete) opts.onComplete(mistakes === 0);
     }
     // Referenz-Strich in gleichmäßige Punkte (BOX-Koord.) abtasten — für das Snapping.
     function refStrokePoints(d) {
@@ -135,7 +144,7 @@
     canvas.addEventListener('touchmove', moveDraw, { passive: false });
     canvas.addEventListener('touchend', endDraw);
 
-    function clear() { done = []; cur = []; idx = 0; redraw(); if (opts.onProgress) opts.onProgress(0, strokes.length); }
+    function clear() { done = []; cur = []; idx = 0; mistakes = 0; redraw(); if (opts.onProgress) opts.onProgress(0, strokes.length); }
     function toggleGuide() { showGuide = !showGuide; redraw(); return showGuide; }
 
     // Reihenfolge abspielen (Animation Strich für Strich)
@@ -170,7 +179,7 @@
 
     redraw();
     return { clear: clear, toggleGuide: toggleGuide, play: play, strokeCount: strokes.length,
-      isComplete: function () { return idx >= strokes.length; } };
+      isComplete: function () { return idx >= strokes.length; }, mistakeCount: function () { return mistakes; } };
   }
 
   /* ---------- Seiten-Logik (schreiben.html) ---------- */
@@ -211,12 +220,19 @@
       if (charEl) charEl.textContent = k.k; if (meanEl) meanEl.textContent = k.meaning || '';
       if (prog) prog.textContent = 'Kanji ' + (pos + 1) + ' / ' + session.length;
       setMsg('');
-      var snap = !!(window.SRS && window.SRS.get && (((window.SRS.get('k:' + k.k) || {}).writeReps || 0) < SNAP_UNTIL));
+      var kid = 'k:' + k.k;
+      var snap = !!(window.SRS && window.SRS.get && (((window.SRS.get(kid) || {}).writeReps || 0) < SNAP_UNTIL));
+      // Ab Erkennungs-Meisterschaft (Lernstand ≥ MASTER_AT) ohne Vorlage schreiben — trotzdem bewertet.
+      var guide = !(window.SRS && window.SRS.scoreOf && window.SRS.scoreOf(kid) >= (window.SRS.MASTER_AT || 80));
       fetch('assets/kanjivg/' + cpFile(k.k)).then(function (r) { return r.text(); }).then(function (svg) {
-        widget = create(stage, { svgText: svg, size: Math.min(320, root.clientWidth - 40), snap: snap,
+        widget = create(stage, { svgText: svg, size: Math.min(320, root.clientWidth - 40), snap: snap, guide: guide,
           onProgress: function (i, n) { setMsg('Strich ' + i + ' / ' + n); },
-          onComplete: function () { setMsg('✓ Alle Striche geschrieben!');
-            if (window.SRS && window.SRS.gradeWrite) window.SRS.gradeWrite('k:' + k.k, true); } });
+          onMistake: function (strokeNo) { setMsg('✗ Strich ' + strokeNo + ' passt nicht — nochmal'); },
+          onComplete: function (clean) {
+            setMsg(clean ? '✓ Sauber geschrieben!' : '✓ Fertig — mit Fehlern. „Nochmal" für einen sauberen Eintrag.');
+            // Nur eine fehlerfreie Schreibung zählt als Schreib-Fortschritt.
+            if (window.SRS && window.SRS.gradeWrite) window.SRS.gradeWrite(kid, clean); } });
+        if (!guide) setMsg('Freihändig — ohne Vorlage, aus dem Gedächtnis.');
       }).catch(function () { stage.innerHTML = '<p>SVG konnte nicht geladen werden.</p>'; });
     }
     // „Geschafft": bewerten; im Einzel-Modus zurück zur Kanji-Übersicht, sonst nächstes Kanji.
@@ -237,5 +253,5 @@
     load();
   }
 
-  window.KanjiWrite = { parseStrokes: parseStrokes, cpFile: cpFile, create: create, initPage: initPage };
+  window.KanjiWrite = { parseStrokes: parseStrokes, cpFile: cpFile, create: create, initPage: initPage, strokeMatches: strokeMatches };
 })();
