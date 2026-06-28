@@ -1,6 +1,6 @@
 /* OTA-Updater (nur Android/Capacitor) — lädt neue Web-Bundles vom GitHub-Release nach.
    Manueller Modus (@capgo/capacitor-updater): beim Start wird im Hintergrund geprüft, ob eine
-   neuere Bundle-Version vorliegt; angewendet (download → set → reload) wird NUR auf Knopfdruck.
+   neuere Bundle-Version vorliegt; angewendet (download → set, set startet selbst neu) NUR auf Knopfdruck.
    Im Web/PWA komplett No-Op. Kein Bundler nötig — Plugins via window.Capacitor.Plugins.*.
    Quelle der Wahrheit sind zwei konstant benannte Release-Assets:
      …/releases/latest/download/ota-manifest.json   → { "version": "X.Y.Z" }
@@ -52,13 +52,15 @@
     }).catch(function (e) { state.error = String(e && e.message || e); emit(); return false; });
   }
 
-  // Anwenden NUR auf Knopfdruck: download → set → reload (auf das neue Bundle).
+  // Anwenden NUR auf Knopfdruck: download → set. set() ist TERMINAL — es setzt das neue Bundle und
+  // startet die App SOFORT selbst neu (es löst nie auf, danach läuft kein Code mehr). Daher KEIN
+  // separates reload(). set() erwartet eine BundleId ({id}), NICHT das ganze BundleInfo-Objekt.
   function applyUpdate() {
     var U = plugin();
     if (!native() || !U || !state.version || state.busy) return Promise.resolve(false);
     state.busy = true; state.error = null; emit();
     return U.download({ url: BUNDLE, version: state.version }).then(function (bundle) {
-      return U.set(bundle).then(function () { return U.reload(); });
+      return U.set({ id: bundle.id }); // lädt das neue Bundle & startet neu (terminal)
     }).catch(function (e) { state.busy = false; state.error = String(e && e.message || e); emit(); throw e; });
   }
 
@@ -79,7 +81,12 @@
     __cmp: cmp
   };
 
-  // SOFORT bestätigen (so früh wie möglich gegen Auto-Rollback), bevor irgendetwas anderes lädt.
-  if (native()) confirmReady();
+  // SOFORT bestätigen (so früh wie möglich gegen Auto-Rollback) — und mehrfach nachfassen, falls das
+  // CapacitorUpdater-Plugin beim allerersten Aufruf noch nicht registriert war (Timing-Rennen). Alle
+  // Aufrufe sind idempotent. So wird das frische Bundle zuverlässig bestätigt, bevor appReadyTimeout greift.
+  if (native()) {
+    confirmReady();
+    [200, 800, 2000].forEach(function (ms) { setTimeout(confirmReady, ms); });
+  }
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init); else init();
 })();
