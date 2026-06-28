@@ -62,11 +62,13 @@
     let n=0; for(let i=0;i<thresholds.length;i++){ if(value>=thresholds[i])n++; }
     return Math.min(5,n);
   }
-  // n=0 → grüne Knospe; n=1..5 → n Blütenblätter (gleichmäßig verteilt) + gelber Kern ab ≥1.
+  // Eindeutige Gradient-ID je Aufruf — verhindert ID-Kollisionen bei vielen Inline-SVGs auf einer Seite.
+  let _skId=0;
+  // n=0 → Knospe; n=1..5 → n Blütenblätter (eingekerbte Sakura-Form, Verlauf) + Sternmitte ab ≥1.
+  // Volle Blüte (n=5) ist dem 🌸-Emoji nachempfunden.
   function sakuraSvg(value,thresholds,opts){
     opts=opts||{};
     const n=sakuraPetals(value,thresholds);
-    const PINK='#e8889e', PINKD='#d96a86', CORE='#f6c84c';
     const cls='sakura'+(opts.cls?' '+opts.cls:'')+' sakura-'+n;
     if(n<=0){
       return '<svg class="'+cls+'" viewBox="0 0 48 48" role="img" aria-label="Knospe (noch keine Blüte)">'+
@@ -74,17 +76,30 @@
         '<ellipse cx="24" cy="15" rx="5" ry="7.5" fill="#cdb7a6"/>'+
         '<ellipse cx="24" cy="15" rx="2.4" ry="6" fill="#bda493"/></svg>';
     }
-    // n Blätter, sodass die volle Blüte (5) gleichmäßig wie eine echte Sakura aussieht.
-    const r=10;
+    const gid='sk-grad-'+(_skId++);
+    // Kirschblüten-Blatt: nach oben zeigend, oben zweilappig eingekerbt (das Sakura-Merkmal).
+    const PETAL='M0 -3 C -7 -4 -8.2 -13 -3.3 -18 C -1.8 -19.6 -1.1 -18 0 -15.4 C 1.1 -18 1.8 -19.6 3.3 -18 C 8.2 -13 7 -4 0 -3 Z';
     let petals='';
     for(let i=0;i<n;i++){
-      const ang=-90+i*(360/Math.max(n,1));
+      const ang=-90+i*(360/n);
       petals+='<g transform="translate(24 24) rotate('+ang.toFixed(1)+')">'+
-        '<path d="M0 '+(-r).toFixed(1)+' C '+(r*0.85).toFixed(1)+' '+(-r).toFixed(1)+', '+(r*0.85).toFixed(1)+' '+(r*0.55).toFixed(1)+', 0 '+(r*1.05).toFixed(1)+' C '+(-r*0.85).toFixed(1)+' '+(r*0.55).toFixed(1)+', '+(-r*0.85).toFixed(1)+' '+(-r).toFixed(1)+', 0 '+(-r).toFixed(1)+' Z" '+
-        'fill="'+PINK+'" stroke="'+PINKD+'" stroke-width="0.6"/></g>';
+        '<path d="'+PETAL+'" fill="url(#'+gid+')" stroke="#e87fa3" stroke-width="0.5"/></g>';
     }
-    const core='<circle cx="24" cy="24" r="3.4" fill="'+CORE+'"/>';
-    return '<svg class="'+cls+'" viewBox="0 0 48 48" role="img" aria-label="Blüte: '+n+' von 5 Blütenblättern">'+petals+core+'</svg>';
+    // Sternförmige Mitte (5-zackig, pink) + goldene Staubgefäß-Punkte an den Spitzen.
+    let star='';
+    for(let k=0;k<10;k++){
+      const rad=(k%2===0)?3.6:1.6, a=(-90+k*36)*Math.PI/180;
+      star+=(k===0?'M':'L')+(24+rad*Math.cos(a)).toFixed(2)+' '+(24+rad*Math.sin(a)).toFixed(2)+' ';
+    }
+    star='<path d="'+star+'Z" fill="#d65a86"/>';
+    let dots='';
+    for(let k=0;k<5;k++){
+      const a=(-90+k*72)*Math.PI/180;
+      dots+='<circle cx="'+(24+4.2*Math.cos(a)).toFixed(2)+'" cy="'+(24+4.2*Math.sin(a)).toFixed(2)+'" r="0.75" fill="#f7d35a"/>';
+    }
+    const defs='<defs><radialGradient id="'+gid+'" gradientUnits="userSpaceOnUse" cx="24" cy="24" r="19">'+
+      '<stop offset="0" stop-color="#fff0f6"/><stop offset="0.55" stop-color="#f8b9d0"/><stop offset="1" stop-color="#ef88ad"/></radialGradient></defs>';
+    return '<svg class="'+cls+'" viewBox="0 0 48 48" role="img" aria-label="Blüte: '+n+' von 5 Blütenblättern">'+defs+petals+star+dots+'</svg>';
   }
 
   /* ---------- Navigation (responsiv: oben gruppiert / unten Tab-Leiste) ---------- */
