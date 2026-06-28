@@ -87,6 +87,27 @@ describe('exercisesFor / pickExercise — adaptiv', () => {
   });
 });
 
+describe('Lernkarten-UX: große Karte + Furigana bei unbeherrschten Kanji', () => {
+  it('vocabRecognizeMC ist eine große Karte mit Unterfrage', () => {
+    const ex = Ex.vocabRecognizeMC(win.VOKABULAR[0], []);
+    expect(ex.big).toBe(true);
+    expect(ex.q).toBe('Was bedeutet das?');
+  });
+  it('Furigana nur, solange die Kanji des Worts nicht beherrscht sind', () => {
+    const v = win.VOKABULAR.find((x) => x.kanji && /[一-龯]/.test(x.kanji));
+    expect(v).toBeTruthy();
+    // Standard: Kanji unbeherrscht → Lesung als Furigana mitgeben
+    expect(Ex.vocabRecognizeMC(v, []).furigana).toBe(v.kana);
+    // Alle Kanji beherrscht → keine Furigana mehr
+    [...v.kanji].forEach((c) => { if (/[一-龯]/.test(c)) SRS.__test.setScore('k:' + c, 100); });
+    expect(Ex.vocabRecognizeMC(v, []).furigana).toBeUndefined();
+  });
+  it('reine Kana-Wörter bekommen keine Furigana', () => {
+    const kana = win.VOKABULAR.find((x) => !x.kanji || !x.kanji.length);
+    expect(Ex.vocabRecognizeMC(kana, []).furigana).toBeUndefined();
+  });
+});
+
 describe('SRS.grade — gainCeiling / gainScale (Kanji-MC-Regel)', () => {
   it('gainScale halbiert den Gewinn', () => {
     SRS.grade('k:test1', 1, '2026-06-10', { gainScale: 0.5 });

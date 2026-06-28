@@ -160,11 +160,16 @@
   }
 
   function renderMC(ex, mount, finish) {
+    // „big" = großzügige Lernkarte (großer Prompt + Unterfrage + volle Optionsknöpfe), wie die alten Karten.
+    var big = !!ex.big;
     // Sprache je Richtung: Frage standardmäßig japanisch; Optionen nur „ja", wenn sie japanisch sind.
-    mount.appendChild(el('div', ex.frageJa === false ? 'ex-frage' : 'ex-frage ja', esc(ex.frage)));
-    var opts = el('div', 'ex-options');
+    // Furigana über Kanji, wenn die Lesung noch gebraucht wird (ex.furigana gesetzt).
+    var frHtml = (ex.frageJa !== false && ex.furigana && kat().ruby) ? kat().ruby(ex.frage, ex.furigana) : esc(ex.frage);
+    mount.appendChild(el('div', (ex.frageJa === false ? 'ex-frage' : 'ex-frage ja') + (big ? ' big' : ''), frHtml));
+    if (big && ex.q) mount.appendChild(el('div', 'ex-subprompt', esc(ex.q)));
+    var opts = el('div', 'ex-options' + (big ? ' big' : ''));
     ex.optionen.forEach(function (o, i) {
-      var b = el('button', ex.optJa ? 'ex-opt ja' : 'ex-opt', esc(o)); b.type = 'button';
+      var b = el('button', (ex.optJa ? 'ex-opt ja' : 'ex-opt') + (big ? ' big' : ''), esc(o)); b.type = 'button';
       b.addEventListener('click', function () {
         if (mount.querySelector('.ex-feedback')) return;
         var ok = (i === ex.richtig);
@@ -196,7 +201,9 @@
 
   // Tippen (Produktion): Bedeutung → japanisch eingeben; akzeptiert Kanji/Kana/Rōmaji (acceptsVocabInput).
   function renderInput(ex, mount, finish) {
-    mount.appendChild(el('div', 'ex-prompt', esc(ex.prompt)));
+    var big = !!ex.big;
+    mount.appendChild(el('div', big ? 'ex-frage big' : 'ex-prompt', esc(ex.prompt)));
+    if (big && ex.q) mount.appendChild(el('div', 'ex-subprompt', esc(ex.q)));
     var inp = el('input', 'ex-input'); inp.type = 'text';
     inp.setAttribute('autocomplete', 'off'); inp.setAttribute('autocapitalize', 'off');
     inp.setAttribute('autocorrect', 'off'); inp.setAttribute('spellcheck', 'false');
@@ -310,6 +317,14 @@
 
   function vocabId(v) { return 'v:' + v.kana + '|' + v.lesson; }
   function vocabWritten(v) { return (v.kanji && v.kanji.length) ? v.kanji : v.kana; }
+  // Furigana zeigen, wenn die Schreibung Kanji enthält, deren Einzel-Kanji noch nicht beherrscht sind.
+  function kanjiMastered(ch) { return !!(window.SRS && window.SRS.isMastered && window.SRS.isMastered('k:' + ch)); }
+  function vocabNeedsFurigana(v) {
+    if (!v.kanji || !v.kanji.length) return false; // reine Kana: keine Kanji
+    for (var i = 0; i < v.kanji.length; i++) { var ch = v.kanji[i];
+      if (/[一-龯㐀-䶿]/.test(ch) && !kanjiMastered(ch)) return true; }
+    return false;
+  }
   function vocabMeaningPool(v, core) {
     var pool = (core || []).filter(function (c) { return c.type === 'vocab'; }).map(function (c) { return c.data.de; });
     if (pool.length < 4) pool = pool.concat((window.VOKABULAR || []).filter(function (x) { return x.pos === v.pos; }).map(function (x) { return x.de; }));
@@ -319,7 +334,9 @@
   // Vokabel MC JP→DE (Erkennen).
   function vocabRecognizeMC(v, core) {
     var ex = meaningMC(vocabWritten(v), v.de, vocabMeaningPool(v, core));
-    ex.srsId = vocabId(v); ex.mode = 'vocab-recognize'; return ex;
+    ex.srsId = vocabId(v); ex.mode = 'vocab-recognize'; ex.big = true; ex.q = 'Was bedeutet das?';
+    if (vocabNeedsFurigana(v)) ex.furigana = v.kana; // Lesung über noch nicht beherrschten Kanji
+    return ex;
   }
   // Vokabel MC DE→JP (Produktion: japanische Schreibung wählen).
   function vocabProduceMC(v, core) {
@@ -329,16 +346,18 @@
     if (pool.length < 4) pool = pool.concat((window.VOKABULAR || []).map(vocabWritten));
     var distract = uniqueSample(pool.filter(function (f) { return f && f !== correct; }), 3);
     var optionen = shuffle([correct].concat(distract));
-    return { typ: 'mc', srsId: vocabId(v), frage: v.de, frageJa: false, optJa: true,
+    return { typ: 'mc', srsId: vocabId(v), frage: v.de, frageJa: false, optJa: true, big: true, q: 'Welches Wort ist das?',
       optionen: optionen, richtig: optionen.indexOf(correct), erkl: v.de + ' = ' + correct, mode: 'vocab-produce' };
   }
   // Vokabel Tippen (Produktion, freie Eingabe).
   function vocabInput(v) {
-    return { typ: 'input', srsId: vocabId(v), prompt: v.de, accept: v, erkl: v.de + ' = ' + vocabWritten(v), mode: 'vocab-input' };
+    return { typ: 'input', srsId: vocabId(v), prompt: v.de, accept: v, big: true, q: 'Wie heißt das auf Japanisch?',
+      erkl: v.de + ' = ' + vocabWritten(v), mode: 'vocab-input' };
   }
   // Kanji MC Bedeutung (Glyph → Bedeutung), gedeckelte Score-Regel.
   function kanjiMeaningMC(k, core) {
-    var ex = kanjiMC(k, core); ex.srsId = 'k:' + k.k; ex.gradeOpts = KANJI_GRADE_OPTS; ex.mode = 'kanji-meaning'; return ex;
+    var ex = kanjiMC(k, core); ex.srsId = 'k:' + k.k; ex.gradeOpts = KANJI_GRADE_OPTS; ex.mode = 'kanji-meaning';
+    ex.big = true; ex.q = 'Was bedeutet dieses Kanji?'; return ex;
   }
   // Kanji MC „richtiges Kanji wählen" (Bedeutung → Glyph), gedeckelte Score-Regel.
   function kanjiPickMC(k, pool) {
@@ -347,7 +366,7 @@
     if (glyphs.length < 3) glyphs = glyphs.concat((window.KANJI || []).filter(function (x) { return x.k !== correct; }).map(function (x) { return x.k; }));
     var distract = uniqueSample(glyphs, 3);
     var optionen = shuffle([correct].concat(distract));
-    return { typ: 'mc', srsId: 'k:' + k.k, frage: k.meaning, frageJa: false, optJa: true,
+    return { typ: 'mc', srsId: 'k:' + k.k, frage: k.meaning, frageJa: false, optJa: true, big: true, q: 'Welches Kanji passt?',
       optionen: optionen, richtig: optionen.indexOf(correct), erkl: k.meaning + ' = ' + correct, gradeOpts: KANJI_GRADE_OPTS, mode: 'kanji-pick' };
   }
   // Kanji Zeichnen — Deskriptor (Host rendert via KanjiWrite; Schreiben bewertet ungedeckelt = Meister-Pfad).
