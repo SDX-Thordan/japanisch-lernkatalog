@@ -108,6 +108,28 @@ describe('Lernkarten-UX: große Karte + Furigana bei unbeherrschten Kanji', () =
   });
 });
 
+describe('autoFuri — Furigana in Übungstexten (nur unbeherrschte Kanji)', () => {
+  it('annotiert ein bekanntes Kanji-Wort im Satz, Partikel/Kana bleiben', () => {
+    const html = Ex.autoFuri('わたしも会社員です。');
+    expect(html).toContain('<ruby>会社員<rt>かいしゃいん</rt></ruby>');
+    expect(html).toContain('わたしも'); // Partikel/Kana unverändert
+    expect(html).toContain('です。');
+    expect(html).not.toContain('<ruby>わ'); // keine Furigana über reinem Kana
+  });
+  it('keine Furigana, wenn alle Kanji des Worts beherrscht sind', () => {
+    ['会', '社', '員'].forEach((c) => SRS.__test.setScore('k:' + c, 100));
+    expect(Ex.autoFuri('会社員です。')).not.toContain('<ruby>');
+  });
+  it('lässt die Lücke (＿) und unbekannte Zeichen unangetastet', () => {
+    const html = Ex.autoFuri('あの人＿＿会社員です。');
+    expect(html).toContain('＿＿');
+    expect(html).toContain('<ruby>会社員');
+  });
+  it('reine Kana-Optionen bekommen keine Furigana', () => {
+    expect(Ex.autoFuri('すし')).toBe('すし');
+  });
+});
+
 describe('SRS.grade — gainCeiling / gainScale (Kanji-MC-Regel)', () => {
   it('gainScale halbiert den Gewinn', () => {
     SRS.grade('k:test1', 1, '2026-06-10', { gainScale: 0.5 });
