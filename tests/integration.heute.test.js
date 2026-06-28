@@ -53,13 +53,13 @@ describe('Heute (Wiederholung)', () => {
     expect(win.document.getElementById('h-prog').textContent).toContain('/ 3');
   });
 
-  it('Karteikarte: Aufdecken → Gewusst bewertet und rückt vor', () => {
+  it('Übung beantworten + Weiter bewertet und rückt vor', () => {
     makeDue(3);
     click(win.document.getElementById('h-start'));
     const before = win.SRS.stats().totalReviews;
     const body = win.document.getElementById('h-body');
-    click(body.querySelector('.h-reveal'));
-    click(body.querySelector('.h-good'));
+    click(body.querySelector('.ex-opt'));   // MC aus der Registry → wertet über srsId
+    click(body.querySelector('.h-next'));    // Weiter → nächstes Item
     expect(win.SRS.stats().totalReviews).toBe(before + 1);
     expect(win.document.getElementById('h-prog').textContent).toContain('Aufgabe 2 / 3');
   });
@@ -69,8 +69,8 @@ describe('Heute (Wiederholung)', () => {
     click(win.document.getElementById('h-start'));
     for (let n = 0; n < 3; n++) {
       const body = win.document.getElementById('h-body');
-      click(body.querySelector('.h-reveal'));
-      click(body.querySelector('.h-good'));
+      const opt = body.querySelector('.ex-opt'); if (opt) click(opt);
+      const nx = body.querySelector('.h-next'); if (nx) click(nx);
     }
     expect(win.document.getElementById('h-done').classList.contains('hidden')).toBe(false);
     expect(win.document.getElementById('h-done').textContent).toContain('geschafft');
@@ -113,13 +113,12 @@ describe('Heute im Lernpfad-Modus (?lesson=L)', () => {
     expect(body.querySelector('.tc-next')).toBeTruthy();
     expect(body.querySelector('.h-reveal')).toBeFalsy(); // KEINE blinde Karteikarte als erster Schritt
     click(body.querySelector('.tc-next'));
-    // 2) ERKENNEN: Multiple-Choice mit 4 Optionen für dasselbe Wort.
-    const opts = [...body.querySelectorAll('.rc-opt')];
+    // 2) SOFORT ABFRAGEN: Multiple-Choice aus der zentralen Registry (4 Optionen = Bedeutungen).
+    const opts = [...body.querySelectorAll('.ex-opt')];
     expect(opts.length).toBe(4);
-    const correct = opts.find((o) => o.dataset.de === de);
+    const correct = opts.find((o) => o.textContent === de);
     expect(correct).toBeTruthy();
     click(correct);
-    expect(correct.classList.contains('rc-correct')).toBe(true);
     const next = body.querySelector('.h-next');
     expect(next).toBeTruthy();
     click(next);
@@ -182,8 +181,10 @@ describe('Heute im Lernpfad-Modus (?lesson=L)', () => {
     for (let i = 0; i < 80 && doneEl.classList.contains('hidden'); i++) {
       const tc = body.querySelector('.tc-next');
       if (tc) { clickW(w, tc); continue; }
-      const opt = body.querySelector('.rc-opt');
+      const opt = body.querySelector('.rc-opt') || body.querySelector('.ex-opt');
       if (opt) { clickW(w, opt); const nx = body.querySelector('.h-next'); if (nx) clickW(w, nx); continue; }
+      const chk = body.querySelector('.ex-check');
+      if (chk) { const inp = body.querySelector('.ex-input'); if (inp) inp.value = 'x'; clickW(w, chk); const nx = body.querySelector('.h-next'); if (nx) clickW(w, nx); continue; }
       const hn = body.querySelector('.h-next'); if (hn) { clickW(w, hn); continue; }
       break;
     }
@@ -213,27 +214,25 @@ describe('Heute (Wiederholung) — adaptive Schwierigkeit', () => {
     return { w, body: w.document.getElementById('h-body'), data: c.data };
   }
 
-  it('niedriger Lernstand → Erkennen (Multiple-Choice)', async () => {
+  it('niedriger Lernstand → Erkennen (MC JP→DE, 4 Optionen)', async () => {
     const { body } = await reviewWith(20);
-    expect(body.querySelector('.rc-card')).toBeTruthy();
+    expect(body.querySelectorAll('.ex-opt').length).toBe(4);
   });
 
-  it('mittlerer Lernstand → freier Abruf (verdeckte Karte)', async () => {
+  it('mittlerer Lernstand → Produktion (MC DE→JP, japanische Optionen)', async () => {
     const { body } = await reviewWith(55);
-    expect(body.querySelector('.h-reveal')).toBeTruthy();
-    expect(body.querySelector('.rc-card')).toBeFalsy();
-    expect(body.querySelector('.ty-card')).toBeFalsy();
+    const opts = [...body.querySelectorAll('.ex-opt')];
+    expect(opts.length).toBe(4);
+    expect(opts.every((o) => o.classList.contains('ja'))).toBe(true); // Optionen sind japanisch
   });
 
-  it('hoher Lernstand → Produktion (Tippen) und akzeptiert Romaji/Kana/Kanji', async () => {
+  it('hoher Lernstand → Tippen (Produktion) und akzeptiert Romaji/Kana/Kanji', async () => {
     const { w, body, data } = await reviewWith(75);
-    const card = body.querySelector('.ty-card');
-    expect(card).toBeTruthy();
-    const input = body.querySelector('.ty-input');
+    const input = body.querySelector('.ex-input');
+    expect(input).toBeTruthy();
     input.value = data.romaji; // Romaji eingeben
-    clickW(w, body.querySelector('.ty-btn')); // prüfen
-    expect(body.querySelector('.ty-input').classList.contains('ty-ok')).toBe(true);
-    clickW(w, body.querySelector('.ty-btn')); // weiter → wertet
+    clickW(w, body.querySelector('.ex-check')); // prüfen
+    expect(body.querySelector('.ex-feedback.ok')).toBeTruthy();
     expect(w.SRS.stats().totalReviews).toBeGreaterThan(0);
   });
 });

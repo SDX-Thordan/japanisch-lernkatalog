@@ -823,11 +823,12 @@
       if(!fresh.length)return [];
       const d=[], step=(c,phase,mode,reason)=>d.push({id:c.id,type:c.type,data:c.data,reason:reason||'new',phase:phase,mode:mode});
       const vocab=fresh.filter(c=>c.type==='vocab'), grammar=fresh.filter(c=>c.type==='grammar'), kanji=fresh.filter(c=>c.type==='kanji');
-      // Vokabeln pädagogisch einführen: erst VORSTELLEN (Wort + Bedeutung + Beispiel), dann ERKENNEN (MC).
-      vocab.forEach(c=>{ step(c,'Vokabeln','teach'); step(c,'Vokabeln','recognize'); });
+      // Jedes neue Item: erst VORSTELLEN, dann SOFORT abprüfen (zentrale Registry liefert die Übung).
+      vocab.forEach(c=>{ step(c,'Vokabeln','teach'); step(c,'Vokabeln','ex'); });
       // Grammatik umfangreich: Muster ausführlich VORSTELLEN, dann mit mehreren Übungen FESTIGEN (jedes Muster).
       grammar.forEach(c=>{ step(c,'Grammatik','teach'); grammarPracticeSteps(c).forEach(s=>d.push(s)); });
-      kanji.forEach(c=>step(c,'Kanji','write'));
+      // Kanji: kurz vorstellen, dann direkt schreiben (das Schreiben ist die erste Prüfung).
+      kanji.forEach(c=>{ step(c,'Kanji','teach'); step(c,'Kanji','write'); });
       return d;
     }
     // Übungs-Schritte zu einem Grammatik-Muster: zuerst die GRAMMATIK_PLUS-Aufgaben (mc/cloze) — für JEDES
@@ -848,8 +849,7 @@
       } else {
         // Heute = reine Wiederholung: nur fällige (zerfallene) Items aus allen freigeschalteten Lektionen.
         deck=window.SRS.buildQueue({sources:['kanji','vocab','grammar'],newLimit:0,reviewLimit:clampInt('h-revlimit',30),maxLesson:window.SRS.maxUnlockedLesson()});
-        // Adaptive Schwierigkeit: Übungstyp je Vokabel an den Lernstand koppeln (Erkennen → Abruf → Tippen).
-        deck.forEach(function(c){ if(c.type==='vocab'&&c.mode==null)c.mode=pickVocabMode(c.id); });
+        // Übungstyp je Item adaptiv aus der zentralen Registry (in render() über pickExercise).
       }
       total=deck.length; setup.classList.add('hidden'); done.classList.add('hidden'); stage.classList.remove('hidden'); render();
     }
@@ -905,12 +905,15 @@
       typeTag.className='tag tr-type-'+c.type;
       // Modus aus dem Kurs/adaptiv (teach/recognize/type/gex/card/exercise/write) bzw. Auto-Routing in der Wiederholung.
       const canWrite=window.KanjiWrite, canEx=window.Exercises&&window.SATZ_TEMPLATES&&window.SATZ_TEMPLATES[c.data.pattern];
+      const canReg=window.Exercises&&window.Exercises.pickExercise;
       if(c.mode==='teach')renderTeachCard(c);
       else if(c.mode==='recognize')renderRecognizeCard(c);
       else if(c.mode==='type'&&c.type==='vocab'&&window.Exercises&&window.Exercises.acceptsVocabInput)renderTypeCard(c);
       else if(c.mode==='gex'&&c.ex&&window.Exercises)renderGrammarExercise(c);
-      else if((c.mode==='write'||(c.mode==null&&c.type==='kanji'))&&canWrite)renderWriteCard(c);
-      else if((c.mode==='exercise'||(c.mode==null&&c.type==='grammar'))&&canEx)renderExerciseItem(c);
+      else if(c.mode==='write'&&canWrite)renderWriteCard(c);
+      else if(c.mode==='exercise'&&canEx)renderExerciseItem(c);
+      // „ex" (Kurs-Prüfung) und Wiederholung (mode==null) ziehen die Übung adaptiv aus der zentralen Registry.
+      else if((c.mode==='ex'||c.mode==null)&&canReg)renderRegistryItem(c);
       else renderFlashcard(c);
     }
     // GRAMMATIK ÜBEN: eine statische GRAMMATIK_PLUS-Aufgabe (mc/cloze) rendern; sie wertet selbst über ex.srsId.
@@ -957,6 +960,16 @@
           '<div class="tc-de">'+esc(d.de)+'</div>'+
           (d.pos?'<div class="tc-pos">'+esc(d.pos)+'</div>':'')+
           (bsp?'<div class="v-bsp"><div class="v-bsp-jp ja">'+esc(bsp.jp)+'</div>'+(bsp.r?'<div class="v-bsp-r">'+esc(bsp.r)+'</div>':'')+'<div class="v-bsp-de">'+esc(bsp.de)+'</div>'+(bsp.note?'<div class="v-note">'+esc(bsp.note)+'</div>':'')+'</div>':'');
+      } else if(c.type==='kanji'){ // Kanji vorstellen, bevor geschrieben wird
+        const onr=(d.on||[]).join('・'), kunr=(d.kun||[]).join('・');
+        const exHtml=(d.examples||[]).slice(0,2).map(e=>'<div class="v-bsp"><div class="v-bsp-jp ja">'+ruby(e.w,e.r)+'</div><div class="v-bsp-de">'+esc(e.m)+'</div></div>').join('');
+        inner='<div class="tc-badge">Neues Kanji</div>'+
+          '<div class="tr-big ja">'+esc(d.k)+'</div>'+
+          '<div class="tc-de">'+esc(d.meaning||'')+'</div>'+
+          (onr?'<div class="tc-reading ja">音 '+esc(onr)+'</div>':'')+
+          (kunr?'<div class="tc-reading ja">訓 '+esc(kunr)+'</div>':'')+
+          (d.strokes?'<div class="tc-pos">'+esc(d.strokes)+' Striche</div>':'')+
+          exHtml;
       } else { // grammar
         const plus=(window.GRAMMATIK_PLUS||{})[d.pattern]||{};
         const exs=(d.beispiele||[]).concat((window.GRAMMATIK_EXTRA||{})[d.pattern]||[]).slice(0,2);
@@ -1000,6 +1013,20 @@
         const nx=el('button','btn-primary h-next','Weiter →'); nx.type='button';
         nx.addEventListener('click',()=>finishItem(correct?1:0)); wrap.appendChild(nx); nx.focus();
       }));
+    }
+    // ZENTRALE ÜBUNG: adaptiv eine Übung aus der Registry ziehen und einheitlich rendern.
+    // Kanji-Zeichnen läuft über die bestehende Schreib-Karte (mit Vergleich); alles andere über Exercises.
+    function renderRegistryItem(c){
+      const item={id:c.id,type:c.type,data:c.data};
+      const score=(window.SRS&&window.SRS.scoreOf)?window.SRS.scoreOf(c.id):0;
+      const ex=window.Exercises.pickExercise(item,{score});
+      if(!ex){ renderFlashcard(c); return; }
+      if(ex.typ==='write'){ renderWriteCard(c); return; }
+      body.innerHTML='<div class="tr-card"><div class="h-ex"></div><div class="h-next-wrap"></div></div>';
+      const mount=body.querySelector('.h-ex'), nextWrap=body.querySelector('.h-next-wrap');
+      window.Exercises.renderExercise(ex,mount,{ onResult:(ok)=>{
+        if(ok===false){ const h=mistakeHint(c); if(h)nextWrap.insertAdjacentHTML('beforebegin',h); }
+        const nx=el('button','btn-primary h-next','Weiter →'); nx.type='button'; nx.addEventListener('click',()=>finishItem(null)); nextWrap.appendChild(nx); } });
     }
     function renderWriteCard(c){
       const k=c.data;
