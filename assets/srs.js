@@ -18,7 +18,6 @@
 
   /* ---------- Lernpfad/Gating-Konstanten (leicht justierbar) ---------- */
   var MASTERY_REPS = 2;        // (Alt-Feld, bleibt für Migration/Stats)
-  var WRITE_LEVEL_REPS = 2;    // ab diesem Erkennungs-Level müssen Kanji zusätzlich geschrieben werden
   var LESSON_TEST_PASS = 0.8;  // Bestehensgrenze des Lektionstests
   var LESSON_TEST_N = 10;      // Aufgaben pro Lektionstest
   var MAX_GATED_LESSON = 25;   // Lernpfad umfasst alle Lektionen L1–25
@@ -81,7 +80,7 @@
     return { v: VERSION, items: {}, lessons: {}, lists: {}, daily: {}, stats: { streakDays: 0, lastActive: null, totalReviews: 0 } };
   }
   function defaultItem() {
-    return { score: 0, last: null, ease: DEFAULT_EASE, interval: 0, due: null, reps: 0, lapses: 0, streak: 0, writeReps: 0, lastWritten: null, history: [] };
+    return { score: 0, last: null, ease: DEFAULT_EASE, interval: 0, due: null, reps: 0, lapses: 0, streak: 0, history: [] };
   }
   // Roh-Punktzahl eines Items (mit Lazy-Migration aus alten reps, falls score fehlt).
   function rawScore(item) {
@@ -221,35 +220,17 @@
     return store.stats.streakDays;
   }
 
-  // Korrektes Schreiben eines Kanji vermerken (vom KanjiVG-Widget bei vollständiger,
-  // strichkorrekter Vollendung aufgerufen). Erhöht writeReps; beeinflusst die Mastery.
-  function gradeWrite(id, ok, today) {
-    today = today || todayISO();
-    var item = store.items[id] || defaultItem();
-    if (ok) { item.writeReps = (item.writeReps || 0) + 1; item.lastWritten = today; }
-    store.items[id] = item;
-    save();
-    return item;
-  }
-
   /* ---------- Mastery / Lektions-Zuordnung ---------- */
   function kanjiLessonOf(level) { return KANJI_LEVEL_LESSON[level] || null; }
   function itemLesson(type, data) {
     if (type === 'kanji') return kanjiLessonOf(data.level);
     return data.lesson;
   }
-  // Item „beherrscht": effektive Punktzahl ≥ MASTER_AT; Kanji zusätzlich min. einmal korrekt geschrieben.
+  // Item „beherrscht": effektive Punktzahl ≥ MASTER_AT — einheitlich für alle Typen.
+  // (Kanji werden ausschließlich übers Schreiben bewertet, daher ist ihr Score = Schreib-Können.)
   function isMastered(id, today) {
     var it = store.items[id]; if (!it) return false;
-    if (effectiveScore(it, today) < MASTER_AT) return false;
-    if (typeOf(id) === 'kanji' && (it.writeReps || 0) < 1) return false;
-    return true;
-  }
-  // Kanji, das schon erkannt wird (gestartet), aber noch nicht korrekt geschrieben wurde.
-  function needsWriting(id) {
-    if (typeOf(id) !== 'kanji') return false;
-    var it = store.items[id]; if (!it) return false;
-    return rawScore(it) > 0 && (it.writeReps || 0) < 1;
+    return effectiveScore(it, today) >= MASTER_AT;
   }
 
   /* ---------- Fälligkeit ---------- */
@@ -670,14 +651,14 @@
 
   window.SRS = {
     srsId: srsId, typeOf: typeOf,
-    get: get, ensure: ensure, grade: grade, gradeWrite: gradeWrite,
+    get: get, ensure: ensure, grade: grade,
     completeDaily: completeDaily, dailyGain: dailyGain,
     // Lernpunktzahl 0–100
     effectiveScore: scoreOf, scoreOf: scoreOf, MASTER_AT: MASTER_AT,
     isDue: isDue, dueIds: dueIds,
     buildQueue: buildQueue, stats: stats, catalogStats: catalogStats, leeches: leeches,
     // Lernpfad / Gating
-    isMastered: isMastered, needsWriting: needsWriting,
+    isMastered: isMastered,
     kanjiLessonOf: kanjiLessonOf, lessonCore: lessonCore, coreProgress: coreProgress, lessonPlan: lessonPlan,
     lessonChunks: lessonChunks, partsInfo: partsInfo, nextPart: nextPart, markPartDone: markPartDone,
     markLessonLearned: markLessonLearned,

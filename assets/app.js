@@ -269,8 +269,7 @@
     const card=el('article','kanji-card item');
     card.dataset.filter=k.level;
     card.dataset.search=norm([k.k,on,kun,k.meaning,k.level,k.cls,(k.examples||[]).map(e=>e.w+' '+e.r+' '+e.m).join(' ')].join(' '));
-    const wr=(window.SRS&&window.SRS.get&&window.SRS.get('k:'+k.k))||null;
-    const writeReps=wr?(wr.writeReps||0):0;
+    const kScore=(window.SRS&&window.SRS.scoreOf)?window.SRS.scoreOf('k:'+k.k):0;
     card.innerHTML=
       '<div class="kc-top"><div class="kanji-char">'+esc(k.k)+'</div>'+
       '<div class="kc-meta"><span class="tag">'+esc(k.level)+(k.cls?' · '+esc(k.cls):'')+'</span>'+
@@ -281,8 +280,7 @@
         (kun?'<div class="reading-row"><span class="lbl kun">訓</span><span class="vals">'+esc(kun)+'</span></div>':'')+'</div>'+
       (exHtml?'<div class="kc-examples hideable">'+exHtml+'</div>':'')+
       '<div class="kc-foot">'+
-        '<span class="kc-writes" title="Schreiben geübt: '+writeReps+'×">'+sakuraSvg(writeReps,[1,2,3,4,5],{cls:'sakura-sm'})+
-          (writeReps>0?'<span class="kc-writes-n">'+writeReps+'×</span>':'')+'</span>'+
+        '<span class="kc-writes" title="Lernstand '+Math.round(kScore)+' % (durch Schreiben)">'+sakuraSvg(kScore,SCORE_THRESHOLDS,{cls:'sakura-sm'})+'</span>'+
         '<a class="kc-write" href="schreiben.html?kanji='+encodeURIComponent(k.k)+'" aria-label="Dieses Kanji schreiben üben" title="Schreiben üben"><span class="msi" aria-hidden="true">draw</span></a>'+
       '</div>';
     return card;
@@ -911,7 +909,7 @@
       else if(c.mode==='recognize')renderRecognizeCard(c);
       else if(c.mode==='type'&&c.type==='vocab'&&window.Exercises&&window.Exercises.acceptsVocabInput)renderTypeCard(c);
       else if(c.mode==='gex'&&c.ex&&window.Exercises)renderGrammarExercise(c);
-      else if((c.mode==='write'||(c.mode==null&&c.type==='kanji'&&window.SRS.needsWriting(c.id)))&&canWrite)renderWriteCard(c);
+      else if((c.mode==='write'||(c.mode==null&&c.type==='kanji'))&&canWrite)renderWriteCard(c);
       else if((c.mode==='exercise'||(c.mode==null&&c.type==='grammar'))&&canEx)renderExerciseItem(c);
       else renderFlashcard(c);
     }
@@ -1007,22 +1005,28 @@
       const k=c.data;
       body.innerHTML='<div class="tr-card kw-card"><div class="kw-head"><span class="tr-big ja">'+esc(k.k)+'</span>'+
         '<span class="tr-q">'+esc(k.meaning||'')+' — schreibe das Kanji in richtiger Strichreihenfolge</span></div>'+
-        '<div class="kw-stage"></div><div class="kw-msg" aria-live="polite"></div>'+
+        '<div class="kw-stage"></div><div class="kw-compare-host"></div><div class="kw-msg" aria-live="polite"></div>'+
         '<div class="tr-controls"><button class="btn h-kw-guide" type="button">Vorlage</button>'+
         '<button class="btn h-kw-play" type="button"><span class="msi" aria-hidden="true">play_arrow</span> Reihenfolge</button>'+
         '<button class="btn h-kw-clear" type="button">Löschen</button>'+
         '<button class="btn btn-again h-kw-again" type="button"><span class="msi" aria-hidden="true">refresh</span> Später</button></div></div>';
-      const mount=body.querySelector('.kw-stage'), msg=body.querySelector('.kw-msg');
+      const mount=body.querySelector('.kw-stage'), msg=body.querySelector('.kw-msg'), cmp=body.querySelector('.kw-compare-host');
       const size=Math.min(300,(stage.clientWidth||320)-40);
-      const snap=((window.SRS.get(c.id)||{}).writeReps||0)<3;
+      // Snap/Vorlage rein aus dem 0–100-Lernstand (Kanji werden nur übers Schreiben bewertet).
+      const m=window.KanjiWrite.writeMode(window.SRS.scoreOf(c.id));
       fetch('assets/kanjivg/'+window.KanjiWrite.cpFile(k.k)).then(r=>r.text()).then(svg=>{
-        const w=window.KanjiWrite.create(mount,{svgText:svg,size:size,snap:snap,
-          onProgress:(i,n)=>{ msg.textContent='Strich '+i+' / '+n; },
-          onComplete:()=>{ msg.textContent='✓ Richtig geschrieben!'; window.SRS.gradeWrite(c.id,true); refreshStats();
-            const nx=el('button','btn-primary h-next','Weiter →'); nx.type='button'; nx.addEventListener('click',()=>finishItem(1)); body.querySelector('.tr-controls').appendChild(nx); }});
+        const w=window.KanjiWrite.create(mount,{svgText:svg,size:size,snap:m.snap,guide:m.guide,
+          onProgress:(i,n)=>{ cmp.innerHTML=''; msg.textContent='Strich '+i+' / '+n; },
+          onMistake:(strokeNo)=>{ msg.textContent='✗ Strich '+strokeNo+' passt nicht — nochmal'; },
+          onComplete:(clean)=>{
+            if(clean){ msg.textContent='✓ Sauber geschrieben!'; }
+            else { msg.textContent='✗ Mit Fehlern — Vergleich unten. Kein Fortschritt; gern „Löschen" und nochmal.'; w.showComparison(cmp); }
+            refreshStats();
+            // Nur saubere Schreibung gibt Punkte; unsauber rückt nur weiter (kein Score-Gewinn).
+            const nx=el('button','btn-primary h-next','Weiter →'); nx.type='button'; nx.addEventListener('click',()=>finishItem(clean?1:null)); body.querySelector('.tr-controls').appendChild(nx); }});
         body.querySelector('.h-kw-guide').addEventListener('click',()=>w.toggleGuide());
         body.querySelector('.h-kw-play').addEventListener('click',()=>w.play());
-        body.querySelector('.h-kw-clear').addEventListener('click',()=>w.clear());
+        body.querySelector('.h-kw-clear').addEventListener('click',()=>{ w.clear(); cmp.innerHTML=''; });
       }).catch(()=>{ msg.textContent='SVG konnte nicht geladen werden.'; });
       // „Später": ans Ende schieben, ohne Bewertung.
       body.querySelector('.h-kw-again').addEventListener('click',()=>{ const c2=deck.shift(); deck.push(c2); render(); });

@@ -14,9 +14,14 @@
   var BOX = 109;            // KanjiVG-Koordinatensystem
   var HIT = 20;             // Toleranz (in BOX-Einheiten) für Start/Endpunkt
   var HIT_MID = 30;         // Toleranz für den Mittelpunkt (fängt grob fehlplatzierte/falsch geformte Striche)
-  var SNAP_UNTIL = 3;       // bis < so vielen korrekten Schreibungen: Striche „einrasten" (geführt)
+  var SNAP_BELOW = 30;      // Lernstand < 30: Striche „einrasten" (geführt)
+  var GUIDE_BELOW = 60;     // Lernstand < 60: Vorlage sichtbar; ab 60 freihändig (Meistern nur freihändig)
 
   function cpFile(k) { return k.codePointAt(0).toString(16).padStart(5, '0') + '.svg'; }
+
+  // Übungsmodus rein aus dem 0–100-Lernstand: <30 Snap+Vorlage, 30–59 nur Vorlage, ≥60 freihändig.
+  // (Bewertung läuft in jedem Modus über strokeMatches.)
+  function writeMode(score) { score = score || 0; return { snap: score < SNAP_BELOW, guide: score < GUIDE_BELOW }; }
 
   // Strich-Pfade aus dem SVG ziehen, nach Strich-Nummer sortiert.
   function parseStrokes(svgText) {
@@ -77,6 +82,7 @@
     var idx = 0;            // erwarteter Strich
     var drawing = false;
     var mistakes = 0;       // komplett falsche Striche in diesem Durchgang
+    var log = [];           // alle Strichversuche (auch falsche) in Zeichen-Reihenfolge: {pts, ok, expected}
 
     function toBox(ev) {
       var r = canvas.getBoundingClientRect();
@@ -117,15 +123,18 @@
     function moveDraw(ev) { if (!drawing) return; ev.preventDefault(); cur.push(toBox(ev)); redraw(); }
     function endDraw() {
       if (!drawing) return; drawing = false;
+      var attempt = cur.slice();           // Roh-Punkte wie gezeichnet (für den Fehler-Vergleich)
       var ok = strokeMatches(cur, infos[idx]);
       if (ok) {
         // Snap-Modus (Anfang): den akzeptierten Strich sauber auf die Referenz „einrasten";
         // später (genug korrekte Schreibungen) freihändig die eigenen Punkte behalten.
-        var rec = cur.slice();
+        var rec = attempt.slice();
         if (opts.snap) { var ref = refStrokePoints(strokes[idx]); if (ref && ref.length >= 2) rec = ref; }
+        log.push({ pts: attempt, ok: true, expected: idx });
         done.push(rec); idx++; if (opts.onProgress) opts.onProgress(idx, strokes.length);
-      } else if (cur.length >= 2) {
-        // Komplett falscher Strich → als Fehler werten (kein Fortschritt), Strich verwerfen.
+      } else if (attempt.length >= 2) {
+        // Komplett falscher Strich → als Fehler werten (kein Fortschritt), Strich verwerfen, aber protokollieren.
+        log.push({ pts: attempt, ok: false, expected: idx });
         mistakes++; if (opts.onMistake) opts.onMistake(idx + 1, mistakes);
       }
       cur = []; redraw();
@@ -144,7 +153,7 @@
     canvas.addEventListener('touchmove', moveDraw, { passive: false });
     canvas.addEventListener('touchend', endDraw);
 
-    function clear() { done = []; cur = []; idx = 0; mistakes = 0; redraw(); if (opts.onProgress) opts.onProgress(0, strokes.length); }
+    function clear() { done = []; cur = []; idx = 0; mistakes = 0; log = []; redraw(); if (opts.onProgress) opts.onProgress(0, strokes.length); }
     function toggleGuide() { showGuide = !showGuide; redraw(); return showGuide; }
 
     // Reihenfolge abspielen (Animation Strich für Strich)
@@ -177,9 +186,83 @@
       } catch (e) { return null; }
     }
 
+    /* ---------- Fehler-Vergleich: „links richtig / rechts deins" ---------- */
+    // Beide Seiten als Punkt-Strich-Listen (BOX-Koord.) mit Farbe + Nummer. Referenz = korrekte
+    // Reihenfolge; „Deins" = protokollierte Versuche in Zeichen-Reihenfolge (falsche rot).
+    function refItems() {
+      return strokes.map(function (d, i) { return { pts: refStrokePoints(d), color: '#3a4150', n: i + 1, ok: true }; });
+    }
+    function userItems() {
+      return log.map(function (a, i) { return { pts: a.pts, color: a.ok ? '#20242b' : '#d23b3b', n: i + 1, ok: a.ok }; });
+    }
+    function paint(c, csc, items, upto, partial) {
+      c.clearRect(0, 0, c.canvas.width, c.canvas.height);
+      c.strokeStyle = 'rgba(120,120,120,.18)'; c.lineWidth = 1; c.beginPath();
+      c.moveTo(c.canvas.width / 2, 0); c.lineTo(c.canvas.width / 2, c.canvas.height);
+      c.moveTo(0, c.canvas.height / 2); c.lineTo(c.canvas.width, c.canvas.height / 2); c.stroke();
+      items.forEach(function (it, i) {
+        if (upto != null && i > upto) return;
+        var pts = (upto != null && i === upto && partial != null) ? it.pts.slice(0, Math.max(2, Math.ceil(it.pts.length * partial))) : it.pts;
+        if (!pts || pts.length < 1) return;
+        c.strokeStyle = it.color; c.lineWidth = 6; c.lineCap = 'round'; c.lineJoin = 'round';
+        c.beginPath(); pts.forEach(function (p, j) { var x = p.x * csc, y = p.y * csc; j ? c.lineTo(x, y) : c.moveTo(x, y); }); c.stroke();
+        var s = it.pts[0]; // Nummer am Strich-Anfang
+        c.fillStyle = '#fff'; c.beginPath(); c.arc(s.x * csc, s.y * csc, 8, 0, 6.2832); c.fill();
+        c.fillStyle = it.color; c.font = 'bold 11px sans-serif'; c.textAlign = 'center'; c.textBaseline = 'middle';
+        c.fillText(String(it.n), s.x * csc, s.y * csc);
+      });
+    }
+    // Vergleichsansicht in einen Container rendern (zwei Canvases + „Abspielen").
+    function showComparison(host) {
+      if (!host) return;
+      var cs = Math.min(180, Math.max(120, Math.round(size * 0.55)));
+      host.innerHTML = '';
+      var wrap = document.createElement('div');
+      wrap.className = 'kw-compare';
+      wrap.setAttribute('style', 'display:flex;gap:1rem;justify-content:center;flex-wrap:wrap;margin:.4rem 0');
+      function cell(label) {
+        var d = document.createElement('div'); d.setAttribute('style', 'display:flex;flex-direction:column;align-items:center;gap:.25rem');
+        var l = document.createElement('div'); l.textContent = label; l.setAttribute('style', 'font-size:.8rem;font-weight:700;color:var(--muted,#666)');
+        var cv = document.createElement('canvas'); cv.width = cs; cv.height = cs;
+        cv.setAttribute('style', 'background:var(--surface,#fff);border:1px solid var(--border,#ddd);border-radius:10px;touch-action:none');
+        d.appendChild(l); d.appendChild(cv); return { box: d, cv: cv };
+      }
+      var left = cell('Richtig'), right = cell('Deins');
+      wrap.appendChild(left.box); wrap.appendChild(right.box);
+      host.appendChild(wrap);
+      var playRow = document.createElement('div'); playRow.setAttribute('style', 'text-align:center;margin:.2rem 0 .4rem');
+      var playBtn = document.createElement('button'); playBtn.type = 'button'; playBtn.className = 'btn';
+      playBtn.innerHTML = '<span class="msi" aria-hidden="true">play_arrow</span> Abspielen';
+      playRow.appendChild(playBtn); host.appendChild(playRow);
+
+      var refIt = refItems(), userIt = userItems(), csc = cs / BOX;
+      var lc = left.cv.getContext('2d'), rc = right.cv.getContext('2d');
+      function showStatic() { paint(lc, csc, refIt); paint(rc, csc, userIt); }
+      showStatic();
+      // Beide Seiten Strich für Strich animieren (links korrekte Reihenfolge, rechts die eigene).
+      var playing = false;
+      function animateSide(c, items, doneCb) {
+        var i = 0;
+        (function one() {
+          if (i >= items.length) { if (doneCb) doneCb(); return; }
+          var steps = 14, t = 0;
+          var timer = setInterval(function () {
+            t++; paint(c, csc, items, i, t / steps);
+            if (t >= steps) { clearInterval(timer); i++; setTimeout(one, 140); }
+          }, 22);
+        })();
+      }
+      playBtn.addEventListener('click', function () {
+        if (playing) return; playing = true;
+        var pending = 2, fin = function () { if (--pending <= 0) playing = false; };
+        animateSide(lc, refIt, fin); animateSide(rc, userIt, fin);
+      });
+    }
+
     redraw();
     return { clear: clear, toggleGuide: toggleGuide, play: play, strokeCount: strokes.length,
-      isComplete: function () { return idx >= strokes.length; }, mistakeCount: function () { return mistakes; } };
+      isComplete: function () { return idx >= strokes.length; }, mistakeCount: function () { return mistakes; },
+      attempts: function () { return log.slice(); }, showComparison: showComparison };
   }
 
   /* ---------- Seiten-Logik (schreiben.html) ---------- */
@@ -219,39 +302,45 @@
       var k = session[pos];
       if (charEl) charEl.textContent = k.k; if (meanEl) meanEl.textContent = k.meaning || '';
       if (prog) prog.textContent = 'Kanji ' + (pos + 1) + ' / ' + session.length;
-      setMsg('');
+      setMsg(''); clearCompare();
       var kid = 'k:' + k.k;
-      var snap = !!(window.SRS && window.SRS.get && (((window.SRS.get(kid) || {}).writeReps || 0) < SNAP_UNTIL));
-      // Ab Erkennungs-Meisterschaft (Lernstand ≥ MASTER_AT) ohne Vorlage schreiben — trotzdem bewertet.
-      var guide = !(window.SRS && window.SRS.scoreOf && window.SRS.scoreOf(kid) >= (window.SRS.MASTER_AT || 80));
+      // Snap/Vorlage rein aus dem 0–100-Lernstand: <30 Snap+Vorlage, 30–59 nur Vorlage, ≥60 freihändig.
+      var score = (window.SRS && window.SRS.scoreOf) ? window.SRS.scoreOf(kid) : 0;
+      var m = writeMode(score);
       fetch('assets/kanjivg/' + cpFile(k.k)).then(function (r) { return r.text(); }).then(function (svg) {
-        widget = create(stage, { svgText: svg, size: Math.min(320, root.clientWidth - 40), snap: snap, guide: guide,
+        widget = create(stage, { svgText: svg, size: Math.min(320, root.clientWidth - 40), snap: m.snap, guide: m.guide,
           onProgress: function (i, n) { setMsg('Strich ' + i + ' / ' + n); },
           onMistake: function (strokeNo) { setMsg('✗ Strich ' + strokeNo + ' passt nicht — nochmal'); },
           onComplete: function (clean) {
-            setMsg(clean ? '✓ Sauber geschrieben!' : '✓ Fertig — mit Fehlern. „Nochmal" für einen sauberen Eintrag.');
-            // Nur eine fehlerfreie Schreibung zählt als Schreib-Fortschritt.
-            if (window.SRS && window.SRS.gradeWrite) window.SRS.gradeWrite(kid, clean); } });
-        if (!guide) setMsg('Freihändig — ohne Vorlage, aus dem Gedächtnis.');
+            if (clean) { setMsg('✓ Sauber geschrieben!'); if (window.SRS && window.SRS.grade) window.SRS.grade(kid, 1); }
+            // Nur eine fehlerfreie Schreibung zählt als Fortschritt; sonst Fehler-Vergleich zeigen.
+            else { setMsg('✗ Mit Fehlern — schau dir den Vergleich an. „Nochmal" für einen neuen Versuch.'); showCompare(widget); } } });
+        if (!m.guide) setMsg('Freihändig — ohne Vorlage, aus dem Gedächtnis.');
       }).catch(function () { stage.innerHTML = '<p>SVG konnte nicht geladen werden.</p>'; });
     }
-    // „Geschafft": bewerten; im Einzel-Modus zurück zur Kanji-Übersicht, sonst nächstes Kanji.
-    function done(g) {
-      var k = session[pos];
-      if (window.SRS && k) window.SRS.grade('k:' + k.k, g);
+    // Fehler-Vergleich unter die Schreibfläche rendern bzw. leeren.
+    function compareHost() {
+      var h = document.getElementById('kw-compare-host');
+      if (!h && stage && stage.parentNode) { h = document.createElement('div'); h.id = 'kw-compare-host'; stage.parentNode.insertBefore(h, stage.nextSibling); }
+      return h;
+    }
+    function showCompare(w) { var h = compareHost(); if (h && w && w.showComparison) w.showComparison(h); }
+    function clearCompare() { var h = document.getElementById('kw-compare-host'); if (h) h.innerHTML = ''; }
+    // „Geschafft": nur Navigation (die Bewertung passiert beim sauberen Schreiben).
+    function done() {
       if (single) { location.href = 'kanji.html'; return; }
       pos++; load();
     }
 
     bind('kw-guide', function () { if (widget) { var on = widget.toggleGuide(); setMsg(on ? 'Vorlage an' : 'Vorlage aus'); } });
     bind('kw-play', function () { if (widget) widget.play(); });
-    bind('kw-clear', function () { if (widget) widget.clear(); });
-    bind('kw-again', function () { setMsg(''); load(); }); // Nochmal: dasselbe Kanji neu starten
-    bind('kw-good', function () { done(1); });             // Geschafft: bewerten → weiter / zurück
+    bind('kw-clear', function () { if (widget) widget.clear(); clearCompare(); });
+    bind('kw-again', function () { setMsg(''); clearCompare(); load(); }); // Nochmal: dasselbe Kanji neu starten
+    bind('kw-good', function () { done(); });               // Geschafft: nur weiter / zurück (Bewertung beim Schreiben)
     function bind(id, fn) { var e = document.getElementById(id); if (e) e.addEventListener('click', fn); }
 
     load();
   }
 
-  window.KanjiWrite = { parseStrokes: parseStrokes, cpFile: cpFile, create: create, initPage: initPage, strokeMatches: strokeMatches };
+  window.KanjiWrite = { parseStrokes: parseStrokes, cpFile: cpFile, create: create, initPage: initPage, strokeMatches: strokeMatches, writeMode: writeMode };
 })();
