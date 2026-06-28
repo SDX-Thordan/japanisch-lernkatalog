@@ -45,12 +45,12 @@ describe('Lernpunktzahl', () => {
     expect(SRS.get('v:c|1').score).toBe(40);
   });
 
-  it('globaler Tagescap: insgesamt max. 800 Punkte/Tag', () => {
-    // 20 Wörter × 40 = 800 → globaler Cap (800) greift, bevor das nächste Wort Punkte bekommt
-    for (let i = 0; i < 20; i++) { SRS.grade('v:g' + i + '|1', 1, '2026-06-10'); SRS.grade('v:g' + i + '|1', 1, '2026-06-10'); }
+  it('globaler Tagescap: insgesamt max. 2400 Punkte/Tag', () => {
+    // 60 Wörter × 40 = 2400 → globaler Cap (2400) greift, bevor das nächste Wort Punkte bekommt
+    for (let i = 0; i < 60; i++) { SRS.grade('v:g' + i + '|1', 1, '2026-06-10'); SRS.grade('v:g' + i + '|1', 1, '2026-06-10'); }
     SRS.grade('v:extra|1', 1, '2026-06-10'); // global gedeckelt → kein Gain
     expect(SRS.get('v:extra|1').score).toBe(0);
-    expect(SRS.stats('2026-06-10').dailyGain).toBe(800);
+    expect(SRS.stats('2026-06-10').dailyGain).toBe(2400);
   });
 
   it('Zerfall: nach der Schonfrist sinkt der effektive Lernstand sanft', () => {
