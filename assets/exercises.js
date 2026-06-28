@@ -39,6 +39,37 @@
 
   var PARTICLES = ['は', 'が', 'を', 'に', 'で', 'へ', 'と', 'も', 'から', 'まで'];
 
+  /* ---------- Auto-Furigana: Lesung über noch nicht beherrschten Kanji (Wörterbuch aus VOKABULAR) ---------- */
+  var _furiDict = null, _furiMaxLen = 1;
+  function hasKanji(s) { return /[一-龯㐀-䶿]/.test(s); }
+  function furiDict() {
+    if (_furiDict) return _furiDict;
+    var d = {}, max = 1;
+    (window.VOKABULAR || []).forEach(function (v) {
+      if (v.kanji && v.kana && hasKanji(v.kanji) && !(v.kanji in d)) { d[v.kanji] = v.kana; if (v.kanji.length > max) max = v.kanji.length; }
+    });
+    _furiDict = d; _furiMaxLen = max; return d;
+  }
+  function wordNeedsFuri(w) { for (var i = 0; i < w.length; i++) { var c = w.charAt(i); if (hasKanji(c) && !kanjiMastered(c)) return true; } return false; }
+  // Erkennt bekannte Kanji-Wörter (Longest-Match) und setzt Furigana über solche mit unbeherrschten Kanji.
+  // Partikel/Kana/Lücken bleiben unverändert. Liefert fertiges (escaptes) HTML.
+  function autoFuri(jp) {
+    jp = String(jp == null ? '' : jp);
+    var d = furiDict(), out = '', i = 0, n = jp.length;
+    while (i < n) {
+      var hit = null;
+      for (var L = Math.min(_furiMaxLen, n - i); L >= 1; L--) {
+        var sub = jp.substr(i, L);
+        if (Object.prototype.hasOwnProperty.call(d, sub)) { hit = { w: sub, kana: d[sub], L: L }; break; }
+      }
+      if (hit) {
+        out += wordNeedsFuri(hit.w) ? ('<ruby>' + esc(hit.w) + '<rt>' + esc(hit.kana) + '</rt></ruby>') : esc(hit.w);
+        i += hit.L;
+      } else { out += esc(jp.charAt(i)); i += 1; }
+    }
+    return out;
+  }
+
   /* ---------- Tag-Index: tag → [Vokabel] ---------- */
   function buildTagIndex() {
     var byId = {};
@@ -164,12 +195,14 @@
     var big = !!ex.big;
     // Sprache je Richtung: Frage standardmäßig japanisch; Optionen nur „ja", wenn sie japanisch sind.
     // Furigana über Kanji, wenn die Lesung noch gebraucht wird (ex.furigana gesetzt).
-    var frHtml = (ex.frageJa !== false && ex.furigana && kat().ruby) ? kat().ruby(ex.frage, ex.furigana) : esc(ex.frage);
+    var frHtml = (ex.frageJa === false) ? esc(ex.frage)
+      : (ex.furigana && kat().ruby) ? kat().ruby(ex.frage, ex.furigana)   // Einzelwort-Karte: präzise Lesung
+      : autoFuri(ex.frage);                                               // Sätze: Auto-Furigana je bekanntem Wort
     mount.appendChild(el('div', (ex.frageJa === false ? 'ex-frage' : 'ex-frage ja') + (big ? ' big' : ''), frHtml));
     if (big && ex.q) mount.appendChild(el('div', 'ex-subprompt', esc(ex.q)));
     var opts = el('div', 'ex-options' + (big ? ' big' : ''));
     ex.optionen.forEach(function (o, i) {
-      var b = el('button', (ex.optJa ? 'ex-opt ja' : 'ex-opt') + (big ? ' big' : ''), esc(o)); b.type = 'button';
+      var b = el('button', (ex.optJa ? 'ex-opt ja' : 'ex-opt') + (big ? ' big' : ''), ex.optJa ? autoFuri(o) : esc(o)); b.type = 'button';
       b.addEventListener('click', function () {
         if (mount.querySelector('.ex-feedback')) return;
         var ok = (i === ex.richtig);
@@ -187,7 +220,7 @@
   }
 
   function renderCloze(ex, mount, finish) {
-    mount.appendChild(el('div', 'ex-frage ja', esc(ex.satz || ex.frage || '')));
+    mount.appendChild(el('div', 'ex-frage ja', autoFuri(ex.satz || ex.frage || '')));
     var inp = el('input', 'ex-input'); inp.type = 'text'; inp.setAttribute('aria-label', 'Antwort');
     var btn = el('button', 'btn-primary ex-check', 'Prüfen'); btn.type = 'button';
     btn.addEventListener('click', function () {
@@ -226,10 +259,10 @@
     var target = el('div', 'ex-target');
     var bank = el('div', 'ex-bank');
     ex.chunks.forEach(function (c) {
-      var b = el('button', 'ex-chunk', esc(c)); b.type = 'button';
+      var b = el('button', 'ex-chunk', autoFuri(c)); b.type = 'button';
       b.addEventListener('click', function () {
         if (b.disabled) return; b.disabled = true; answer.push(c);
-        var t = el('span', 'ex-token', esc(c)); target.appendChild(t);
+        var t = el('span', 'ex-token', autoFuri(c)); target.appendChild(t);
       });
       bank.appendChild(b);
     });
@@ -416,7 +449,7 @@
     particleExercise: particleExercise, orderExercise: orderExercise, translateExercise: translateExercise,
     fromTemplate: fromTemplate, gradeAnswer: gradeAnswer, renderExercise: renderExercise,
     meaningMC: meaningMC, buildLessonTest: buildLessonTest,
-    vocabForms: vocabForms, acceptsVocabInput: acceptsVocabInput,
+    vocabForms: vocabForms, acceptsVocabInput: acceptsVocabInput, autoFuri: autoFuri,
     // Zentrale Registry + neue Builder
     exercisesFor: exercisesFor, pickExercise: pickExercise,
     vocabRecognizeMC: vocabRecognizeMC, vocabProduceMC: vocabProduceMC, vocabInput: vocabInput,

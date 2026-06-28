@@ -790,6 +790,8 @@ body.drill-open { overflow: hidden; }
 .ex-options.big { flex-direction: column; flex-wrap: nowrap; gap: .55rem; width: 100%; max-width: 30rem; margin: .2rem auto 0; }
 .ex-opt.big { text-align: left; width: 100%; padding: .75rem .95rem; border-radius: 10px; border-width: 1px; font-size: 1.05rem; }
 .ex-opt.big.ja { font-size: 1.3rem; }
+/* Auto-Furigana in Übungen (Optionen, Fragesätze, Satzbau) — immer sichtbar, dezent */
+.ex-frage ruby rt, .ex-opt ruby rt, .ex-chunk ruby rt, .ex-token ruby rt { visibility: visible; font-size: .5em; color: var(--indigo); font-weight: 500; }
 .ex-opt { font-family: var(--font-ja-sans); font-size: 1.05rem; background: var(--surface); border: 1.5px solid var(--border); border-radius: 9px; padding: .5rem 1rem; cursor: pointer; transition: all .12s; }
 .ex-opt:hover:not(:disabled) { border-color: var(--accent); }
 .ex-opt:disabled { cursor: default; opacity: .85; }
