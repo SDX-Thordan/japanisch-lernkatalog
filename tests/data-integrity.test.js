@@ -53,3 +53,48 @@ describe('VOKABULAR_TAGS', () => {
     expect(bad).toEqual([]);
   });
 });
+
+describe('Vokabel-Kanji stammen aus dem Katalog', () => {
+  let kanjiWin, catalog;
+  beforeAll(() => {
+    kanjiWin = loadWithData(['assets/data/vokabular.js', 'assets/data/kanji.js']);
+    catalog = new Set((kanjiWin.KANJI || []).map((k) => k.k));
+  });
+
+  // Diese Lücken-Korrekturen wurden ergänzt — ausschließlich Kanji aus dem Katalog
+  // (Nutzer-Vorgabe). Bestand-Vokabeln dürfen weiterhin Kanji außerhalb des Katalogs nutzen.
+  const ERGAENZT = [
+    ['わたし', 1, '私'], ['ほん', 2, '本'], ['いま', 4, '今'], ['がっこう', 5, '学校'],
+    ['ひとり', 5, '一人'], ['みっか', 5, '三日'], ['みせ', 6, '店'], ['なに', 6, '何'],
+    ['うえ', 10, '上'], ['そと', 10, '外'], ['ひとり', 11, '一人'], ['とお', 11, '十'],
+    ['ふたり', 11, '二人'], ['がいこく', 11, '外国'],
+  ];
+
+  it('jedes ergänzte Kanji-Zeichen kommt im Katalog vor', () => {
+    const bad = [];
+    ERGAENZT.forEach(([, , kanji]) => {
+      [...kanji].forEach((ch) => { if (!catalog.has(ch)) bad.push(`${kanji}: ${ch}`); });
+    });
+    expect(bad).toEqual([]);
+  });
+
+  it('jede ergänzte Schreibweise steht im Vokabular', () => {
+    const bad = [];
+    ERGAENZT.forEach(([kana, lesson, kanji]) => {
+      const v = (kanjiWin.VOKABULAR || []).find((x) => x.kana === kana && x.lesson === lesson);
+      if (!v || v.kanji !== kanji) bad.push(`${kana}|${lesson} → ${kanji}`);
+    });
+    expect(bad).toEqual([]);
+  });
+
+  it('Spot-Checks bestätigter Schreibweisen', () => {
+    const find = (kana, lesson) => (kanjiWin.VOKABULAR || []).find((v) => v.kana === kana && v.lesson === lesson);
+    expect(find('ほん', 2).kanji).toBe('本');
+    expect(find('みせ', 6).kanji).toBe('店');
+    expect(find('わたし', 1).kanji).toBe('私');
+    expect(find('がっこう', 5).kanji).toBe('学校');
+    // Homophone bleiben bewusst kana-only (kein falsches Kanji).
+    expect(find('はい', 1).kanji).toBe('');
+    expect(find('せき', 17).kanji).toBe('');
+  });
+});
