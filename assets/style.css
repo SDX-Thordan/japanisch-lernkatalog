@@ -476,6 +476,9 @@ footer {
 }
 footer .jp { font-family: var(--font-ja); }
 .app-version { display: block; margin-top: .6rem; font-size: .76rem; color: var(--faint); letter-spacing: .02em; }
+.footer-gh { display: inline-flex; align-items: center; margin-top: .5rem; color: var(--faint); transition: color .15s; }
+.footer-gh:hover, .footer-gh:focus-visible { color: var(--accent); }
+.footer-gh svg { display: block; }
 
 .empty { text-align: center; color: var(--muted); padding: 3rem 1rem; font-style: italic; }
 .hidden { display: none !important; }
