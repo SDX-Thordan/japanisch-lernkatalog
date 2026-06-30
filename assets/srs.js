@@ -78,7 +78,7 @@
 
   /* ---------- Store-Grundgerüst ---------- */
   function freshStore() {
-    return { v: VERSION, items: {}, lessons: {}, lists: {}, daily: {}, stats: { streakDays: 0, lastActive: null, totalReviews: 0 } };
+    return { v: VERSION, items: {}, lessons: {}, lists: {}, daily: {}, activity: {}, stats: { streakDays: 0, lastActive: null, totalReviews: 0 } };
   }
   function defaultItem() {
     return { score: 0, last: null, ease: DEFAULT_EASE, interval: 0, due: null, reps: 0, lapses: 0, streak: 0, history: [] };
@@ -119,6 +119,7 @@
       lessons: s.lessons || {},
       lists: s.lists || {},
       daily: s.daily || {},
+      activity: pruneActivity(s.activity || {}),
       stats: {
         streakDays: (s.stats && s.stats.streakDays) || 0,
         lastActive: (s.stats && s.stats.lastActive) || null,
@@ -191,6 +192,7 @@
     var item = store.items[id] || defaultItem();
     var d = dailyToday(today);
     var cur = effectiveScore(item, today);
+    var gained = 0;
     if (g <= 0) {
       if (!d.pen[id]) { cur = clamp(cur - PENALTY, 0, 100); d.pen[id] = 1; }
       item.lapses = (item.lapses || 0) + 1; item.streak = 0;
@@ -199,7 +201,7 @@
         var gain = GAIN * (opts.gainScale != null ? opts.gainScale : 1);
         var allowed = Math.min(gain, ITEM_DAILY_CAP - (d.item[id] || 0), DAILY_CAP - d.gain);
         if (opts.gainCeiling != null) allowed = Math.min(allowed, Math.max(0, opts.gainCeiling - cur));
-        if (allowed > 0) { cur = clamp(cur + allowed, 0, 100); d.item[id] = (d.item[id] || 0) + allowed; d.gain += allowed; }
+        if (allowed > 0) { cur = clamp(cur + allowed, 0, 100); d.item[id] = (d.item[id] || 0) + allowed; d.gain += allowed; gained = allowed; }
       }
       item.reps = (item.reps || 0) + 1; item.streak = (item.streak || 0) + 1;
     }
@@ -207,6 +209,7 @@
     item.history = (item.history || []).concat([{ t: today, grade: g }]).slice(-MAX_HISTORY);
     store.items[id] = item;
     store.stats.totalReviews = (store.stats.totalReviews || 0) + 1;
+    recordActivity(today, gained, 1);
     save();
     return item;
   }
@@ -224,6 +227,38 @@
     store.stats.lastActive = today;
     save();
     return store.stats.streakDays;
+  }
+
+  // Persistentes Aktivitäts-Log (anders als store.daily, das beim Tageswechsel geleert wird):
+  // hält Punkte & Bewertungen je Tag dauerhaft für Verlaufs-Charts. Auf die letzten ACTIVITY_KEEP Tage begrenzt.
+  var ACTIVITY_KEEP = 400;
+  function recordActivity(today, gain, reviews) {
+    store.activity = store.activity || {};
+    var a = store.activity[today] || (store.activity[today] = { gain: 0, reviews: 0 });
+    a.gain = round2((a.gain || 0) + (gain || 0));
+    a.reviews = (a.reviews || 0) + (reviews || 0);
+  }
+  function pruneActivity(act, today) {
+    act = act || {};
+    var cutoff = addDays(today || todayISO(), -ACTIVITY_KEEP);
+    var out = {};
+    for (var d in act) {
+      if (d >= cutoff && act[d]) out[d] = { gain: round2(act[d].gain || 0), reviews: act[d].reviews || 0 };
+    }
+    return out;
+  }
+  // Tagesverlauf der letzten `days` Tage bis `today`, fehlende Tage mit Nullen aufgefüllt (chronologisch).
+  function dailyHistory(today, days) {
+    today = today || todayISO();
+    days = days || 30;
+    var act = store.activity || {};
+    var out = [];
+    for (var i = days - 1; i >= 0; i--) {
+      var d = addDays(today, -i), rec = act[d] || {};
+      var gain = round2(rec.gain || 0), reviews = rec.reviews || 0;
+      out.push({ date: d, gain: gain, reviews: reviews, active: gain > 0 || reviews > 0 });
+    }
+    return out;
   }
 
   /* ---------- Mastery / Lektions-Zuordnung ---------- */
@@ -417,9 +452,18 @@
       (bl2.items || []).forEach(function (x) { if (mlists[mid].items.indexOf(x) === -1) mlists[mid].items.push(x); });
       mlists[mid].name = mlists[mid].name || bl2.name;
     }
+    // Aktivitäts-Log mergen: je Tag das Maximum (idempotent beim Re-Import derselben Sicherung).
+    var activity = {}, ad;
+    for (ad in (a.activity || {})) activity[ad] = { gain: round2(a.activity[ad].gain || 0), reviews: a.activity[ad].reviews || 0 };
+    for (ad in (b.activity || {})) {
+      var br = b.activity[ad], cur = activity[ad];
+      if (!cur) activity[ad] = { gain: round2(br.gain || 0), reviews: br.reviews || 0 };
+      else activity[ad] = { gain: Math.max(cur.gain, round2(br.gain || 0)), reviews: Math.max(cur.reviews, br.reviews || 0) };
+    }
     var as = a.stats || {}, bs = b.stats || {};
     return {
       v: VERSION, items: items, lessons: lessons, lists: mlists, daily: a.daily || b.daily || {},
+      activity: pruneActivity(activity),
       stats: {
         streakDays: Math.max(as.streakDays || 0, bs.streakDays || 0),
         lastActive: (as.lastActive || '') > (bs.lastActive || '') ? as.lastActive : (bs.lastActive || as.lastActive || null),
@@ -678,7 +722,7 @@
   window.SRS = {
     srsId: srsId, typeOf: typeOf,
     get: get, ensure: ensure, grade: grade,
-    completeDaily: completeDaily, dailyGain: dailyGain,
+    completeDaily: completeDaily, dailyGain: dailyGain, dailyHistory: dailyHistory,
     // Lernpunktzahl 0–100
     effectiveScore: scoreOf, scoreOf: scoreOf, MASTER_AT: MASTER_AT,
     isDue: isDue, dueIds: dueIds,

@@ -695,6 +695,28 @@
       '<span class="f-distn">'+n+'</span>'+sakuraSvg(i*20,SCORE_THRESHOLDS,{cls:'sakura-sm'})+'</div>').join(''));
   }
 
+  // Intensitätsstufe (0–4) eines Tages für die Heatmap, anhand der gesammelten Punkte.
+  function actLevel(gain){ if(gain<=0)return 0; if(gain<=20)return 1; if(gain<=60)return 2; if(gain<=120)return 3; return 4; }
+  // Wochentag Mo=0 … So=6 für ein ISO-Datum (UTC, ohne Zeitzonendrift).
+  function isoWeekday(iso){ const p=String(iso).split('-'); return (new Date(Date.UTC(+p[0],+p[1]-1,+p[2])).getUTCDay()+6)%7; }
+  // Punkte-pro-Tag-Balken (Verlauf der letzten `days` Tage).
+  function activityBars(days){
+    if(!window.SRS||!window.SRS.dailyHistory)return '';
+    const h=window.SRS.dailyHistory(undefined,days), max=Math.max(1,...h.map(d=>d.gain));
+    return h.map(d=>'<div class="act-bar" title="'+esc(d.date)+' · '+d.gain+' Punkte">'+
+      '<span class="act-bar-fill" style="height:'+Math.round(d.gain/max*100)+'%"></span></div>').join('');
+  }
+  // Aktivitäts-Kalender (Heatmap): Wochen als Spalten, Wochentage (Mo–So) als Zeilen.
+  function activityCalendar(days){
+    if(!window.SRS||!window.SRS.dailyHistory)return '';
+    const h=window.SRS.dailyHistory(undefined,days);
+    let cells='';
+    const lead=isoWeekday(h[0].date);
+    for(let i=0;i<lead;i++)cells+='<span class="cal-cell cal-pad" aria-hidden="true"></span>';
+    h.forEach(d=>{ cells+='<span class="cal-cell l'+actLevel(d.gain)+'" title="'+esc(d.date)+' · '+d.gain+' Punkte"></span>'; });
+    return '<div class="cal-grid">'+cells+'</div>';
+  }
+
   // Sakura-Lernstand-Indikator je Lektion (Ø-Lernstand der Items).
   function lessonRepsBadge(L,type){
     const avg=lessonScoreAvg(L,type);
@@ -1119,6 +1141,8 @@
       setText('f-avg',Math.round(s.avgScore||0)+'%'); setHtml('f-avg-flower',sakuraSvg(s.avgScore||0,SCORE_THRESHOLDS,{cls:'sakura-sm'}));
       setText('f-daily',(s.dailyGain||0)+' / '+(s.dailyCap||0));
       if(window.SRS.catalogStats)drawOverview(window.SRS.catalogStats());
+      const act=document.getElementById('f-activity'); if(act)act.innerHTML=activityBars(30);
+      const cal=document.getElementById('f-calendar'); if(cal)cal.innerHTML=activityCalendar(91);
       const forecast=document.getElementById('f-forecast'); if(forecast)forecast.innerHTML=bars;
       // Lernpfad-Fortschritt: Status + Kern-Fortschritt + Test-Score je Lektion.
       const lp=document.getElementById('f-lessons');
