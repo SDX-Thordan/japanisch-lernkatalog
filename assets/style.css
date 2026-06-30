@@ -848,6 +848,23 @@ body.drill-open { overflow: hidden; }
 .f-distbar { width: 100%; min-height: 3px; background: linear-gradient(var(--accent), #e8889e); border-radius: 6px 6px 0 0; transition: height .4s; }
 .f-distn { font-size: .82rem; font-weight: 700; color: var(--ink); }
 
+/* Punkte-pro-Tag-Verlauf (30 schmale Balken) */
+.act-bars { display: flex; align-items: flex-end; gap: 2px; height: 6rem; padding-top: .5rem; }
+.act-bar { flex: 1; height: 100%; display: flex; align-items: flex-end; background: var(--surface-2); border-radius: 3px; overflow: hidden; }
+.act-bar-fill { width: 100%; min-height: 0; background: linear-gradient(var(--accent), var(--accent-d)); border-radius: 3px 3px 0 0; transition: height .4s; }
+
+/* Aktivitäts-Kalender (Heatmap): Wochen als Spalten, Mo–So als Zeilen */
+.cal-grid { display: grid; grid-auto-flow: column; grid-template-rows: repeat(7, 1fr); grid-auto-columns: 1fr; gap: 3px; }
+.cal-cell { width: 100%; aspect-ratio: 1 / 1; border-radius: 2px; background: var(--surface-2); }
+.cal-cell.cal-pad { background: transparent; }
+.cal-cell.l0 { background: var(--surface-2); border: 1px solid var(--border); }
+.cal-cell.l1 { background: #f1c7c0; }
+.cal-cell.l2 { background: #e29084; }
+.cal-cell.l3 { background: #c75a4b; }
+.cal-cell.l4 { background: var(--accent-d); }
+.cal-legend { display: flex; align-items: center; gap: 4px; margin-top: .6rem; font-size: .72rem; color: var(--muted); }
+.cal-legend .cal-cell { width: .8rem; height: .8rem; aspect-ratio: auto; }
+
 .f-actions { display: flex; flex-wrap: wrap; gap: .6rem; align-items: center; }
 .f-danger { color: var(--accent-d); border-color: var(--accent); }
 .f-danger:hover { background: var(--accent); color: #fff; }
