@@ -1,6 +1,6 @@
 // Unit-Test für service-worker.js (klassisches Worker-Script): Cache-Name aus Version,
-// network-first für Kern-Code, cache-first für Daten. Wir laden den SW-Code in einen
-// gemockten Worker-Scope (self/caches/fetch/importScripts) und rufen die Handler auf.
+// network-first für Kern-Code + Katalogdaten, cache-first für KanjiVG/Font. Wir laden den
+// SW-Code in einen gemockten Worker-Scope (self/caches/fetch/importScripts) und rufen die Handler auf.
 import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
@@ -68,11 +68,28 @@ describe('service-worker', () => {
     expect(res.tag).toBe('cache');
   });
 
-  it('Daten (assets/data/*.js) bleiben cache-first: Cache-Treffer ohne Netz', async () => {
+  it('Daten (assets/data/*.js) sind network-first: online kommt die frische Netz-Antwort', async () => {
+    // Vorher cache-first — dadurch erreichten Inhalts-Korrekturen (z. B. ergänzte
+    // Vokabel-Kanji) bestehende Installationen nie.
     const cacheStore = new Map([[ORIGIN + '/assets/data/vokabular.js', { tag: 'cache-data' }]]);
     const { handlers, fetchCalls } = loadSW({ cacheStore });
     const res = await handleFetch(handlers, ORIGIN + '/assets/data/vokabular.js');
+    expect(res.tag).toBe('network');
+    expect(fetchCalls()).toBe(1);
+  });
+
+  it('Daten offline: fallen auf den Cache zurück', async () => {
+    const cacheStore = new Map([[ORIGIN + '/assets/data/vokabular.js', { tag: 'cache-data' }]]);
+    const { handlers } = loadSW({ cacheStore, fetchImpl: () => Promise.reject(new Error('offline')) });
+    const res = await handleFetch(handlers, ORIGIN + '/assets/data/vokabular.js');
     expect(res.tag).toBe('cache-data');
+  });
+
+  it('KanjiVG-SVGs bleiben cache-first: Cache-Treffer ohne Netz', async () => {
+    const cacheStore = new Map([[ORIGIN + '/assets/kanjivg/05b66.svg', { tag: 'cache-svg' }]]);
+    const { handlers, fetchCalls } = loadSW({ cacheStore });
+    const res = await handleFetch(handlers, ORIGIN + '/assets/kanjivg/05b66.svg');
+    expect(res.tag).toBe('cache-svg');
     expect(fetchCalls()).toBe(0);
   });
 });

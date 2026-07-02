@@ -1,6 +1,6 @@
 {
   "name": "go-nihongo",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "Go! Nihongo — Japanisch-Lern-App (Web/PWA + Android-APK via Capacitor)",
   "private": true,
   "type": "module",
