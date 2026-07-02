@@ -1,10 +1,11 @@
 /* Service Worker — Offline-Cache für den Lern-Katalog.
    Strategie:
-   - Navigationen (HTML) + Branding (manifest, App-Icons) + Kern-Code (assets/*.js, *.css):
-     NETWORK-FIRST mit Cache-Fallback. So sind App-Version, Logo UND der Programmcode online
-     stets aktuell (kein „eingefrorenes" altes app.js mehr — der Grund, warum ein gemergter
-     Fix früher im Browser-Cache hängenblieb), offline läuft alles weiter aus dem Cache.
-   - Übrige statische Assets (Daten unter assets/data/, Font, KanjiVG-SVG): CACHE-FIRST (schnell).
+   - Navigationen (HTML) + Branding (manifest, App-Icons) + Kern-Code (assets/*.js, *.css)
+     + Katalogdaten (assets/data/*.js): NETWORK-FIRST mit Cache-Fallback. So sind App-Version,
+     Logo, Programmcode UND Inhalts-Korrekturen online stets aktuell (kein „eingefrorenes"
+     altes app.js/vokabular.js mehr — der Grund, warum gemergte Fixes früher im Browser-Cache
+     hängenblieben), offline läuft alles weiter aus dem Cache.
+   - Übrige statische Assets (Font, KanjiVG-SVG): CACHE-FIRST (groß & unveränderlich → schnell).
    Der Cache-Name wird automatisch aus der App-Version abgeleitet (importScripts unten),
    sodass ein manuelles Hochzählen entfällt. */
 'use strict';
@@ -45,9 +46,13 @@ function isBranding(url) {
 }
 
 // Kern-Code: assets/app.js, srs.js, exercises.js, kanji-write.js, version.js, ota.js, style.css.
-// NUR direkt unter assets/ (nicht assets/data/…) → Daten bleiben cache-first.
 function isCode(url) {
   return /\/assets\/[^/]+\.(?:js|css)$/.test(url.pathname);
+}
+// Katalogdaten (assets/data/*.js): ebenfalls network-first, damit Inhalts-Korrekturen
+// (z. B. ergänzte Kanji im Vokabular) bestehende Installationen sofort erreichen.
+function isData(url) {
+  return /\/assets\/data\/[^/]+\.js$/.test(url.pathname);
 }
 
 function putInCache(req, res) {
@@ -63,7 +68,7 @@ self.addEventListener('fetch', function (e) {
   if (req.method !== 'GET') return;
   var url = new URL(req.url);
   var sameOrigin = url.origin === self.location.origin;
-  var networkFirst = sameOrigin && (req.mode === 'navigate' || isBranding(url) || isCode(url));
+  var networkFirst = sameOrigin && (req.mode === 'navigate' || isBranding(url) || isCode(url) || isData(url));
 
   if (networkFirst) {
     // Netz zuerst (frisch), bei Fehler aus dem Cache (offline); Navigation fällt auf index.html zurück.
