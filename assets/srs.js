@@ -103,14 +103,33 @@
 
   var store = load();
 
-  function load() {
+  // Unlesbare/versionsfremde Rohdaten NIE stillschweigend überschreiben: unter _rescue sichern
+  // (nur wenn dort noch nichts liegt — die erste Rettung ist die wertvollste).
+  function rescueRaw(raw) {
+    try { if (!backend.getItem(KEY + '_rescue')) backend.setItem(KEY + '_rescue', raw); } catch (e) {}
+  }
+  // Tages-Backup lesen (siehe save()); null wenn fehlend/unlesbar.
+  function loadBackup() {
     try {
-      var raw = backend.getItem(KEY);
-      if (!raw) return freshStore();
+      var raw = backend.getItem(KEY + '_backup');
+      if (!raw) return null;
       var parsed = JSON.parse(raw);
-      if (!parsed || parsed.v !== VERSION || typeof parsed.items !== 'object') return freshStore();
+      if (!parsed || parsed.v !== VERSION || typeof parsed.items !== 'object') return null;
       return normalize(parsed);
-    } catch (e) { return freshStore(); }
+    } catch (e) { return null; }
+  }
+  function load() {
+    var raw = null;
+    try { raw = backend.getItem(KEY); } catch (e) { return freshStore(); }
+    if (!raw) return loadBackup() || freshStore(); // Haupt-Key weg, Backup da → wiederherstellen
+    try {
+      var parsed = JSON.parse(raw);
+      if (!parsed || parsed.v !== VERSION || typeof parsed.items !== 'object') {
+        rescueRaw(raw);
+        return loadBackup() || freshStore();
+      }
+      return normalize(parsed);
+    } catch (e) { rescueRaw(raw); return loadBackup() || freshStore(); }
   }
   function normalize(s) {
     return {
@@ -128,7 +147,17 @@
     };
   }
   function save() {
-    try { backend.setItem(KEY, JSON.stringify(store)); } catch (e) {}
+    try {
+      var json = JSON.stringify(store);
+      backend.setItem(KEY, json);
+      // Auto-Backup: höchstens 1×/Tag eine Kopie sichern (Schutz vor Korruption des Haupt-Keys;
+      // gegen App-Deinstallation hilft weiterhin nur der JSON-Export im Profil).
+      var today = todayISO();
+      if (backend.getItem(KEY + '_backup_at') !== today) {
+        backend.setItem(KEY + '_backup', json);
+        backend.setItem(KEY + '_backup_at', today);
+      }
+    } catch (e) {}
   }
 
   /* ---------- ID-Ableitung ---------- */
@@ -483,7 +512,15 @@
     return { ok: true };
   }
 
-  function reset() { store = freshStore(); save(); }
+  // Vor dem Zurücksetzen den aktuellen Stand ins Tages-Backup sichern — ein versehentlicher
+  // Reset bleibt so (bis zum nächsten Tageswechsel) wiederherstellbar.
+  function reset() {
+    try {
+      var cur = backend.getItem(KEY);
+      if (cur) { backend.setItem(KEY + '_backup', cur); backend.setItem(KEY + '_backup_at', todayISO()); }
+    } catch (e) {}
+    store = freshStore(); save();
+  }
 
   // Flache Kopie für Auswertungen (Fortschritts-Seite).
   function snapshot() { return JSON.parse(JSON.stringify(store)); }

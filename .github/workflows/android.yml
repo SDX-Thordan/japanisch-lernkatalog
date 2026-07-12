@@ -60,20 +60,16 @@ jobs:
           fi
           # In package.json schreiben, damit build:www → assets/version.js (Footer) dieselbe Version zeigt.
           node -e "const f='package.json',p=require('./'+f);p.version='${VERSION_NAME}';require('fs').writeFileSync(f,JSON.stringify(p,null,2)+'\n')"
+          # versionCode STRENG MONOTON aus der Semver ableiten (major*1e6 + minor*1e4 + patch*1e2).
+          # Früher GITHUB_RUN_NUMBER: nicht an die Version gekoppelt → konnte rückläufig wirken,
+          # blockierte In-Place-Updates und erzwang Deinstallation (= Datenverlust im localStorage).
+          VERSION_CODE=$(node -e "const [ma,mi,pa]='${VERSION_NAME}'.split('-')[0].split('.').map(n=>parseInt(n,10)||0);console.log(ma*1000000+mi*10000+pa*100)")
           echo "version_name=$VERSION_NAME" >> "$GITHUB_OUTPUT"
-          echo "Version: $VERSION_NAME (versionCode ${GITHUB_RUN_NUMBER})"
+          echo "version_code=$VERSION_CODE" >> "$GITHUB_OUTPUT"
+          echo "Version: $VERSION_NAME (versionCode $VERSION_CODE)"
 
       - name: Web-Assets nach www/ stagen
         run: npm run build:www
-
-      - name: OTA-Bundle + Manifest erzeugen (@capgo Live-Update, konstante Asset-Namen)
-        run: |
-          set -eo pipefail
-          # Web-Bundle (Inhalt von www/ auf Zip-Wurzel) — wird vom Updater nachgeladen & entpackt.
-          ( cd www && zip -qr ../www-bundle.zip . )
-          # Manifest mit der Version; konstante Namen → …/releases/latest/download/<asset> zeigt stets auf neu.
-          node -e "require('fs').writeFileSync('ota-manifest.json', JSON.stringify({version:'${{ steps.ver.outputs.version_name }}'})+'\n')"
-          ls -la www-bundle.zip ota-manifest.json
 
       - name: Android-Projekt erzeugen (Capacitor)
         run: npx cap add android
@@ -106,9 +102,9 @@ jobs:
       - name: Synchronisieren
         run: npx cap sync android
 
-      - name: Version in build.gradle setzen (versionCode hochzählend → Update ohne Neuinstallation)
+      - name: Version in build.gradle setzen (versionCode monoton aus Semver → Update ohne Neuinstallation)
         run: |
-          sed -i -E "s/versionCode [0-9]+/versionCode ${GITHUB_RUN_NUMBER}/" android/app/build.gradle
+          sed -i -E "s/versionCode [0-9]+/versionCode ${{ steps.ver.outputs.version_code }}/" android/app/build.gradle
           sed -i -E "s/versionName \"[^\"]*\"/versionName \"${{ steps.ver.outputs.version_name }}\"/" android/app/build.gradle
           grep -E "versionCode|versionName" android/app/build.gradle
 
@@ -142,12 +138,9 @@ jobs:
           path: ${{ steps.apk.outputs.path }}
           if-no-files-found: error
 
-      - name: APK + OTA-Bundle ans GitHub-Release hängen (nur bei Release)
+      - name: APK ans GitHub-Release hängen (nur bei Release; OTA-Bundles gibt es nicht mehr)
         if: github.event_name == 'release'
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ github.event.release.tag_name }}
-          files: |
-            ${{ steps.apk.outputs.path }}
-            www-bundle.zip
-            ota-manifest.json
+          files: ${{ steps.apk.outputs.path }}
