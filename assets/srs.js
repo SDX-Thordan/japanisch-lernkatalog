@@ -36,6 +36,10 @@
   var LEARNED_SCORE = 60;    // „ganze Lektion als gelernt" setzt Items hierher (unter MASTER_AT → sofort fällig)
   var SCORE_THRESHOLDS = [20, 40, 60, 80, 100]; // Blütenblatt je 20 %
   var LEECH_LAPSES = 4;      // ab so vielen Fehlversuchen gilt ein noch-nicht-beherrschtes Item als „schwierig"
+  // WICHTIG: muss VOR `var store = load()` zugewiesen sein — normalize() ruft pruneActivity()
+  // bereits beim initialen Laden auf. Stand die Zuweisung weiter unten, war der Wert dort noch
+  // undefined → addDays(…, -undefined) warf → load() verlor den kompletten Store (Daten weg).
+  var ACTIVITY_KEEP = 400;   // Aktivitäts-Log (Punkte/Tag) auf die letzten N Tage begrenzen
   /* ---------- Teil-Lektionen: lange Lektionen in ~5–10-Min-Häppchen schneiden ---------- */
   var PART_BUDGET = 8;       // Ziel-Kosten je Teil (≈ 5–7 Min)
   // Grammatik wiegt mehr: pro Muster Vorstellen + mehrere Übungen (umfangreich, ~2–3 Min).
@@ -260,7 +264,6 @@
 
   // Persistentes Aktivitäts-Log (anders als store.daily, das beim Tageswechsel geleert wird):
   // hält Punkte & Bewertungen je Tag dauerhaft für Verlaufs-Charts. Auf die letzten ACTIVITY_KEEP Tage begrenzt.
-  var ACTIVITY_KEEP = 400;
   function recordActivity(today, gain, reviews) {
     store.activity = store.activity || {};
     var a = store.activity[today] || (store.activity[today] = { gain: 0, reviews: 0 });
