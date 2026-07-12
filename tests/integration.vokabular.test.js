@@ -43,6 +43,34 @@ describe('Vokabular — erweiterte Bedeutung aufklappen', () => {
     expect(row.classList.contains('expanded')).toBe(false);
   });
 
+  it('Listen-Zähler am ＋-Button: „1+" nach dem Hinzufügen, „2+" bei zweiter Liste, ✓ im Picker', () => {
+    const btn = win.document.querySelector('.v-add');
+    expect(btn.textContent).toBe('＋'); // noch in keiner Liste
+    const vid = btn.dataset.vid;
+
+    // Picker öffnen und über die echte UI eine neue Liste anlegen & hinzufügen.
+    click(btn);
+    const ov = win.document.querySelector('.pick-overlay');
+    expect(ov.hidden).toBe(false);
+    ov.querySelector('.pick-name').value = 'Meine Liste';
+    click(ov.querySelector('.pick-add'));
+    expect(btn.textContent).toBe('1+');
+    expect(btn.classList.contains('in-list')).toBe(true);
+    expect(btn.title).toContain('In 1 Liste');
+    // Im Picker ist die Liste jetzt mit ✓ markiert.
+    expect(ov.querySelector('.pick-list.pick-has')).toBeTruthy();
+
+    // Zweite Liste → „2+".
+    ov.querySelector('.pick-name').value = 'Zweite';
+    click(ov.querySelector('.pick-add'));
+    expect(btn.textContent).toBe('2+');
+    expect(win.SRS.listsContaining(vid).length).toBe(2);
+
+    // Andere Buttons bleiben unberührt.
+    const other = [...win.document.querySelectorAll('.v-add')].find((b) => b !== btn);
+    expect(other.textContent).toBe('＋');
+  });
+
   it('nimmt den Beispieltext in den Suchindex der Zeile auf', () => {
     // Eine Zeile finden, deren Beispieltext ein reines ASCII-Wort (≥5) enthält,
     // das norm() unverändert lässt → robuste Teilstring-Prüfung im Suchindex.

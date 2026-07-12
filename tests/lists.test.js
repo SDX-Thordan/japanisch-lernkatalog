@@ -39,6 +39,18 @@ describe('Listen-Grundfunktionen', () => {
     expect(SRS.lists().length).toBe(0);
   });
 
+  it('listsContaining findet alle Listen mit einem Item', () => {
+    const v0 = win.VOKABULAR[0], v1 = win.VOKABULAR[1];
+    const a = SRS.createList('A'), b = SRS.createList('B');
+    SRS.addToList(a.id, [vid(v0), vid(v1)]);
+    SRS.addToList(b.id, [vid(v0)]);
+    expect(SRS.listsContaining(vid(v0)).map((l) => l.name)).toEqual(['A', 'B']);
+    expect(SRS.listsContaining(vid(v1)).map((l) => l.name)).toEqual(['A']);
+    expect(SRS.listsContaining('v:gibtsnicht|1')).toEqual([]);
+    SRS.removeFromList(b.id, [vid(v0)]);
+    expect(SRS.listsContaining(vid(v0)).length).toBe(1);
+  });
+
   it('IDs zählen hoch, umbenennen funktioniert', () => {
     const a = SRS.createList('A'); const b = SRS.createList('B');
     expect([a.id, b.id]).toEqual(['l1', 'l2']);

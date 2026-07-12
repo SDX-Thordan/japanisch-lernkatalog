@@ -728,6 +728,10 @@
     return Object.keys(store.lists).map(function (k) { return store.lists[k]; })
       .sort(function (a, b) { return (parseInt(a.id.slice(1), 10) || 0) - (parseInt(b.id.slice(1), 10) || 0); });
   }
+  // Alle Listen, die ein bestimmtes Item enthalten (für den Zähler am ＋-Button).
+  function listsContaining(id) {
+    return lists().filter(function (l) { return (l.items || []).indexOf(id) !== -1; });
+  }
   // Alle Items (Vokabel/Kanji/Grammatik) als Index id → {type, data} — für gemischte Lernlisten.
   function itemIndex() {
     var idx = {};
@@ -777,7 +781,7 @@
     unlockAll: unlockAll, resetLessons: resetLessons,
     // Persönliche Vokabellisten
     createList: createList, renameList: renameList, deleteList: deleteList,
-    addToList: addToList, removeFromList: removeFromList, lists: lists, listItems: listItems,
+    addToList: addToList, removeFromList: removeFromList, lists: lists, listItems: listItems, listsContaining: listsContaining,
     exportJSON: exportJSON, importJSON: importJSON, downloadBackup: downloadBackup, reset: reset,
     snapshot: snapshot, forecast: forecast,
     _useStorage: useStorage,

@@ -300,7 +300,7 @@
       (exHtml?'<div class="kc-examples hideable">'+exHtml+'</div>':'')+
       '<div class="kc-foot">'+
         '<span class="kc-writes" title="Lernstand '+Math.round(kScore)+' % (durch Schreiben)">'+sakuraSvg(kScore,SCORE_THRESHOLDS,{cls:'sakura-sm'})+'</span>'+
-        (window.SRS?'<button class="kc-add" type="button" title="Zur Lernliste hinzufügen" data-kanji="'+esc(k.k)+'" data-word="'+esc(k.meaning||k.k)+'">＋</button>':'')+
+        (window.SRS?'<button class="kc-add'+(inListCount('k:'+k.k)>0?' in-list':'')+'" type="button" title="'+esc(addBtnTitle('k:'+k.k,'Zur Lernliste hinzufügen'))+'" data-kanji="'+esc(k.k)+'" data-word="'+esc(k.meaning||k.k)+'">'+addBtnLabel('k:'+k.k)+'</button>':'')+
         '<a class="kc-write" href="schreiben.html?kanji='+encodeURIComponent(k.k)+'" aria-label="Dieses Kanji schreiben üben" title="Schreiben üben"><span class="msi" aria-hidden="true">draw</span></a>'+
       '</div>';
     return card;
@@ -348,7 +348,7 @@
       '<div class="v-main">'+(showKana?'<div class="v-read ja">'+esc(w.kana)+'</div>':'')+'<div class="v-word ja">'+esc(written)+'</div></div>'+
       '<div class="v-mean de hideable">'+esc(w.de)+ext+'</div>'+
       '<div class="v-meta"><span class="pos">'+esc(w.pos)+'</span>'+
-      (listsOn?'<button class="v-add" type="button" title="Zu Liste hinzufügen" data-vid="v:'+esc(w.kana)+'|'+w.lesson+'" data-word="'+esc(written)+'">＋</button>':'')+'</div>';
+      (listsOn?'<button class="v-add'+(inListCount('v:'+w.kana+'|'+w.lesson)>0?' in-list':'')+'" type="button" title="'+esc(addBtnTitle('v:'+w.kana+'|'+w.lesson,'Zu Liste hinzufügen'))+'" data-vid="v:'+esc(w.kana)+'|'+w.lesson+'" data-word="'+esc(written)+'">'+addBtnLabel('v:'+w.kana+'|'+w.lesson)+'</button>':'')+'</div>';
     return row;
   }
   // Ordnet eine Wortart einer Filter-Kategorie zu.
@@ -417,7 +417,8 @@
       btn.addEventListener('click',()=>openGrammarPractice(g));
       card.querySelector('.collapse-body').appendChild(btn);
     }
-    if(window.SRS){ const addb=el('button','gp-add btn','＋ Lernliste'); addb.type='button'; addb.dataset.pattern=g.pattern; card.querySelector('.collapse-body').appendChild(addb); }
+    if(window.SRS){ const gn=inListCount('g:'+g.pattern);
+      const addb=el('button','gp-add btn'+(gn>0?' in-list':''),'＋ Lernliste'+(gn>0?' ('+gn+')':'')); addb.type='button'; addb.dataset.pattern=g.pattern; card.querySelector('.collapse-body').appendChild(addb); }
     return card;
   }
   // Additiver „Mehr erklären"-Block + Übungen (window.Exercises) für Muster mit GRAMMATIK_PLUS.
@@ -1308,6 +1309,20 @@
   }
 
   /* ============================================================  LISTEN-PICKER (geteilt: Vokabular-Seite)  */
+  // Zähler am ＋-Button: „2+" statt „＋", wenn das Item schon in 2 Listen ist.
+  function inListCount(id){ return (window.SRS&&window.SRS.listsContaining)?window.SRS.listsContaining(id).length:0; }
+  function addBtnLabel(id){ const n=inListCount(id); return n>0?n+'+':'＋'; }
+  function addBtnTitle(id,base){ const n=inListCount(id); return n>0?('In '+n+(n===1?' Liste':' Listen')+' — '+base):base; }
+  // Nach dem Hinzufügen im Picker die betroffenen ＋-Buttons auf der Seite aktualisieren.
+  function refreshAddButtons(ids){
+    const set=new Set(ids||[]);
+    document.querySelectorAll('.v-add').forEach(b=>{ const id=b.dataset.vid; if(!set.has(id))return;
+      b.textContent=addBtnLabel(id); b.title=addBtnTitle(id,'Zu Liste hinzufügen'); b.classList.toggle('in-list',inListCount(id)>0); });
+    document.querySelectorAll('.kc-add').forEach(b=>{ const id='k:'+b.dataset.kanji; if(!set.has(id))return;
+      b.textContent=addBtnLabel(id); b.title=addBtnTitle(id,'Zur Lernliste hinzufügen'); b.classList.toggle('in-list',inListCount(id)>0); });
+    document.querySelectorAll('.gp-add').forEach(b=>{ const id='g:'+b.dataset.pattern; if(!set.has(id))return;
+      const n=inListCount(id); b.textContent='＋ Lernliste'+(n>0?' ('+n+')':''); b.classList.toggle('in-list',n>0); });
+  }
   let picker=null;
   function ensurePicker(){
     if(picker)return picker;
@@ -1330,11 +1345,14 @@
     const p=ensurePicker();
     p.title.textContent='„'+label+'" zu Liste hinzufügen';
     p.msg.textContent=''; p.name.value='';
-    function addTo(id,name){ window.SRS.addToList(id,ids); p.msg.textContent='✓ '+ids.length+' zu „'+name+'" hinzugefügt.'; renderExisting(); }
+    function addTo(id,name){ window.SRS.addToList(id,ids); p.msg.textContent='✓ '+ids.length+' zu „'+name+'" hinzugefügt.'; renderExisting(); refreshAddButtons(ids); }
     function renderExisting(){
       const ls=window.SRS.lists();
       p.existing.innerHTML = ls.length ? '<div class="pick-lbl">Vorhandene Listen</div>' : '<div class="pick-lbl">Noch keine Liste — leg unten eine an.</div>';
-      ls.forEach(l=>{ const b=el('button','pick-list','<span>'+esc(l.name)+'</span><span class="pick-n">'+l.items.length+'</span>'); b.type='button';
+      ls.forEach(l=>{
+        // ✓, wenn die Liste alle betroffenen Items bereits enthält.
+        const has=ids.every(id=>(l.items||[]).indexOf(id)!==-1);
+        const b=el('button','pick-list'+(has?' pick-has':''),(has?'<span class="pick-check" aria-hidden="true">✓</span>':'')+'<span class="pick-name-lbl">'+esc(l.name)+'</span><span class="pick-n">'+l.items.length+'</span>'); b.type='button';
         b.addEventListener('click',()=>addTo(l.id,l.name)); p.existing.appendChild(b); });
     }
     renderExisting();
