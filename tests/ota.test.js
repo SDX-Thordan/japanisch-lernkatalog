@@ -1,84 +1,59 @@
-// Unit-Test für assets/ota.js: Semver-Vergleich, Web-No-Op und der native Prüf-/Anwenden-Fluss
-// (über einen gemockten window.Capacitor). Kein echtes Gerät nötig.
-import { describe, it, expect, beforeEach } from 'vitest';
-import { loadScripts } from './helpers/load.js';
+// Unit-Test für assets/ota.js (STUB — OTA ist deaktiviert): meldet nie ein Update,
+// bestätigt aber weiterhin das aktive Bundle (notifyAppReady) gegen capgo-Auto-Rollback.
+import { describe, it, expect } from 'vitest';
+import { readFileSync } from 'node:fs';
+import { loadScripts, repoPath } from './helpers/load.js';
 
 const BODY = '<!DOCTYPE html><html><body></body></html>';
 
-let win;
-beforeEach(() => {
-  // url setzen → jsdom aktiviert localStorage (von ota.js für die gemerkte Version genutzt).
-  win = loadScripts(['assets/version.js', 'assets/ota.js'], { html: BODY, url: 'https://example.test/' });
-});
-
-function nativeCapacitor(manifestVersion, calls) {
-  return {
-    isNativePlatform: () => true,
-    Plugins: {
-      CapacitorHttp: { get: () => Promise.resolve({ data: JSON.stringify({ version: manifestVersion }) }) },
-      CapacitorUpdater: {
-        notifyAppReady: () => { (calls || []).push('ready'); return Promise.resolve(); },
-        download: () => { (calls || []).push('download'); return Promise.resolve({ id: 'b1', version: '2.0.0' }); },
-        // set() ist terminal (lädt neu); wir prüfen, dass es die BundleId {id} bekommt.
-        set: (opts) => { (calls || []).push('set:' + (opts && opts.id)); return Promise.resolve(); },
-        reload: () => { (calls || []).push('reload'); return Promise.resolve(); },
-      },
-    },
-  };
+function loadOta({ capacitor } = {}) {
+  // Capacitor muss VOR ota.js existieren (der Sofort-confirmReady liest ihn beim Laden).
+  const win = loadScripts([], { html: BODY, url: 'https://example.test/' });
+  if (capacitor) win.Capacitor = capacitor;
+  const script = win.document.createElement('script');
+  script.textContent = readFileSync(repoPath('assets/ota.js'), 'utf8');
+  win.document.head.appendChild(script);
+  return win;
 }
 
-describe('OTA — Versionslogik', () => {
-  it('vergleicht Semver numerisch (auch 1.10 > 1.2) und ignoriert -dev-Suffixe', () => {
-    expect(win.OTA.isNewer('1.0.1', '1.0.0')).toBe(true);
-    expect(win.OTA.isNewer('1.0.0', '1.0.0')).toBe(false);
-    expect(win.OTA.isNewer('1.2.0', '1.10.0')).toBe(false); // 10 > 2
-    expect(win.OTA.isNewer('1.10.0', '1.2.0')).toBe(true);
-    expect(win.OTA.isNewer('1.0.0', '1.0.0-dev.7')).toBe(false); // selbe Zahlen-Version
-  });
-});
-
-describe('OTA — Web (kein Capacitor)', () => {
-  it('ist ein No-Op: check() liefert false, kein Banner-Zustand', async () => {
+describe('OTA — deaktiviert (Stub)', () => {
+  it('Web: No-Op, check() liefert false, kein Update-Zustand', async () => {
+    const win = loadOta();
     expect(typeof win.OTA).toBe('object');
     expect(win.OTA.isNative()).toBe(false);
     await expect(win.OTA.check()).resolves.toBe(false);
-    expect(win.OTA.state().available).toBe(false);
-  });
-});
-
-describe('OTA — nativ (gemockt)', () => {
-  it('check() meldet ein neueres Bundle als verfügbar', async () => {
-    win.APP_VERSION = '1.0.0';
-    win.Capacitor = nativeCapacitor('2.0.0');
-    const avail = await win.OTA.check();
-    expect(avail).toBe(true);
-    expect(win.OTA.state().available).toBe(true);
-    expect(win.OTA.state().version).toBe('2.0.0');
-  });
-
-  it('check() meldet nichts, wenn das Manifest nicht neuer ist', async () => {
-    win.APP_VERSION = '2.0.0';
-    win.Capacitor = nativeCapacitor('2.0.0');
-    expect(await win.OTA.check()).toBe(false);
+    await expect(win.OTA.applyUpdate()).resolves.toBe(false);
     expect(win.OTA.state().available).toBe(false);
   });
 
-  it('applyUpdate() lädt das Bundle und ruft set() mit der BundleId {id} (terminal, kein reload)', async () => {
+  it('nativ: check() meldet NIE ein Update (OTA abgeschaltet)', async () => {
+    const win = loadOta({
+      capacitor: {
+        isNativePlatform: () => true,
+        Plugins: { CapacitorUpdater: { notifyAppReady: () => Promise.resolve() } },
+      },
+    });
+    expect(win.OTA.isNative()).toBe(true);
+    await expect(win.OTA.check()).resolves.toBe(false);
+    expect(win.OTA.state().available).toBe(false);
+  });
+
+  it('nativ: bestätigt das aktive Bundle sofort (notifyAppReady gegen Auto-Rollback)', () => {
     const calls = [];
-    win.APP_VERSION = '1.0.0';
-    win.Capacitor = nativeCapacitor('2.0.0', calls);
-    await win.OTA.check();
-    await win.OTA.applyUpdate();
-    // notifyAppReady ('ready') kann je nach Tick-Timing dazwischenfunken → herausfiltern.
-    // set() startet selbst neu → KEIN separates reload(); set bekommt {id} der heruntergeladenen Bundle.
-    expect(calls.filter((c) => c !== 'ready')).toEqual(['download', 'set:b1']);
+    loadOta({
+      capacitor: {
+        isNativePlatform: () => true,
+        Plugins: { CapacitorUpdater: { notifyAppReady: () => { calls.push('ready'); return Promise.resolve(); } } },
+      },
+    });
+    expect(calls).toContain('ready'); // Sofort-Aufruf beim Skript-Load
   });
 
-  it('vergleicht gegen die laufende APP_VERSION (kein localStorage-Desync nach Rollback)', async () => {
-    // Nach einem Rollback läuft wieder das alte Bundle → APP_VERSION ist alt → Update wird ERNEUT angeboten.
-    win.APP_VERSION = '1.0.0';
-    win.Capacitor = nativeCapacitor('2.0.0');
-    expect(await win.OTA.check()).toBe(true);
-    expect(win.OTA.state().version).toBe('2.0.0');
+  it('onChange liefert den (leeren) Zustand sofort, ohne je ein Update zu melden', () => {
+    const win = loadOta();
+    const seen = [];
+    win.OTA.onChange((st) => seen.push(st));
+    expect(seen).toHaveLength(1);
+    expect(seen[0].available).toBe(false);
   });
 });
