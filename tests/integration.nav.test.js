@@ -49,4 +49,32 @@ describe('renderNav', () => {
     const bnActive = win.document.querySelector('#bottomnav .bn-tab.active');
     expect(bnActive.textContent).toContain('Nachschlagen');
   });
+
+  it('Tabs tragen title-Tooltips (Labels werden beim Scrollen ausgeblendet)', () => {
+    const win = page('kanji');
+    expect(win.document.querySelector('.subnav-tab.active').title).toBe('Kanji');
+    expect([...win.document.querySelectorAll('#topnav .nav-tab')].every((a) => a.title)).toBe(true);
+  });
+});
+
+describe('Scroll: Menüs kompakt als Icons', () => {
+  function frame(win) { return new Promise((r) => win.requestAnimationFrame(() => r())); }
+
+  it('setzt body.scrolled beim Runter- und entfernt sie beim Hochscrollen', async () => {
+    const win = page('kanji');
+    expect(win.document.body.classList.contains('scrolled')).toBe(false);
+    Object.defineProperty(win, 'scrollY', { value: 200, configurable: true, writable: true });
+    win.dispatchEvent(new win.Event('scroll'));
+    await frame(win);
+    expect(win.document.body.classList.contains('scrolled')).toBe(true);
+    win.scrollY = 0;
+    win.dispatchEvent(new win.Event('scroll'));
+    await frame(win);
+    expect(win.document.body.classList.contains('scrolled')).toBe(false);
+  });
+
+  it('misst die Topbar-Höhe in --topbar-h (Sticky-Anker der Subnav)', () => {
+    const win = page('kanji');
+    expect(win.document.documentElement.style.getPropertyValue('--topbar-h')).toMatch(/px$/);
+  });
 });

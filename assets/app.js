@@ -131,7 +131,25 @@
   function navLink(it,page,cls){
     const active=(it.match?it.match.indexOf(page)!==-1:it.page===page);
     const a=el('a',cls+(active?' active':''),icon(it.icon)+'<span class="nav-label">'+esc(it.label)+'</span>');
-    a.href=it.href; if(active)a.setAttribute('aria-current','page'); return a;
+    a.href=it.href; a.title=it.label; if(active)a.setAttribute('aria-current','page'); return a;
+  }
+  // Beim Runterscrollen bleiben die Menüs als Icons sichtbar: body.scrolled blendet die
+  // Textlabels aus (Topbar + Subnav werden kompakt); --topbar-h hält die Subnav sticky darunter.
+  function initScrollNav(){
+    const tb=document.querySelector('.topbar');
+    function measure(){
+      if(tb)document.documentElement.style.setProperty('--topbar-h',tb.offsetHeight+'px');
+      const sn=document.querySelector('.subnav');
+      document.documentElement.style.setProperty('--subnav-h',(sn?sn.offsetHeight:0)+'px');
+    }
+    let ticking=false;
+    function onScroll(){
+      if(ticking)return; ticking=true;
+      requestAnimationFrame(()=>{ document.body.classList.toggle('scrolled',window.scrollY>60); measure(); ticking=false; });
+    }
+    measure();
+    window.addEventListener('scroll',onScroll,{passive:true});
+    window.addEventListener('resize',measure,{passive:true});
   }
   function renderNav(page){
     // Obere, gruppierte Leiste (Browser)
@@ -1572,7 +1590,7 @@
     if(page==='schreiben')initSchreiben();
     if(page==='listen')initListen();
     if(page==='lernpfad')initLernpfad();
-    initSearch(); initToggles();
+    initSearch(); initToggles(); initScrollNav();
   }
   /* ---------- geteilte Helfer für die neuen Module (srs.js, exercises.js, kanji-write.js) ----------
      Additiv: macht die intern definierten Helfer nutzbar, ohne sie zu duplizieren.

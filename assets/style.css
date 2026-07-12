@@ -99,12 +99,25 @@ body {
 /* ---------- Untere Tab-Leiste (App / schmal) ---------- */
 .bottomnav { display: none; }
 
-/* ---------- Sekundäre Tab-Zeile (Nachschlagen) ---------- */
-.subnav { display: flex; gap: .4rem; flex-wrap: wrap; margin: 0 0 1.1rem; }
-.subnav-tab { display: inline-flex; align-items: center; gap: .3rem; text-decoration: none; color: var(--muted); border: 1px solid var(--border); border-radius: 999px; padding: .3rem .8rem; font-size: .85rem; font-weight: 600; }
+/* ---------- Sekundäre Tab-Zeile (Nachschlagen) ----------
+   Sticky unter der Topbar: bleibt beim Scrollen sichtbar; body.scrolled blendet die
+   Textlabels aus, sodass nur die Icons stehen bleiben (kompakt, v. a. mobil). */
+.subnav { display: flex; gap: .4rem; flex-wrap: wrap; margin: 0 0 1.1rem;
+  position: sticky; top: var(--topbar-h, 3.2rem); z-index: 40;
+  background: var(--bg); padding: .45rem 0; }
+.subnav-tab { display: inline-flex; align-items: center; gap: .3rem; text-decoration: none; color: var(--muted); border: 1px solid var(--border); border-radius: 999px; padding: .3rem .8rem; font-size: .85rem; font-weight: 600; background: var(--surface); transition: padding .15s; }
 .subnav-tab .msi { font-size: 1rem; }
 .subnav-tab:hover { border-color: var(--accent); color: var(--accent); }
 .subnav-tab.active { background: var(--accent); color: #fff; border-color: var(--accent); }
+body.scrolled .subnav-tab .nav-label { display: none; }
+body.scrolled .subnav-tab { padding: .35rem .55rem; }
+body.scrolled .subnav-tab .msi { font-size: 1.2rem; }
+
+/* Topbar kompakt beim Scrollen: Gruppentitel + Labels weg, nur Icon-Tabs. */
+body.scrolled .nav-group-label { display: none; }
+body.scrolled .nav-tab .nav-label { display: none; }
+body.scrolled .nav { align-items: center; }
+body.scrolled .topbar-inner { padding-top: .35rem; padding-bottom: .35rem; }
 
 @media (max-width: 760px) {
   .nav { display: none; }
@@ -182,8 +195,9 @@ main {
 /* ---------- Werkzeugleiste (Suche, Filter, Schalter) ---------- */
 .toolbar {
   position: sticky;
-  top: 49px;
-  z-index: 40;
+  /* Unter Topbar + (falls vorhanden) Subnav gestaffelt; Höhen werden in app.js gemessen. */
+  top: calc(var(--topbar-h, 49px) + var(--subnav-h, 0px));
+  z-index: 39;
   background: rgba(246,243,236,.92);
   backdrop-filter: blur(8px);
   padding: .7rem 0;
@@ -488,7 +502,6 @@ footer .jp { font-family: var(--font-ja); }
   .kanji-grid { grid-template-columns: 1fr 1fr; }
   .kanji-char { font-size: 3rem; }
   .nav { width: 100%; margin-left: 0; }
-  .toolbar { top: 0; }
   /* Filter-Schalter auf dem Handy zeigen; eingeklappt = Chips ausblenden (beide Markup-Varianten) */
   .toggle-filters { display: inline-flex; }
   body.filters-collapsed .toolbar .filter-row,
