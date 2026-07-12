@@ -1,7 +1,8 @@
 // Datenverlust-Schutz im SRS-Store: korrupte Daten werden gerettet statt überschrieben,
 // tägliches Auto-Backup, Wiederherstellung bei fehlendem Haupt-Key, Reset sichert vorher.
 import { describe, it, expect } from 'vitest';
-import { loadWithData } from './helpers/load.js';
+import { readFileSync } from 'node:fs';
+import { loadWithData, loadScripts, repoPath } from './helpers/load.js';
 
 const KEY = 'katalog_srs_v1';
 
@@ -82,6 +83,31 @@ describe('Store-Sicherheit', () => {
     win.SRS._useStorage(st2);
     expect(win.SRS.get('v:a|1').score).toBe(20);
     expect(st2._dump()[KEY + '_rescue']).toBe('zerschossen');
+  });
+
+  it('REGRESSION Reload-Pfad: Bestandsdaten im localStorage überleben die Skript-Auswertung', () => {
+    // Wie ein echter Seiten-Reload: die Daten liegen BEREITS im localStorage, wenn srs.js
+    // ausgewertet wird (var store = load() läuft beim Parsen — nicht erst nach _useStorage).
+    // Genau hier verlor ein zu spät zugewiesenes ACTIVITY_KEEP (undefined → addDays warf)
+    // den kompletten Store.
+    const win = loadScripts([], { html: '<!DOCTYPE html><html><body></body></html>', url: 'https://example.test/' });
+    const data = {
+      v: 1,
+      items: { 'v:わたし|1': { score: 40, last: '2026-06-10', reps: 2, lapses: 0, streak: 2, history: [] } },
+      lessons: {}, lists: { l1: { id: 'l1', name: 'Meine', created: '2026-06-10', items: ['v:わたし|1'] } },
+      daily: {}, activity: { '2026-06-10': { gain: 40, reviews: 2 } },
+      stats: { streakDays: 1, lastActive: '2026-06-10', totalReviews: 2 },
+    };
+    win.localStorage.setItem(KEY, JSON.stringify(data));
+    for (const f of ['assets/app.js', 'assets/srs.js']) {
+      const s = win.document.createElement('script');
+      s.textContent = readFileSync(repoPath(f), 'utf8');
+      win.document.head.appendChild(s);
+    }
+    expect(win.localStorage.getItem(KEY + '_rescue')).toBe(null); // nichts zu retten
+    expect(win.SRS.lists().map((l) => l.name)).toEqual(['Meine']);
+    expect(win.SRS.get('v:わたし|1').score).toBe(40);
+    expect(win.SRS.dailyHistory('2026-06-10', 1)[0]).toMatchObject({ gain: 40, reviews: 2 });
   });
 
   it('reset() sichert den alten Stand vorher ins Backup', () => {
