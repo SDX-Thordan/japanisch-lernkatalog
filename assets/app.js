@@ -42,12 +42,30 @@
       if(c==='っ'){ const nr=ROMA_DI[k.substr(i+1,2)]||ROMA_MO[k[i+1]]||''; if(nr)r+=nr[0]; continue; }
       r+=(ROMA_MO[c]!=null)?ROMA_MO[c]:c; }
     return r; }
-  // Wandelt einen Beispielsatz in Ruby-HTML um, falls Furigana-Daten vorliegen (Notation {Basis|Lesung}).
+  // ADAPTIVE Furigana für Erklärungs-/Beispieltexte: Lesungen erscheinen nur über Kanji,
+  // die noch nicht beherrscht sind — Kanji außerhalb des Lernstoffs sind nie beherrscht
+  // und bekommen daher immer eine Lesung (Nutzerwunsch: Erklärungen lesbar halten).
+  function kanjiUnmastered(word){
+    for(const ch of String(word)){
+      if(/[㐀-鿿]/.test(ch) && !(window.SRS&&window.SRS.isMastered&&window.SRS.isMastered('k:'+ch)))return true;
+    }
+    return false;
+  }
+  // Wandelt einen Satz in Ruby-HTML um: exakte Furigana-Daten ({Basis|Lesung}) haben Vorrang
+  // und werden adaptiv gerendert; ohne Eintrag übernimmt das Wörterbuch-Furigana der
+  // Übungs-Engine (Exercises.autoFuri, ebenfalls adaptiv); ganz ohne beides bleibt esc.
   function furiToRuby(jp){
     const f=(window.GRAMMATIK_FURIGANA||{})[jp];
-    if(!f) return esc(jp);
+    if(!f){
+      if(window.Exercises&&window.Exercises.autoFuri)return window.Exercises.autoFuri(jp);
+      return esc(jp);
+    }
     let out='', last=0, m; const re=/\{([^|{}]+)\|([^{}]+)\}/g;
-    while((m=re.exec(f))){ out+=esc(f.slice(last,m.index)); out+='<ruby>'+esc(m[1])+'<rt>'+esc(m[2])+'</rt></ruby>'; last=re.lastIndex; }
+    while((m=re.exec(f))){
+      out+=esc(f.slice(last,m.index));
+      out+=kanjiUnmastered(m[1])?('<ruby>'+esc(m[1])+'<rt>'+esc(m[2])+'</rt></ruby>'):esc(m[1]);
+      last=re.lastIndex;
+    }
     out+=esc(f.slice(last)); return out;
   }
 
@@ -343,7 +361,7 @@
     // Erweiterte Bedeutung (Beispielsatz + Notiz) ist verdeckt und klappt per Klick auf die Karte auf.
     if(bsp)row.dataset.ext='1';
     const ext=bsp?'<span class="v-more" aria-hidden="true" title="Beispiel anzeigen">›</span>'+
-      '<div class="v-ext"><div class="v-bsp-inline"><span class="ja">'+esc(bsp.jp)+'</span> — '+esc(bsp.de)+(bsp.note?'<span class="v-note"> · '+esc(bsp.note)+'</span>':'')+'</div></div>':'';
+      '<div class="v-ext"><div class="v-bsp-inline"><span class="ja">'+furiToRuby(bsp.jp)+'</span> — '+esc(bsp.de)+(bsp.note?'<span class="v-note"> · '+esc(bsp.note)+'</span>':'')+'</div></div>':'';
     row.innerHTML='<span class="v-score">'+scoreBadgeHtml('v:'+w.kana+'|'+w.lesson)+'</span>'+
       '<div class="v-main">'+(showKana?'<div class="v-read ja">'+esc(w.kana)+'</div>':'')+'<div class="v-word ja">'+esc(written)+'</div></div>'+
       '<div class="v-mean de hideable">'+esc(w.de)+ext+'</div>'+
@@ -386,7 +404,7 @@
       const card=h.closest('.collapsible'); if(card)card.classList.toggle('collapsed'); });
   }
   function gpTable(t){
-    const rows=(t.rows||[]).map(r=>'<tr><th>'+esc(r.g)+'</th><td>'+esc(r.regel)+'</td><td class="ja">'+esc(r.bsp)+'</td></tr>').join('');
+    const rows=(t.rows||[]).map(r=>'<tr><th>'+esc(r.g)+'</th><td>'+esc(r.regel)+'</td><td class="ja">'+furiToRuby(r.bsp)+'</td></tr>').join('');
     return '<table class="conj-table"><thead><tr><th>Gruppe</th><th>Regel</th><th>Beispiel</th></tr></thead><tbody>'+rows+'</tbody></table>';
   }
   function grammarCard(g,L){
@@ -401,9 +419,9 @@
       '<div class="gp-head card-toggle">'+scoreBadgeHtml('g:'+g.pattern)+'<span class="gp-pattern">'+esc(g.pattern)+'</span>'+
       (g.title?'<span class="gp-title">'+esc(g.title)+'</span>':'')+'<span class="tag">L'+L+'</span></div>'+
       '<div class="collapse-body">'+
-      (g.bildung?'<div class="gp-bildung"><b>Bildung:</b> '+esc(g.bildung)+'</div>':'')+
+      (g.bildung?'<div class="gp-bildung"><b>Bildung:</b> '+furiToRuby(g.bildung)+'</div>':'')+
       (g.tabelle?gpTable(g.tabelle):'')+
-      (g.erklaerung?'<p class="gp-erk">'+esc(g.erklaerung)+'</p>':'')+
+      (g.erklaerung?'<p class="gp-erk">'+furiToRuby(g.erklaerung)+'</p>':'')+
       (ex?'<ul class="gp-ex">'+ex+'</ul>':'')+
       '</div>';
     const plus=(window.GRAMMATIK_PLUS||{})[g.pattern];
@@ -424,15 +442,15 @@
   // Additiver „Mehr erklären"-Block + Übungen (window.Exercises) für Muster mit GRAMMATIK_PLUS.
   function grammarPlusBlock(g,plus){
     const wrap=el('div','gp-plus');
-    if(plus.erklaerung_lang)wrap.appendChild(el('div','gp-plus-erk','<b>Mehr erklären:</b> '+esc(plus.erklaerung_lang)));
+    if(plus.erklaerung_lang)wrap.appendChild(el('div','gp-plus-erk','<b>Mehr erklären:</b> '+furiToRuby(plus.erklaerung_lang)));
     if(plus.fehler&&plus.fehler.length){
       wrap.appendChild(el('div','gp-plus-h','Häufige Fehler'));
-      const ul=el('ul','gp-fehler'); plus.fehler.forEach(f=>ul.appendChild(el('li',null,esc(f)))); wrap.appendChild(ul);
+      const ul=el('ul','gp-fehler'); plus.fehler.forEach(f=>ul.appendChild(el('li',null,furiToRuby(f)))); wrap.appendChild(ul);
     }
     if(plus.kontrast&&plus.kontrast.length){
       wrap.appendChild(el('div','gp-plus-h','Abgrenzung'));
       const ul=el('ul','gp-kontrast');
-      plus.kontrast.forEach(k=>ul.appendChild(el('li',null,'<span class="ja">'+esc(k.a)+'</span> ↔ <span class="ja">'+esc(k.b)+'</span> — '+esc(k.note))));
+      plus.kontrast.forEach(k=>ul.appendChild(el('li',null,'<span class="ja">'+furiToRuby(k.a)+'</span> ↔ <span class="ja">'+furiToRuby(k.b)+'</span> — '+esc(k.note))));
       wrap.appendChild(ul);
     }
     // Übungen werden nicht mehr hier gestartet, sondern über den EINEN „Üben"-Knopf der Karte
@@ -817,15 +835,15 @@
       return '<div class="tr-answer-jp ja">'+ruby(written,v.kana)+'</div>'+
       '<div class="tr-mean">'+esc(v.de)+'</div>'+
       '<div class="tr-tag"><span class="pos">'+esc(v.pos)+'</span> · Lektion '+v.lesson+'</div>'+
-      (bsp?'<div class="v-bsp"><div class="v-bsp-jp ja">'+esc(bsp.jp)+'</div>'+
+      (bsp?'<div class="v-bsp"><div class="v-bsp-jp ja">'+furiToRuby(bsp.jp)+'</div>'+
         (bsp.r?'<div class="v-bsp-r">'+esc(bsp.r)+'</div>':'')+
         '<div class="v-bsp-de">'+esc(bsp.de)+'</div>'+
         (bsp.note?'<div class="v-note">'+esc(bsp.note)+'</div>':'')+'</div>':''); }
     const g=c.d, ex=(g.beispiele||[]).slice(0,2).map(b=>'<li><span class="ex-jp">'+furiToRuby(b.jp)+'</span>'+
       '<span class="ex-trans">'+esc(b.de)+'</span></li>').join('');
     return '<div class="tr-mean">'+esc(g.title||'')+' <span class="tag">L'+g.lesson+'</span></div>'+
-      (g.bildung?'<div class="gp-bildung"><b>Bildung:</b> '+esc(g.bildung)+'</div>':'')+
-      (g.erklaerung?'<p class="gp-erk">'+esc(g.erklaerung)+'</p>':'')+(ex?'<ul class="gp-ex">'+ex+'</ul>':'');
+      (g.bildung?'<div class="gp-bildung"><b>Bildung:</b> '+furiToRuby(g.bildung)+'</div>':'')+
+      (g.erklaerung?'<p class="gp-erk">'+furiToRuby(g.erklaerung)+'</p>':'')+(ex?'<ul class="gp-ex">'+ex+'</ul>':'');
   }
 
   /* ============================================================  HEUTE (Tagesaufgabe)  */
@@ -911,10 +929,10 @@
     // Fehler-Feedback: kurzer Hinweis bei falscher Antwort (Beispiel/Notiz bzw. typischer Grammatikfehler).
     function mistakeHint(c){
       if(c.type==='vocab'){ const b=(window.VOKABULAR_BEISPIELE||{})[c.data.kana+'|'+c.data.lesson];
-        return b?'<div class="fb-hint"><span class="ja">'+esc(b.jp)+'</span> — '+esc(b.de)+(b.note?'<div class="v-note">'+esc(b.note)+'</div>':'')+'</div>':''; }
+        return b?'<div class="fb-hint"><span class="ja">'+furiToRuby(b.jp)+'</span> — '+esc(b.de)+(b.note?'<div class="v-note">'+esc(b.note)+'</div>':'')+'</div>':''; }
       if(c.type==='grammar'){ const p=(window.GRAMMATIK_PLUS||{})[c.data.pattern];
         const f=p&&((p.fehler&&p.fehler[0])||p.erklaerung_lang);
-        return f?'<div class="fb-hint"><b>Tipp:</b> '+esc(String(f))+'</div>':''; }
+        return f?'<div class="fb-hint"><b>Tipp:</b> '+furiToRuby(String(f))+'</div>':''; }
       return '';
     }
     function finishItem(grade){ const c=deck[0]; if(grade!=null&&c)window.SRS.grade(c.id,grade); deck.shift(); refreshStats(); render(); }
@@ -1006,7 +1024,7 @@
           (showKana?'<div class="tc-reading ja">'+esc(d.kana)+'</div>':'')+
           '<div class="tc-de">'+esc(d.de)+'</div>'+
           (d.pos?'<div class="tc-pos">'+esc(d.pos)+'</div>':'')+
-          (bsp?'<div class="v-bsp"><div class="v-bsp-jp ja">'+esc(bsp.jp)+'</div>'+(bsp.r?'<div class="v-bsp-r">'+esc(bsp.r)+'</div>':'')+'<div class="v-bsp-de">'+esc(bsp.de)+'</div>'+(bsp.note?'<div class="v-note">'+esc(bsp.note)+'</div>':'')+'</div>':'');
+          (bsp?'<div class="v-bsp"><div class="v-bsp-jp ja">'+furiToRuby(bsp.jp)+'</div>'+(bsp.r?'<div class="v-bsp-r">'+esc(bsp.r)+'</div>':'')+'<div class="v-bsp-de">'+esc(bsp.de)+'</div>'+(bsp.note?'<div class="v-note">'+esc(bsp.note)+'</div>':'')+'</div>':'');
       } else if(c.type==='kanji'){ // Kanji vorstellen, bevor geschrieben wird
         const onr=(d.on||[]).join('・'), kunr=(d.kun||[]).join('・');
         const exHtml=(d.examples||[]).slice(0,2).map(e=>'<div class="v-bsp"><div class="v-bsp-jp ja">'+ruby(e.w,e.r)+'</div><div class="v-bsp-de">'+esc(e.m)+'</div></div>').join('');
@@ -1024,12 +1042,12 @@
         inner='<div class="tc-badge">Neues Muster</div>'+
           '<div class="tr-big ja">'+esc(d.pattern)+'</div>'+
           (d.title?'<div class="tc-de">'+esc(d.title)+'</div>':'')+
-          (d.bildung?'<div class="tc-bildung"><b>Bildung:</b> '+esc(d.bildung)+'</div>':'')+
-          (d.erklaerung?'<p class="tc-erk">'+esc(d.erklaerung)+'</p>':'')+
-          (plus.erklaerung_lang?'<p class="tc-erk tc-erk-more">'+esc(plus.erklaerung_lang)+'</p>':'')+
+          (d.bildung?'<div class="tc-bildung"><b>Bildung:</b> '+furiToRuby(d.bildung)+'</div>':'')+
+          (d.erklaerung?'<p class="tc-erk">'+furiToRuby(d.erklaerung)+'</p>':'')+
+          (plus.erklaerung_lang?'<p class="tc-erk tc-erk-more">'+furiToRuby(plus.erklaerung_lang)+'</p>':'')+
           exHtml+
-          (plus.kontrast&&plus.kontrast.length?'<div class="tc-note tc-kontrast"><b>Abgrenzung:</b><ul>'+plus.kontrast.slice(0,2).map(k=>'<li><span class="ja">'+esc(k.a)+'</span> ↔ <span class="ja">'+esc(k.b)+'</span> — '+esc(k.note)+'</li>').join('')+'</ul></div>':'')+
-          (plus.fehler&&plus.fehler.length?'<div class="tc-note tc-fehler"><b>Typische Fehler:</b><ul>'+plus.fehler.slice(0,3).map(f=>'<li>'+esc(f)+'</li>').join('')+'</ul></div>':'');
+          (plus.kontrast&&plus.kontrast.length?'<div class="tc-note tc-kontrast"><b>Abgrenzung:</b><ul>'+plus.kontrast.slice(0,2).map(k=>'<li><span class="ja">'+furiToRuby(k.a)+'</span> ↔ <span class="ja">'+furiToRuby(k.b)+'</span> — '+esc(k.note)+'</li>').join('')+'</ul></div>':'')+
+          (plus.fehler&&plus.fehler.length?'<div class="tc-note tc-fehler"><b>Typische Fehler:</b><ul>'+plus.fehler.slice(0,3).map(f=>'<li>'+furiToRuby(f)+'</li>').join('')+'</ul></div>':'');
       }
       body.innerHTML='<div class="tr-card tc-card">'+inner+
         '<div class="tr-controls"><button class="btn-primary tc-next" type="button">Verstanden – weiter <span class="kbd">Leertaste</span></button></div></div>';
@@ -1527,7 +1545,7 @@
         const bsp=o.type==='vocab'?(window.VOKABULAR_BEISPIELE||{})[o.data.kana+'|'+o.data.lesson]:null;
         // Erweiterte Bedeutung (Beispiel + Notiz) klappt per Klick auf die Zeile auf (nur Vokabeln).
         const ext=bsp?'<span class="v-more" aria-hidden="true" title="Beispiel anzeigen">›</span>'+
-          '<div class="v-ext"><div class="v-bsp-inline"><span class="ja">'+esc(bsp.jp)+'</span> — '+esc(bsp.de)+(bsp.note?'<span class="v-note"> · '+esc(bsp.note)+'</span>':'')+'</div></div>':'';
+          '<div class="v-ext"><div class="v-bsp-inline"><span class="ja">'+furiToRuby(bsp.jp)+'</span> — '+esc(bsp.de)+(bsp.note?'<span class="v-note"> · '+esc(bsp.note)+'</span>':'')+'</div></div>':'';
         const tag=o.type!=='vocab'?'<span class="lst-tag">'+(o.type==='kanji'?'漢字':'文法')+'</span>':'';
         row.innerHTML='<span class="lst-jp ja">'+itemFrontHtml(o)+'</span><span class="lst-de">'+tag+esc(itemMeaning(o))+ext+'</span>';
         if(bsp){ row.dataset.ext='1'; row.addEventListener('click',e=>{ if(e.target.closest('.lst-rm'))return; row.classList.toggle('expanded'); }); }
