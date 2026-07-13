@@ -7,21 +7,46 @@ function fakeStorage() {
   return { getItem: (k) => (k in d ? d[k] : null), setItem: (k, v) => { d[k] = String(v); }, removeItem: (k) => { delete d[k]; } };
 }
 
+const UPDATE_PANEL = `
+  <p id="f-update-diag" hidden></p>
+  <button id="f-update-check"></button><button id="f-update-apply" hidden></button>
+  <p id="f-update-msg"></p>`;
+
 const BODY = `<!DOCTYPE html><html><body data-page="profil"><div id="f-root">
   <span id="f-streak"></span><span id="f-learned"></span><span id="f-due"></span><span id="f-reviews"></span>
   <div class="act-bars" id="f-activity"></div>
   <div id="f-calendar"></div>
   <div id="f-forecast"></div>
+  ${UPDATE_PANEL}
   <button id="f-export"></button><button id="f-import"></button><input id="f-file" type="file">
   <button id="f-reset"></button><p id="f-msg"></p>
 </div></body></html>`;
 
+// Nativ-Variante: capgo-Mock wird als Inline-Skript VOR ota.js/app.js definiert (wie am Gerät).
+function nativeBody(nativeVersion, manifestVersion) {
+  return BODY.replace('<div id="f-root">', `<div id="f-root">
+    <script>
+      window.APP_VERSION='1.0.0';
+      window.Capacitor={ isNativePlatform:()=>true, Plugins:{
+        CapacitorHttp:{ get:()=>Promise.resolve({ data: JSON.stringify({version:'${manifestVersion}'}) }) },
+        CapacitorUpdater:{
+          notifyAppReady:()=>Promise.resolve(),
+          current:()=>Promise.resolve({ bundle:{id:'b1',version:''}, native:'${nativeVersion}' }),
+          reset:()=>Promise.resolve(),
+          download:(o)=>{ window.__otaCalls=(window.__otaCalls||[]).concat('download:'+o.version); return Promise.resolve({id:'bX',version:o.version}); },
+          set:(o)=>{ window.__otaCalls=(window.__otaCalls||[]).concat('set:'+o.id); return Promise.resolve(); },
+        } } };
+    <\/script>`);
+}
+
+const SCRIPTS = [
+  'assets/data/kanji.js', 'assets/data/vokabular.js', 'assets/data/grammatik.js',
+  'assets/ota.js', 'assets/srs.js', 'assets/app.js',
+];
+
 let win;
 beforeEach(() => {
-  win = loadScripts([
-    'assets/data/kanji.js', 'assets/data/vokabular.js', 'assets/data/grammatik.js',
-    'assets/srs.js', 'assets/app.js',
-  ], { html: BODY });
+  win = loadScripts(SCRIPTS, { html: BODY });
   win.SRS._useStorage(fakeStorage());
 });
 
@@ -54,6 +79,43 @@ describe('Fortschritt-Seite', () => {
     const reset = win.document.getElementById('f-reset');
     // forecast wird in draw() befüllt; prüfe nach einem Import-Trigger-freien Redraw via Reset-Abbruch
     expect(win.document.querySelectorAll('#f-forecast .f-bar').length).toBe(7);
+  });
+
+  it('App-Update im Web: Button deaktiviert + Hinweis, kein Banner-Element', () => {
+    const upd = win.document.getElementById('f-update-check');
+    expect(upd.disabled).toBe(true);
+    expect(win.document.getElementById('f-update-msg').textContent).toContain('automatisch');
+    expect(win.document.getElementById('ota-bar')).toBe(null); // es gibt keinen Auto-Banner mehr
+  });
+
+  it('App-Update nativ: Diagnose-Zeile + Check zeigt Update, Apply lädt & setzt Bundle', async () => {
+    const w = loadScripts(SCRIPTS, { html: nativeBody('1.0.0', '2.0.0') });
+    w.SRS._useStorage(fakeStorage());
+    await tick(); await tick();
+    // Diagnose: aktives Bundle vs. eingebaute APK-Version
+    const diag = w.document.getElementById('f-update-diag');
+    expect(diag.hidden).toBe(false);
+    expect(diag.textContent).toContain('v1.0.0');
+    // Check über den Button → Update wird angeboten (Apply-Button erscheint)
+    w.document.getElementById('f-update-check').dispatchEvent(new w.Event('click', { bubbles: true }));
+    await tick(); await tick();
+    expect(w.document.getElementById('f-update-msg').textContent).toContain('2.0.0');
+    const apply = w.document.getElementById('f-update-apply');
+    expect(apply.hidden).toBe(false);
+    // Anwenden → download + set (terminal)
+    apply.dispatchEvent(new w.Event('click', { bubbles: true }));
+    await tick(); await tick();
+    expect(w.__otaCalls).toEqual(['download:2.0.0', 'set:bX']);
+  });
+
+  it('App-Update nativ: kein Update → Apply bleibt versteckt', async () => {
+    const w = loadScripts(SCRIPTS, { html: nativeBody('1.0.0', '1.0.0') });
+    w.SRS._useStorage(fakeStorage());
+    await tick();
+    w.document.getElementById('f-update-check').dispatchEvent(new w.Event('click', { bubbles: true }));
+    await tick(); await tick();
+    expect(w.document.getElementById('f-update-msg').textContent).toContain('neueste');
+    expect(w.document.getElementById('f-update-apply').hidden).toBe(true);
   });
 
   it('Export liefert gültiges JSON, Import (merge) stellt Items wieder her', () => {

@@ -6,7 +6,7 @@
     "CapacitorUpdater": {
       "autoUpdate": false,
       "appReadyTimeout": 30000,
-      "resetWhenUpdate": true
+      "resetWhenUpdate": false
     }
   }
 }
