@@ -81,6 +81,17 @@
     <div class="lp-lessons" id="f-lessons"></div>
   </section>
 
+  <section class="panel" id="f-update-panel">
+    <h2>App-Update <span class="jp">更新</span></h2>
+    <p style="color:var(--muted);margin-top:0">Updates werden nur hier geprüft — kein automatischer Hinweis. Beim App-Start wird zusätzlich sichergestellt, dass kein veraltetes Update-Bundle aktiv bleibt.</p>
+    <p class="f-diag" id="f-update-diag" hidden></p>
+    <div class="f-actions">
+      <button class="btn-primary" id="f-update-check" type="button"><span class="msi" aria-hidden="true">system_update</span> Nach Updates suchen</button>
+      <button class="btn" id="f-update-apply" type="button" hidden>Update installieren</button>
+    </div>
+    <p class="f-msg" id="f-update-msg" role="status"></p>
+  </section>
+
   <section class="panel">
     <h2>Sicherung <span class="jp">バックアップ</span></h2>
     <p style="color:var(--muted);margin-top:0">Exportiere deinen kompletten Lernstand (Fortschritt, Lektionen &amp; Lernlisten) als JSON oder importiere eine Sicherung (wird zusammengeführt).</p>

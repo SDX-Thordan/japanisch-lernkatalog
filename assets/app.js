@@ -1193,6 +1193,28 @@
           if(msg)msg.textContent=res.ok?'✓ Fortschritt importiert (zusammengeführt).':'✗ Datei ungültig oder falsche Version.'; draw(); }; r.readAsText(f); }); }
     const rst=document.getElementById('f-reset'); if(rst)rst.addEventListener('click',()=>{
       if(window.confirm('Wirklich den gesamten Fortschritt löschen? Tipp: vorher exportieren.')){ window.SRS.reset(); const msg=document.getElementById('f-msg'); if(msg)msg.textContent='Fortschritt zurückgesetzt.'; draw(); } });
+    // App-Update (OTA): NUR hier, kein Auto-Banner. Diagnose-Zeile zeigt, welches Bundle
+    // wirklich läuft (aktiv vs. eingebaut) — macht jedes Zurückrollen sofort sichtbar.
+    const upd=document.getElementById('f-update-check'), uap=document.getElementById('f-update-apply'),
+          umsg=document.getElementById('f-update-msg'), udiag=document.getElementById('f-update-diag');
+    if(upd){
+      if(!(window.OTA&&window.OTA.isNative&&window.OTA.isNative())){
+        upd.disabled=true; if(umsg)umsg.textContent='In dieser (Web-)Version aktualisiert sich die App automatisch beim Neuladen.';
+      } else {
+        if(udiag&&window.OTA.versions)window.OTA.versions().then(v=>{
+          udiag.hidden=false;
+          udiag.textContent='Aktives Bundle: v'+v.current+(v.native?' · Eingebaut (APK): v'+v.native:'');
+        });
+        upd.addEventListener('click',()=>{ if(umsg)umsg.textContent='Suche nach Updates …';
+          window.OTA.check().then(av=>{
+            const st=window.OTA.state();
+            if(uap){ uap.hidden=!av; if(av)uap.textContent='Update auf v'+st.version+' installieren'; }
+            if(umsg)umsg.textContent=av?('Update auf v'+st.version+' verfügbar.'):'Du hast bereits die neueste Version.';
+          }).catch(()=>{ if(umsg)umsg.textContent='Update-Prüfung fehlgeschlagen (offline?).'; }); });
+        if(uap)uap.addEventListener('click',()=>{ if(umsg)umsg.textContent='Update wird geladen … Die App startet gleich neu.';
+          window.OTA.applyUpdate().catch(e=>{ if(umsg)umsg.textContent='Update fehlgeschlagen: '+(e&&e.message||e); }); });
+      }
+    }
   }
 
   /* ============================================================  SCHREIBEN (Kanji-Schreibübung)  */

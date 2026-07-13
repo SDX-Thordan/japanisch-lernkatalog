@@ -493,6 +493,7 @@ footer {
 }
 footer .jp { font-family: var(--font-ja); }
 .app-version { display: block; margin-top: .6rem; font-size: .76rem; color: var(--faint); letter-spacing: .02em; }
+.f-diag { color: var(--muted); font-size: .85rem; margin: 0 0 .6rem; font-variant-numeric: tabular-nums; }
 .footer-gh { display: inline-flex; align-items: center; margin-top: .5rem; color: var(--faint); transition: color .15s; }
 .footer-gh:hover, .footer-gh:focus-visible { color: var(--accent); }
 .footer-gh svg { display: block; }
