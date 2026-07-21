@@ -71,6 +71,26 @@ describe('Vokabular — erweiterte Bedeutung aufklappen', () => {
     expect(other.textContent).toBe('＋');
   });
 
+  it('Verben: Wörterbuchform als Stichwort, ます-Form erst beim Aufklappen', () => {
+    const K = win.Katalog;
+    const verb = win.VOKABULAR.find((v) => /^V\./.test(v.pos) && K.conjugate(v.kana, K.verbGroup(v.pos)));
+    const c = K.conjugate(verb.kana, K.verbGroup(verb.pos));
+    const btn = [...win.document.querySelectorAll('.v-add')].find((b) => b.dataset.vid === 'v:' + verb.kana + '|' + verb.lesson);
+    const row = btn.closest('.v-row');
+    // Stichwort ist die Wörterbuchform (Kana-Lesung = dict), NICHT die ます-Form
+    expect(row.querySelector('.v-word').textContent.endsWith(c.dict.slice(-1))).toBe(true);
+    expect(row.querySelector('.v-main').textContent).not.toContain('ます');
+    // ます-Form liegt im aufklappbaren Bereich
+    expect(row.dataset.ext).toBe('1');
+    expect(row.querySelector('.v-ext .v-masu-inline').textContent).toContain(verb.kana);
+    expect(row.classList.contains('expanded')).toBe(false); // zu Beginn zugeklappt
+    // SRS-ID bleibt unverändert an der ます-Form hängen (kein Fortschritts-Bruch)
+    expect(btn.dataset.vid).toBe('v:' + verb.kana + '|' + verb.lesson);
+    // beide Formen bleiben suchbar
+    expect(row.dataset.search).toContain(win.Katalog.norm(verb.kana));
+    expect(row.dataset.search).toContain(win.Katalog.norm(c.dict));
+  });
+
   it('nimmt den Beispieltext in den Suchindex der Zeile auf', () => {
     // Eine Zeile finden, deren Beispieltext ein reines ASCII-Wort (≥5) enthält,
     // das norm() unverändert lässt → robuste Teilstring-Prüfung im Suchindex.
