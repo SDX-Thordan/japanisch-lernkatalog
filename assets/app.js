@@ -417,7 +417,9 @@
     card.dataset.search=norm([g.pattern,g.title,g.bildung,g.erklaerung,all.map(b=>b.jp+' '+(b.r||'')+' '+b.de).join(' ')].join(' '));
     card.innerHTML=
       '<div class="gp-head card-toggle">'+scoreBadgeHtml('g:'+g.pattern)+'<span class="gp-pattern">'+esc(g.pattern)+'</span>'+
-      (g.title?'<span class="gp-title">'+esc(g.title)+'</span>':'')+'<span class="tag">L'+L+'</span></div>'+
+      (g.title?'<span class="gp-title">'+esc(g.title)+'</span>':'')+'<span class="tag">L'+L+'</span>'+
+      (window.SRS?'<button class="gp-add'+(inListCount('g:'+g.pattern)>0?' in-list':'')+'" type="button" title="'+esc(addBtnTitle('g:'+g.pattern,'Zur Lernliste hinzufügen'))+'" data-pattern="'+esc(g.pattern)+'">'+addBtnLabel('g:'+g.pattern)+'</button>':'')+
+      '</div>'+
       '<div class="collapse-body">'+
       (g.bildung?'<div class="gp-bildung"><b>Bildung:</b> '+furiToRuby(g.bildung)+'</div>':'')+
       (g.tabelle?gpTable(g.tabelle):'')+
@@ -435,8 +437,6 @@
       btn.addEventListener('click',()=>openGrammarPractice(g));
       card.querySelector('.collapse-body').appendChild(btn);
     }
-    if(window.SRS){ const gn=inListCount('g:'+g.pattern);
-      const addb=el('button','gp-add btn'+(gn>0?' in-list':''),'＋ Lernliste'+(gn>0?' ('+gn+')':'')); addb.type='button'; addb.dataset.pattern=g.pattern; card.querySelector('.collapse-body').appendChild(addb); }
     return card;
   }
   // Additiver „Mehr erklären"-Block + Übungen (window.Exercises) für Muster mit GRAMMATIK_PLUS.
@@ -1361,7 +1361,7 @@
     document.querySelectorAll('.kc-add').forEach(b=>{ const id='k:'+b.dataset.kanji; if(!set.has(id))return;
       b.textContent=addBtnLabel(id); b.title=addBtnTitle(id,'Zur Lernliste hinzufügen'); b.classList.toggle('in-list',inListCount(id)>0); });
     document.querySelectorAll('.gp-add').forEach(b=>{ const id='g:'+b.dataset.pattern; if(!set.has(id))return;
-      const n=inListCount(id); b.textContent='＋ Lernliste'+(n>0?' ('+n+')':''); b.classList.toggle('in-list',n>0); });
+      b.textContent=addBtnLabel(id); b.title=addBtnTitle(id,'Zur Lernliste hinzufügen'); b.classList.toggle('in-list',inListCount(id)>0); });
   }
   let picker=null;
   function ensurePicker(){

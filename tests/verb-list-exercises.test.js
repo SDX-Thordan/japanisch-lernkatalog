@@ -19,11 +19,11 @@ beforeEach(() => {
   vid = SRS.srsId('vocab', verb);
 });
 
-describe('Freischaltung der Verbformen (aus den Grammatik-Lektionen)', () => {
+describe('Freischaltung der Formen て/た/ない (aus den Grammatik-Lektionen)', () => {
   it('gesperrt bei frischem Lernpfad, frei nach unlockAll', () => {
-    ['te', 'nai', 'dict', 'ta'].forEach((f) => expect(Ex.formUnlocked(f)).toBe(false));
+    ['te', 'nai', 'ta'].forEach((f) => expect(Ex.formUnlocked(f)).toBe(false));
     SRS.unlockAll();
-    ['te', 'nai', 'dict', 'ta'].forEach((f) => expect(Ex.formUnlocked(f)).toBe(true));
+    ['te', 'nai', 'ta'].forEach((f) => expect(Ex.formUnlocked(f)).toBe(true));
   });
 });
 
@@ -41,30 +41,28 @@ describe('verbDictMC — ます-Form → Wörterbuchform', () => {
 });
 
 describe('verbFormMC — weitere Form aus der Wörterbuchform', () => {
-  it('fragt ab der 辞書形-Freischaltung AUS der Wörterbuchform ab', () => {
-    SRS.unlockAll();
+  it('fragt IMMER aus der Wörterbuchform ab (sie gehört fest zum Lernstoff)', () => {
     const c = K.conjugate(verb.kana, K.verbGroup(verb.pos));
-    const ex = Ex.verbFormMC(verb, 'te');
+    const ex = Ex.verbFormMC(verb, 'te'); // auch OHNE Freischaltung
     expect(ex.srsId).toBe(vid);
     expect(ex.mode).toBe('verb-form-te');
     expect(ex.optionen[ex.richtig]).toBe(c.te);
     expect(ex.frage).toContain(c.dict); // Prompt aus der Wörterbuchform
     expect(ex.frage).toContain('て-Form');
   });
-
-  it('vor der 辞書形-Einführung dient die ます-Form als Basis', () => {
-    // nichts freigeschaltet → formUnlocked('dict')=false → Basis = ます-Form
-    const ex = Ex.verbFormMC(verb, 'te');
-    expect(ex.frage).toContain(verb.kana);
-  });
 });
 
 describe('pickExercise — adaptives Einmischen der Verb-Übungen', () => {
   const item = () => ({ id: vid, type: 'vocab', data: verb });
 
-  it('ohne Freischaltung bleibt alles beim Alten (Input ab 70)', () => {
+  it('Wörterbuchform wird AUCH ohne Freischaltung geschult (immer Lernstoff)', () => {
+    // beherrscht, aber て/た/ない gesperrt → Wörterbuchform-Drill statt Form-Drill
     const ex = Ex.pickExercise(item(), { score: 90, rng: () => 0 });
-    expect(ex.mode).toBe('vocab-input');
+    expect(ex.mode).toBe('verb-dict');
+    expect(ex.srsId).toBe(vid);
+    // mittlerer Lernstand, gesperrt → ebenfalls Wörterbuchform
+    const ex2 = Ex.pickExercise(item(), { score: 50, rng: () => 0 });
+    expect(ex2.mode).toBe('verb-dict');
   });
 
   it('beherrschtes Verb + Freischaltung → Verbform-Drill (benotet dieselbe ID)', () => {

@@ -438,21 +438,21 @@
       richtig: optionen.indexOf(correct), erkl: v.kana + ' → ' + correct + (v.de ? ' — ' + v.de : ''), mode: 'verb-dict' };
   }
   // Beherrschtes Verb: weitere freigeschaltete Form — abgefragt AUS der Wörterbuchform
-  // (sobald diese eingeführt ist, vorher aus der ます-Form).
+  // (die Wörterbuchform gehört immer zum Lernstoff, s. verbExtraExercise).
   function verbFormMC(v, form) {
     var c = verbConj(v); if (!c || !c.kana[form]) return null;
     var correct = c.kana[form];
     var optionen = verbFormOptions(v, form, c);
-    var fromDict = formUnlocked('dict');
-    var baseKana = fromDict ? c.kana.dict : v.kana;
-    var baseWritten = fromDict ? (c.written && c.written.dict) : ((v.kanji && v.kanji.length && v.kanji !== v.kana) ? v.kanji : null);
+    var baseKana = c.kana.dict;
+    var baseWritten = c.written && c.written.dict;
     var prompt = (baseWritten && baseWritten !== baseKana) ? baseWritten + '（' + baseKana + '）' : baseKana;
     var label = { te: 'て-Form', ta: 'た-Form', nai: 'ない-Form' }[form] || form;
     return { typ: 'mc', srsId: vocabId(v), frage: prompt + ' → ?（' + label + '）', optionen: optionen,
       richtig: optionen.indexOf(correct), erkl: baseKana + ' → ' + correct + (v.de ? ' — ' + v.de : ''), mode: 'verb-form-' + form };
   }
-  // Zusatz-Übung für Verben je Lernstand: ab 40 gelegentlich die Wörterbuchform,
-  // ab „beherrscht" (80) bevorzugt weitere freigeschaltete Formen. Sonst null (normale Auswahl).
+  // Zusatz-Übung für Verben je Lernstand. Die WÖRTERBUCHFORM gehört IMMER zum Lernstoff
+  // (kein Freischalt-Gate): ab 40 wird sie gelegentlich abgefragt. Ab „beherrscht" (80)
+  // kommen zusätzlich die freigeschalteten Formen (て/た/ない) dazu. Sonst null (normale Auswahl).
   function verbExtraExercise(v, score, rng) {
     if (!/^V\./.test(v.pos || '')) return null;
     if (score >= 80) {
@@ -461,10 +461,10 @@
         var ex = verbFormMC(v, forms[Math.floor(rng() * forms.length)]);
         if (ex) return ex;
       }
-      if (formUnlocked('dict') && rng() < 0.5) return verbDictMC(v);
+      if (rng() < 0.5) return verbDictMC(v);
       return null;
     }
-    if (score >= 40 && formUnlocked('dict') && rng() < 0.34) return verbDictMC(v);
+    if (score >= 40 && rng() < 0.34) return verbDictMC(v);
     return null;
   }
   // Kanji MC Bedeutung (Glyph → Bedeutung), gedeckelte Score-Regel.
