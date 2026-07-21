@@ -230,9 +230,9 @@
     return { dict, te:base+teEnd, ta:base+taEnd, nai:base+U2A[u]+'ない' };
   }
 
-  /* ---------- Generierte Verb-Form-Übungen (て/た/ない) aus echten Verben ---------- */
-  const VERB_FORM_PATTERNS={'V て-Form':'te','V た-Form':'ta','V ない-Form':'nai'};
-  const VERB_FORM_LABEL={te:'て-Form',ta:'た-Form',nai:'ない-Form'};
+  /* ---------- Generierte Verb-Form-Übungen (て/た/ない/辞書形) aus echten Verben ---------- */
+  const VERB_FORM_PATTERNS={'V て-Form':'te','V た-Form':'ta','V ない-Form':'nai','V 辞書形 (Wörterbuchform)':'dict'};
+  const VERB_FORM_LABEL={te:'て-Form',ta:'た-Form',nai:'ない-Form',dict:'Wörterbuchform'};
   // Konjugierbare Verben für eine Form. Bevorzugt die freigeschalteten Lektionen (gelernt + neu);
   // sind dort noch zu wenige (frühe Lektionen haben kaum Verben), wird auf alle Verben erweitert,
   // damit immer echte, wiederkehrende Aufgaben entstehen (statt Rückfall auf die statischen).
@@ -255,7 +255,7 @@
     return verbs.map(v=>{
       const g=verbGroup(v.pos), c=conjugate(v.kana,g), correct=c[form];
       const stem=v.kana.slice(0,-2);
-      const naive=stem+({te:'て',ta:'た',nai:'ない'}[form]); // typischer Anfängerfehler (Gruppe-II-Regel überall)
+      const naive=stem+({te:'て',ta:'た',nai:'ない',dict:'る'}[form]); // typischer Anfängerfehler (Gruppe-II-Regel überall)
       const seen={}; seen[correct]=1; const distract=[];
       shuffle([c.te,c.ta,c.nai,naive]).forEach(x=>{ if(x&&!seen[x]){ seen[x]=1; distract.push(x); } });
       let guard=0;
@@ -265,7 +265,7 @@
       const optionen=shuffle([correct].concat(distract.slice(0,3)));
       const prompt=(v.kanji&&v.kanji.length&&v.kanji!==v.kana)?v.kanji+'（'+v.kana+'）':v.kana;
       return { typ:'mc', frage:prompt+' → ?（'+label+'）', optionen:optionen, richtig:optionen.indexOf(correct),
-        erkl:c.dict+' → '+correct+(v.de?' — '+v.de:'') };
+        erkl:(form==='dict'?cleanVerb(v.kana):c.dict)+' → '+correct+(v.de?' — '+v.de:'') };
     });
   }
 
@@ -545,11 +545,11 @@
       return items;
     }});
   }
-  // Verbformen-Runde (て・た・ない) aus echten Verben — vom Hub & der Verben-Seite aus aufrufbar.
+  // Verbformen-Runde (辞書形・て・た・ない) aus echten Verben — vom Hub & der Verben-Seite aus aufrufbar.
   function openVerbFormPractice(){
-    openPracticeSession({ pattern:'動詞', title:'Verbformen て・た・ない', build:()=>{
+    openPracticeSession({ pattern:'動詞', title:'Verbformen 辞書形・て・た・ない', build:()=>{
       const items=[];
-      [['te','V て-Form',4],['ta','V た-Form',3],['nai','V ない-Form',3]].forEach(grp=>{
+      [['dict','V 辞書形 (Wörterbuchform)',3],['te','V て-Form',3],['ta','V た-Form',2],['nai','V ない-Form',2]].forEach(grp=>{
         genVerbFormExercises(grp[0],grp[2]).forEach(ex=>items.push({kind:'ex',ex:ex,srsId:'g:'+grp[1]}));
       });
       return items;
