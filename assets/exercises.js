@@ -29,6 +29,14 @@
     if (v.kana) forms.push(v.kana);
     if (v.romaji) forms.push(v.romaji);
     if (v.kana && K.kanaToRomaji) forms.push(K.kanaToRomaji(v.kana));
+    // Verben: die Wörterbuchform zählt immer als richtige Antwort — sie ist die wichtigere
+    // Grundform (die ます-Form bleibt ebenfalls gültig).
+    var c = /^V\./.test(v.pos || '') ? verbConj(v) : null;
+    if (c) {
+      forms.push(c.kana.dict);
+      if (c.written && c.written.dict) forms.push(c.written.dict);
+      if (K.kanaToRomaji) forms.push(K.kanaToRomaji(c.kana.dict));
+    }
     return forms;
   }
   // Liberaler Abgleich einer Eingabe gegen ein Wort: Romaji, Kana/Furigana ODER Kanji gelten als richtig.
@@ -450,21 +458,22 @@
     return { typ: 'mc', srsId: vocabId(v), frage: prompt + ' → ?（' + label + '）', optionen: optionen,
       richtig: optionen.indexOf(correct), erkl: baseKana + ' → ' + correct + (v.de ? ' — ' + v.de : ''), mode: 'verb-form-' + form };
   }
-  // Zusatz-Übung für Verben je Lernstand. Die WÖRTERBUCHFORM gehört IMMER zum Lernstoff
-  // (kein Freischalt-Gate): ab 40 wird sie gelegentlich abgefragt. Ab „beherrscht" (80)
-  // kommen zusätzlich die freigeschalteten Formen (て/た/ない) dazu. Sonst null (normale Auswahl).
+  // Zusatz-Übung für Verben je Lernstand. Die WÖRTERBUCHFORM ist WICHTIGER als die ます-Form:
+  // sie gehört immer zum Lernstoff (kein Freischalt-Gate) und dominiert ab Lernstand 40 die
+  // Produktion (50 %). Ab „beherrscht" (80): 50 % freigeschaltete Formen (て/た/ない, aus der
+  // Wörterbuchform), sonst bevorzugt nochmal die Wörterbuchform. Sonst null (normale Auswahl).
   function verbExtraExercise(v, score, rng) {
     if (!/^V\./.test(v.pos || '')) return null;
     if (score >= 80) {
       var forms = ['te', 'ta', 'nai'].filter(formUnlocked);
-      if (forms.length && rng() < 0.6) {
+      if (forms.length && rng() < 0.5) {
         var ex = verbFormMC(v, forms[Math.floor(rng() * forms.length)]);
         if (ex) return ex;
       }
-      if (rng() < 0.5) return verbDictMC(v);
+      if (rng() < 0.6) return verbDictMC(v);
       return null;
     }
-    if (score >= 40 && rng() < 0.34) return verbDictMC(v);
+    if (score >= 40 && rng() < 0.5) return verbDictMC(v);
     return null;
   }
   // Kanji MC Bedeutung (Glyph → Bedeutung), gedeckelte Score-Regel.

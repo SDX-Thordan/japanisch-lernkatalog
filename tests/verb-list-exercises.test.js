@@ -92,6 +92,24 @@ describe('pickExercise — adaptives Einmischen der Verb-Übungen', () => {
   });
 });
 
+describe('Wörterbuchform ist wichtiger als die ます-Form', () => {
+  it('beim freien Tippen zählt die Wörterbuchform immer als richtig', () => {
+    const c = K.conjugate(verb.kana, K.verbGroup(verb.pos));
+    expect(Ex.acceptsVocabInput(c.dict, verb)).toBe(true);       // Kana-Wörterbuchform
+    expect(Ex.acceptsVocabInput(verb.kana, verb)).toBe(true);    // ます-Form bleibt gültig
+    expect(Ex.acceptsVocabInput(c.dict + 'x', verb)).toBe(false);
+    // Nicht-Verben unverändert
+    const noun = win.VOKABULAR.find((v) => v.pos === 'N.');
+    expect(Ex.acceptsVocabInput(noun.kana, noun)).toBe(true);
+  });
+
+  it('dominiert die Produktion ab Lernstand 40 (50 % statt gelegentlich)', () => {
+    // rng 0.45: früher (34 %) wäre das die normale Produktions-MC gewesen
+    const ex = Ex.pickExercise({ id: vid, type: 'vocab', data: verb }, { score: 50, rng: () => 0.45 });
+    expect(ex.mode).toBe('verb-dict');
+  });
+});
+
 describe('Fortschritt bleibt global (Liste = Lernpfad = Heute)', () => {
   it('Benotung der Verb-Drills schreibt auf dieselbe v:-ID wie überall', () => {
     SRS.unlockAll();
