@@ -9,6 +9,8 @@ function fakeStorage() {
 
 const BODY = `<!DOCTYPE html><html><body data-page="listen">
   <input id="lst-create-name"><button id="lst-create"></button>
+  <button id="lst-import"></button><input type="file" id="lst-import-file" hidden>
+  <p id="lst-msg"></p>
   <div id="lst-root"></div>
 </body></html>`;
 
@@ -26,6 +28,58 @@ beforeEach(() => {
   win.confirm = () => true;
 });
 function click(e) { e.dispatchEvent(new win.Event('click', { bubbles: true })); }
+
+function tick() { return new Promise((r) => setTimeout(r, 0)); }
+
+describe('Listen Export/Import (einzelne Liste)', () => {
+  it('Export-Button vorhanden; exportListJSON liefert Name + IDs', () => {
+    const l = win.SRS.createList('Reise');
+    win.SRS.addToList(l.id, [win.SRS.srsId('vocab', win.VOKABULAR[0]), 'k:' + win.KANJI[0].k]);
+    win.document.getElementById('lst-create-name').value = 'x'; // draw anstoßen? draw lief bei createList nicht
+    // Seite neu zeichnen über den Anlege-Weg
+    click(win.document.getElementById('lst-create'));
+    expect(win.document.querySelector('.lst-export')).toBeTruthy();
+    const parsed = JSON.parse(win.SRS.exportListJSON(l.id));
+    expect(parsed).toMatchObject({ type: 'katalog_liste', v: 1, name: 'Reise' });
+    expect(parsed.items).toHaveLength(2);
+  });
+
+  it('Import über die UI legt eine NEUE Liste an und meldet Übersprungenes', async () => {
+    const json = JSON.stringify({ type: 'katalog_liste', v: 1, name: 'Geteilt',
+      items: [win.SRS.srsId('vocab', win.VOKABULAR[0]), 'v:gibtsnicht|9', 'k:' + win.KANJI[0].k] });
+    const file = win.document.getElementById('lst-import-file');
+    Object.defineProperty(file, 'files', { value: [new win.Blob([json], { type: 'application/json' })], configurable: true });
+    file.dispatchEvent(new win.Event('change'));
+    await tick(); await tick();
+    const l = win.SRS.lists().find((x) => x.name === 'Geteilt');
+    expect(l.items).toHaveLength(2); // unbekannte ID übersprungen
+    expect(win.document.getElementById('lst-msg').textContent).toContain('2 Einträge');
+    expect(win.document.getElementById('lst-msg').textContent).toContain('1 unbekannte');
+    // Karte erscheint sofort
+    expect([...win.document.querySelectorAll('.lst-name')].some((n) => n.textContent === 'Geteilt')).toBe(true);
+  });
+
+  it('ungültige Datei (z. B. Komplett-Sicherung) → Fehlermeldung, keine Liste', async () => {
+    const file = win.document.getElementById('lst-import-file');
+    Object.defineProperty(file, 'files', { value: [new win.Blob([win.SRS.exportJSON()], { type: 'application/json' })], configurable: true });
+    file.dispatchEvent(new win.Event('change'));
+    await tick(); await tick();
+    expect(win.SRS.lists().length).toBe(0);
+    expect(win.document.getElementById('lst-msg').textContent).toContain('✗');
+  });
+
+  it('Roundtrip: Export → Import ergibt dieselben Einträge (Lernstand bleibt unberührt)', () => {
+    const l = win.SRS.createList('Original');
+    const vid = win.SRS.srsId('vocab', win.VOKABULAR[0]);
+    win.SRS.addToList(l.id, [vid, 'g:' + win.GRAMMATIK[0].pattern]);
+    win.SRS.grade(vid, 1, '2026-07-20'); // Lernstand existiert
+    const res = win.SRS.importListJSON(win.SRS.exportListJSON(l.id));
+    expect(res.ok).toBe(true);
+    expect(res.added).toBe(2); expect(res.skipped).toBe(0);
+    expect(res.list.items).toEqual(win.SRS.lists()[0].items);
+    expect(win.SRS.get(vid).score).toBe(20); // Import fasst Lernstände nicht an
+  });
+});
 
 describe('Listen-Seite', () => {
   it('legt über den Button eine Liste an und zeigt sie', () => {

@@ -749,6 +749,44 @@
   }
 
   /* ---------- UI-Komfort: Download/Upload im Browser ---------- */
+  /* Einzelne Liste exportieren/importieren (zwischen Geräten teilen). Die Datei enthält nur
+     Namen + Item-IDs — der Katalog ist überall gleich, Lernstände werden NICHT mitkopiert. */
+  var LIST_FILE_TYPE = 'katalog_liste';
+  function exportListJSON(id) {
+    var l = store.lists && store.lists[id]; if (!l) return null;
+    return JSON.stringify({ type: LIST_FILE_TYPE, v: 1, name: l.name, items: (l.items || []).slice() }, null, 2);
+  }
+  // Importiert eine Listen-Datei als NEUE Liste. Unbekannte IDs (fremde/veraltete Inhalte)
+  // werden übersprungen. Liefert {ok, list, added, skipped} bzw. {ok:false, error}.
+  function importListJSON(text) {
+    var parsed = null;
+    try { parsed = JSON.parse(text); } catch (e) { return { ok: false, error: 'parse' }; }
+    if (!parsed || parsed.type !== LIST_FILE_TYPE || !Array.isArray(parsed.items)) return { ok: false, error: 'format' };
+    var idx = itemIndex();
+    var seen = {}, items = [], skipped = 0;
+    parsed.items.forEach(function (x) {
+      if (typeof x !== 'string' || seen[x]) return;
+      seen[x] = 1;
+      if (idx[x]) items.push(x); else skipped++;
+    });
+    var name = String(parsed.name || 'Importierte Liste').slice(0, 60);
+    var l = createList(name);
+    addToList(l.id, items);
+    return { ok: true, list: store.lists[l.id], added: items.length, skipped: skipped };
+  }
+  function downloadList(id, filename) {
+    var json = exportListJSON(id); if (!json) return;
+    var l = store.lists[id];
+    filename = filename || ('liste-' + String(l.name || id).replace(/[^\wäöüÄÖÜß-]+/g, '_').slice(0, 40) + '.json');
+    try {
+      var blob = new Blob([json], { type: 'application/json' });
+      var url = URL.createObjectURL(blob);
+      var a = document.createElement('a');
+      a.href = url; a.download = filename; document.body.appendChild(a); a.click();
+      document.body.removeChild(a); setTimeout(function () { URL.revokeObjectURL(url); }, 0);
+    } catch (e) {}
+  }
+
   function downloadBackup(filename) {
     filename = filename || 'katalog-fortschritt.json';
     try {
@@ -782,6 +820,7 @@
     // Persönliche Vokabellisten
     createList: createList, renameList: renameList, deleteList: deleteList,
     addToList: addToList, removeFromList: removeFromList, lists: lists, listItems: listItems, listsContaining: listsContaining,
+    exportListJSON: exportListJSON, importListJSON: importListJSON, downloadList: downloadList,
     exportJSON: exportJSON, importJSON: importJSON, downloadBackup: downloadBackup, reset: reset,
     snapshot: snapshot, forecast: forecast,
     _useStorage: useStorage,
