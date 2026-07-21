@@ -230,6 +230,16 @@
     return { dict, te:base+teEnd, ta:base+taEnd, nai:base+U2A[u]+'ない' };
   }
 
+  // Anzeige-Form eines Verbs: die WÖRTERBUCHFORM ist das Stichwort (wichtiger als ます);
+  // die ます-Form wird nur beim Aufklappen/auf der Rückseite gezeigt. null für Nicht-Verben.
+  function verbDictDisplay(v){
+    if(!/^V\./.test(v.pos||''))return null;
+    const g=verbGroup(v.pos); if(g<=0)return null;
+    const kana=conjugate(v.kana,g); if(!kana)return null;
+    const written=(v.kanji&&v.kanji.length&&v.kanji!==v.kana)?conjugate(v.kanji,g):null;
+    return { kana:kana.dict, written:(written&&written.dict)||kana.dict };
+  }
+
   /* ---------- Generierte Verb-Form-Übungen (て/た/ない/辞書形) aus echten Verben ---------- */
   const VERB_FORM_PATTERNS={'V て-Form':'te','V た-Form':'ta','V ない-Form':'nai','V 辞書形 (Wörterbuchform)':'dict'};
   const VERB_FORM_LABEL={te:'て-Form',ta:'た-Form',nai:'ない-Form',dict:'Wörterbuchform'};
@@ -352,18 +362,23 @@
   }
   // Gestapelte Vokabel-Karte (handytauglich): (Lesung klein) / Wort / Übersetzung; Blüte oben rechts.
   function vocabRow(w,listsOn){
-    const written=(w.kanji&&w.kanji.length)?w.kanji:w.kana;
-    const showKana=(w.kanji&&w.kanji.length&&w.kanji!==w.kana);
+    // Verben: Stichwort = Wörterbuchform; die ます-Form erscheint erst beim Aufklappen.
+    const dd=verbDictDisplay(w);
+    const written=dd?dd.written:((w.kanji&&w.kanji.length)?w.kanji:w.kana);
+    const readKana=dd?dd.kana:w.kana;
+    const showKana=written!==readKana;
     const row=el('div','v-row item'); row.dataset.filter=String(w.lesson);
     row.dataset.type=vocabType(w.pos);
     const bsp=(window.VOKABULAR_BEISPIELE||{})[w.kana+'|'+w.lesson];
-    row.dataset.search=norm([w.kanji,w.kana,w.romaji,w.de,w.pos,(bsp?bsp.jp+' '+bsp.de+' '+(bsp.note||''):'')].join(' '));
-    // Erweiterte Bedeutung (Beispielsatz + Notiz) ist verdeckt und klappt per Klick auf die Karte auf.
-    if(bsp)row.dataset.ext='1';
-    const ext=bsp?'<span class="v-more" aria-hidden="true" title="Beispiel anzeigen">›</span>'+
-      '<div class="v-ext"><div class="v-bsp-inline"><span class="ja">'+furiToRuby(bsp.jp)+'</span> — '+esc(bsp.de)+(bsp.note?'<span class="v-note"> · '+esc(bsp.note)+'</span>':'')+'</div></div>':'';
+    row.dataset.search=norm([w.kanji,w.kana,w.romaji,w.de,w.pos,(dd?dd.written+' '+dd.kana:''),(bsp?bsp.jp+' '+bsp.de+' '+(bsp.note||''):'')].join(' '));
+    // Erweiterte Infos (ます-Form bei Verben, Beispielsatz + Notiz) klappen per Klick auf.
+    if(bsp||dd)row.dataset.ext='1';
+    const masuLine=dd?'<div class="v-masu-inline"><span class="v-masu-lbl">ます-Form</span> <span class="ja">'+esc((w.kanji&&w.kanji.length&&w.kanji!==w.kana)?w.kanji+'（'+w.kana+'）':w.kana)+'</span></div>':'';
+    const bspLine=bsp?'<div class="v-bsp-inline"><span class="ja">'+furiToRuby(bsp.jp)+'</span> — '+esc(bsp.de)+(bsp.note?'<span class="v-note"> · '+esc(bsp.note)+'</span>':'')+'</div>':'';
+    const ext=(bsp||dd)?'<span class="v-more" aria-hidden="true" title="Mehr anzeigen">›</span>'+
+      '<div class="v-ext">'+masuLine+bspLine+'</div>':'';
     row.innerHTML='<span class="v-score">'+scoreBadgeHtml('v:'+w.kana+'|'+w.lesson)+'</span>'+
-      '<div class="v-main">'+(showKana?'<div class="v-read ja">'+esc(w.kana)+'</div>':'')+'<div class="v-word ja">'+esc(written)+'</div></div>'+
+      '<div class="v-main">'+(showKana?'<div class="v-read ja">'+esc(readKana)+'</div>':'')+'<div class="v-word ja">'+esc(written)+'</div></div>'+
       '<div class="v-mean de hideable">'+esc(w.de)+ext+'</div>'+
       '<div class="v-meta"><span class="pos">'+esc(w.pos)+'</span>'+
       (listsOn?'<button class="v-add'+(inListCount('v:'+w.kana+'|'+w.lesson)>0?' in-list':'')+'" type="button" title="'+esc(addBtnTitle('v:'+w.kana+'|'+w.lesson,'Zu Liste hinzufügen'))+'" data-vid="v:'+esc(w.kana)+'|'+w.lesson+'" data-word="'+esc(written)+'">'+addBtnLabel('v:'+w.kana+'|'+w.lesson)+'</button>':'')+'</div>';
@@ -819,8 +834,9 @@
   function shuffle(a){ for(let i=a.length-1;i>0;i--){ const j=Math.floor(Math.random()*(i+1)); const t=a[i]; a[i]=a[j]; a[j]=t; } return a; }
   function frontHtml(c){
     if(c.t==='kanji')return '<div class="tr-big ja">'+esc(c.d.k)+'</div><div class="tr-q">On-/Kun-Lesung & Bedeutung?</div>';
-    if(c.t==='vocab'){ const v=c.d, w=(v.kanji&&v.kanji.length)?v.kanji:v.kana;
-      return '<div class="tr-word ja">'+ruby(w,v.kana)+'</div><div class="tr-q">Lesung & Bedeutung?</div>'; }
+    if(c.t==='vocab'){ const v=c.d, dd=verbDictDisplay(v);
+      const w=dd?dd.written:((v.kanji&&v.kanji.length)?v.kanji:v.kana), r=dd?dd.kana:v.kana;
+      return '<div class="tr-word ja">'+ruby(w,r)+'</div><div class="tr-q">Lesung & Bedeutung?</div>'; }
     return '<div class="tr-pat ja">'+esc(c.d.pattern)+'</div><div class="tr-q">Bedeutung & Bildung?</div>';
   }
   function backHtml(c){
@@ -830,10 +846,13 @@
         (onr?'<div class="reading-row"><span class="lbl">音</span><span class="vals">'+esc(onr)+'</span></div>':'')+
         (kunr?'<div class="reading-row"><span class="lbl kun">訓</span><span class="vals">'+esc(kunr)+'</span></div>':'')+'</div>'+
         (ex?'<div class="kc-examples">'+ex+'</div>':''); }
-    if(c.t==='vocab'){ const v=c.d; const written=(v.kanji&&v.kanji.length)?v.kanji:v.kana;
+    if(c.t==='vocab'){ const v=c.d, dd=verbDictDisplay(v);
+      const written=dd?dd.written:((v.kanji&&v.kanji.length)?v.kanji:v.kana), read=dd?dd.kana:v.kana;
       const bsp=(window.VOKABULAR_BEISPIELE||{})[v.kana+'|'+v.lesson];
-      return '<div class="tr-answer-jp ja">'+ruby(written,v.kana)+'</div>'+
-      '<div class="tr-mean">'+esc(v.de)+'</div>'+
+      // Rückseite = aufgeklappt: hier erscheint bei Verben auch die ます-Form.
+      const masu=dd?'<div class="tr-masu"><span class="v-masu-lbl">ます-Form</span> <span class="ja">'+esc((v.kanji&&v.kanji.length&&v.kanji!==v.kana)?v.kanji+'（'+v.kana+'）':v.kana)+'</span></div>':'';
+      return '<div class="tr-answer-jp ja">'+ruby(written,read)+'</div>'+
+      '<div class="tr-mean">'+esc(v.de)+'</div>'+masu+
       '<div class="tr-tag"><span class="pos">'+esc(v.pos)+'</span> · Lektion '+v.lesson+'</div>'+
       (bsp?'<div class="v-bsp"><div class="v-bsp-jp ja">'+furiToRuby(bsp.jp)+'</div>'+
         (bsp.r?'<div class="v-bsp-r">'+esc(bsp.r)+'</div>':'')+
@@ -1511,7 +1530,8 @@
     const root=document.getElementById('lst-root'); if(!root||!window.SRS)return;
     const nameInp=document.getElementById('lst-create-name'), createBtn=document.getElementById('lst-create');
 
-    function vocabFront(v){ const w=(v.kanji&&v.kanji.length)?v.kanji:v.kana; return ruby(w,v.kana); }
+    function vocabFront(v){ const dd=verbDictDisplay(v);
+      const w=dd?dd.written:((v.kanji&&v.kanji.length)?v.kanji:v.kana); return ruby(w,dd?dd.kana:v.kana); }
     // Vorderseite/Glyph je Item-Typ (für die Item-Liste und den Karteikarten-Fallback).
     function itemGlyph(o){ return o.type==='kanji'?o.data.k:(o.type==='grammar'?o.data.pattern:((o.data.kanji&&o.data.kanji.length)?o.data.kanji:o.data.kana)); }
     function itemMeaning(o){ return o.type==='kanji'?(o.data.meaning||''):(o.type==='grammar'?(o.data.title||''):o.data.de); }

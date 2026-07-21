@@ -646,6 +646,10 @@ table.conj-table tbody tr:last-child th, table.conj-table tbody tr:last-child td
 .v-bsp-inline { font-size: .82rem; color: var(--muted); margin-top: .25rem; }
 .v-bsp-inline .ja { font-family: var(--font-ja-sans); color: var(--ink); }
 .v-bsp-inline .v-note { color: var(--indigo); }
+/* ます-Form eines Verbs — nur im aufgeklappten Bereich / auf der Kartenrückseite sichtbar */
+.v-masu-inline, .tr-masu { font-size: .82rem; color: var(--muted); margin-top: .25rem; }
+.v-masu-inline .ja, .tr-masu .ja { font-family: var(--font-ja-sans); color: var(--ink); }
+.v-masu-lbl { display: inline-block; font-size: .68rem; font-weight: 700; color: var(--muted); background: var(--chip); padding: .05rem .35rem; border-radius: 5px; margin-right: .35rem; vertical-align: middle; }
 
 /* Erweiterte Bedeutung (Beispielsatz) — verdeckt, klappt per Klick auf die Zeile auf (wie Grammatik). */
 [data-ext] { cursor: pointer; }
