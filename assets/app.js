@@ -1555,7 +1555,10 @@
         ren.addEventListener('click',()=>{ const nn=window.prompt('Liste umbenennen:',l.name); if(nn&&nn.trim()){ window.SRS.renameList(l.id,nn.trim()); draw(); } });
         const del=el('button','btn lst-del','<span class="msi" aria-hidden="true">delete</span> Löschen'); del.type='button';
         del.addEventListener('click',()=>{ if(window.confirm('Liste „'+l.name+'" löschen? (Vokabeln selbst bleiben erhalten.)')){ window.SRS.deleteList(l.id); draw(); } });
-        actions.appendChild(train); actions.appendChild(show); actions.appendChild(ren); actions.appendChild(del);
+        const exp=el('button','btn lst-export','<span class="msi" aria-hidden="true">download</span> Export'); exp.type='button';
+        exp.title='Diese Liste als JSON-Datei exportieren (zum Teilen/Übertragen)';
+        exp.addEventListener('click',()=>window.SRS.downloadList(l.id));
+        actions.appendChild(train); actions.appendChild(show); actions.appendChild(ren); actions.appendChild(exp); actions.appendChild(del);
         root.appendChild(card);
       });
     }
@@ -1619,6 +1622,23 @@
 
     if(createBtn)createBtn.addEventListener('click',()=>{ const nm=(nameInp.value||'').trim(); if(!nm){ nameInp.focus(); return; } window.SRS.createList(nm); nameInp.value=''; draw(); });
     if(nameInp)nameInp.addEventListener('keydown',e=>{ if(e.key==='Enter'&&createBtn)createBtn.click(); });
+    // Einzelne Liste importieren (JSON aus dem Export) — wird als NEUE Liste angelegt.
+    const impBtn=document.getElementById('lst-import'), impFile=document.getElementById('lst-import-file'), msg=document.getElementById('lst-msg');
+    if(impBtn&&impFile){
+      impBtn.addEventListener('click',()=>impFile.click());
+      impFile.addEventListener('change',()=>{
+        const f=impFile.files&&impFile.files[0]; if(!f)return;
+        const r=new FileReader();
+        r.onload=()=>{
+          const res=window.SRS.importListJSON(String(r.result));
+          if(msg)msg.textContent=res.ok
+            ?('✓ Liste „'+res.list.name+'" importiert ('+res.added+' Einträge'+(res.skipped?', '+res.skipped+' unbekannte übersprungen':'')+').')
+            :'✗ Keine gültige Listen-Datei (bitte einen Listen-Export wählen, nicht die Komplett-Sicherung).';
+          impFile.value=''; draw();
+        };
+        r.readAsText(f);
+      });
+    }
     draw();
   }
 
