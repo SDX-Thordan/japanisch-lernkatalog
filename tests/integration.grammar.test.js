@@ -34,6 +34,26 @@ describe('Grammatik-Seite', () => {
     expect(win.document.querySelectorAll('.gp-ueben').length).toBeGreaterThan(0);
   });
 
+  it('＋-Button im Kartenkopf: ohne Aufklappen sichtbar, öffnet den Picker, zeigt danach „1+"', () => {
+    const card = win.document.querySelector('.gp.item.collapsed');
+    const btn = card.querySelector('.gp-head .gp-add');
+    expect(btn).toBeTruthy();
+    expect(btn.textContent).toBe('＋');
+    btn.dispatchEvent(new win.Event('click', { bubbles: true }));
+    // Karte bleibt zu (kein Toggle), Picker offen
+    expect(card.classList.contains('collapsed')).toBe(true);
+    const ov = win.document.querySelector('.pick-overlay');
+    expect(ov.hidden).toBe(false);
+    // Neue Liste anlegen & hinzufügen → Button aktualisiert sich auf „1+"
+    ov.querySelector('.pick-name').value = 'Grammatik-Liste';
+    ov.querySelector('.pick-add').dispatchEvent(new win.Event('click', { bubbles: true }));
+    expect(btn.textContent).toBe('1+');
+    expect(btn.classList.contains('in-list')).toBe(true);
+    // und die Liste enthält das g:-Item (global dieselbe ID)
+    const l = win.SRS.lists()[0];
+    expect(l.items[0].startsWith('g:')).toBe(true);
+  });
+
   it('„Üben" öffnet die kombinierte Session (Overlay) mit Aufgabe oder Satz', () => {
     const btn = win.document.querySelector('.gp-ueben');
     expect(btn).toBeTruthy();

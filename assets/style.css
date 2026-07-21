@@ -144,10 +144,12 @@ body.scrolled .topbar-inner { padding-top: .35rem; padding-bottom: .35rem; }
 /* „＋ Lernliste" auf Kanji-/Grammatik-Karten */
 .kc-add { margin-left: auto; border: 1px solid var(--border); background: var(--surface); color: var(--accent); border-radius: 7px; min-width: 1.9rem; height: 1.9rem; padding: 0 .35rem; font-size: 1rem; line-height: 1; cursor: pointer; font-weight: 700; }
 .kc-add:hover { border-color: var(--accent); background: var(--surface-2); }
-.gp-add { margin-top: .6rem; }
+/* ＋-Button im Grammatik-Kartenkopf (immer sichtbar, wie .v-add/.kc-add) */
+.gp-add { border: 1px solid var(--border); background: var(--surface); color: var(--accent); border-radius: 7px; min-width: 1.9rem; height: 1.9rem; padding: 0 .35rem; font-size: 1rem; line-height: 1; cursor: pointer; font-weight: 700; align-self: center; }
+.gp-add:hover { border-color: var(--accent); background: var(--surface-2); }
 /* Item ist schon in ≥1 Listen: Button zeigt „n+" und ist dezent markiert. */
 .v-add.in-list, .kc-add.in-list { border-color: var(--accent); background: #f6e7e2; font-size: .85rem; }
-.gp-add.in-list { border-color: var(--accent); color: var(--accent); }
+.gp-add.in-list { border-color: var(--accent); background: #f6e7e2; font-size: .85rem; }
 /* Lernlisten: Typ-Markierung + Übungsfläche im Trainer */
 .lst-tag { display: inline-block; font-size: .68rem; font-weight: 700; color: var(--muted); background: var(--chip); padding: .05rem .35rem; border-radius: 5px; margin-right: .4rem; vertical-align: middle; }
 .lt-ex { min-height: 8rem; display: flex; flex-direction: column; gap: .5rem; }
