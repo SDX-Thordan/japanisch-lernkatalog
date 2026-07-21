@@ -387,6 +387,86 @@
     return { typ: 'input', srsId: vocabId(v), prompt: v.de, accept: v, big: true, q: 'Wie heißt das auf Japanisch?',
       erkl: v.de + ' = ' + vocabWritten(v), mode: 'vocab-input' };
   }
+
+  /* ---------- Verb-Übungen für Lernlisten & Wiederholung: Wörterbuchform + weitere Formen ----------
+     „Freigeschaltet" = die Lektion, in der die Form eingeführt wird (aus GRAMMATIK abgeleitet:
+     て L14 · ない L17 · 辞書形 L18 · た L19), ist über den Lernpfad erreicht. Alle Übungen
+     benoten die kanonische Vokabel-ID (v:kana|lesson) → Fortschritt bleibt global. */
+  var VERB_FORM_INTRO = { te: 'V て-Form', nai: 'V ない-Form', dict: 'V 辞書形 (Wörterbuchform)', ta: 'V た-Form' };
+  var VERB_FORM_FALLBACK_LESSON = { te: 14, nai: 17, dict: 18, ta: 19 };
+  function formLesson(form) {
+    var pat = VERB_FORM_INTRO[form];
+    var g = (window.GRAMMATIK || []).filter(function (x) { return x.pattern === pat; })[0];
+    return (g && g.lesson) || VERB_FORM_FALLBACK_LESSON[form] || 99;
+  }
+  function formUnlocked(form) {
+    if (!(window.SRS && window.SRS.maxUnlockedLesson)) return true;
+    return window.SRS.maxUnlockedLesson() >= formLesson(form);
+  }
+  // Konjugation eines Vokabel-Verbs (Kana; Schreibung mit Kanji separat), null wenn nicht konjugierbar.
+  function verbConj(v) {
+    var K = kat();
+    if (!K.conjugate || !K.verbGroup || !/^V\./.test(v.pos || '')) return null;
+    var g = K.verbGroup(v.pos); if (g <= 0) return null;
+    var kana = K.conjugate(v.kana, g); if (!kana) return null;
+    var written = (v.kanji && v.kanji.length && v.kanji !== v.kana) ? K.conjugate(v.kanji, g) : null;
+    return { g: g, kana: kana, written: written };
+  }
+  // Distraktoren: eigene andere Formen + naive Gruppe-II-Übertragung + gleiche Form anderer Verben.
+  function verbFormOptions(v, form, c) {
+    var correct = c.kana[form];
+    var naive = String(v.kana).replace(/ます$/, '') + ({ te: 'て', ta: 'た', nai: 'ない', dict: 'る' }[form]);
+    var seen = {}; seen[correct] = 1;
+    var distract = [];
+    shuffle([c.kana.te, c.kana.ta, c.kana.nai, c.kana.dict, naive]).forEach(function (x) {
+      if (x && !seen[x]) { seen[x] = 1; distract.push(x); } });
+    var pool = (window.VOKABULAR || []).filter(function (x) { return /^V\./.test(x.pos) && x.kana !== v.kana; });
+    var guard = 0;
+    while (distract.length < 3 && guard < 40 && pool.length) { guard++;
+      var o = pool[Math.floor(Math.random() * pool.length)];
+      var oc = verbConj(o), x = oc && oc.kana[form];
+      if (x && !seen[x]) { seen[x] = 1; distract.push(x); } }
+    return shuffle([correct].concat(distract.slice(0, 3)));
+  }
+  // ます-Form → Wörterbuchform (ab deren Einführungs-Lektion).
+  function verbDictMC(v) {
+    var c = verbConj(v); if (!c) return null;
+    var correct = c.kana.dict;
+    var optionen = verbFormOptions(v, 'dict', c);
+    var prompt = (v.kanji && v.kanji.length && v.kanji !== v.kana) ? v.kanji + '（' + v.kana + '）' : v.kana;
+    return { typ: 'mc', srsId: vocabId(v), frage: prompt + ' → ?（Wörterbuchform）', optionen: optionen,
+      richtig: optionen.indexOf(correct), erkl: v.kana + ' → ' + correct + (v.de ? ' — ' + v.de : ''), mode: 'verb-dict' };
+  }
+  // Beherrschtes Verb: weitere freigeschaltete Form — abgefragt AUS der Wörterbuchform
+  // (sobald diese eingeführt ist, vorher aus der ます-Form).
+  function verbFormMC(v, form) {
+    var c = verbConj(v); if (!c || !c.kana[form]) return null;
+    var correct = c.kana[form];
+    var optionen = verbFormOptions(v, form, c);
+    var fromDict = formUnlocked('dict');
+    var baseKana = fromDict ? c.kana.dict : v.kana;
+    var baseWritten = fromDict ? (c.written && c.written.dict) : ((v.kanji && v.kanji.length && v.kanji !== v.kana) ? v.kanji : null);
+    var prompt = (baseWritten && baseWritten !== baseKana) ? baseWritten + '（' + baseKana + '）' : baseKana;
+    var label = { te: 'て-Form', ta: 'た-Form', nai: 'ない-Form' }[form] || form;
+    return { typ: 'mc', srsId: vocabId(v), frage: prompt + ' → ?（' + label + '）', optionen: optionen,
+      richtig: optionen.indexOf(correct), erkl: baseKana + ' → ' + correct + (v.de ? ' — ' + v.de : ''), mode: 'verb-form-' + form };
+  }
+  // Zusatz-Übung für Verben je Lernstand: ab 40 gelegentlich die Wörterbuchform,
+  // ab „beherrscht" (80) bevorzugt weitere freigeschaltete Formen. Sonst null (normale Auswahl).
+  function verbExtraExercise(v, score, rng) {
+    if (!/^V\./.test(v.pos || '')) return null;
+    if (score >= 80) {
+      var forms = ['te', 'ta', 'nai'].filter(formUnlocked);
+      if (forms.length && rng() < 0.6) {
+        var ex = verbFormMC(v, forms[Math.floor(rng() * forms.length)]);
+        if (ex) return ex;
+      }
+      if (formUnlocked('dict') && rng() < 0.5) return verbDictMC(v);
+      return null;
+    }
+    if (score >= 40 && formUnlocked('dict') && rng() < 0.34) return verbDictMC(v);
+    return null;
+  }
   // Kanji MC Bedeutung (Glyph → Bedeutung), gedeckelte Score-Regel.
   function kanjiMeaningMC(k, core) {
     var ex = kanjiMC(k, core); ex.srsId = 'k:' + k.k; ex.gradeOpts = KANJI_GRADE_OPTS; ex.mode = 'kanji-meaning';
@@ -404,9 +484,19 @@
   }
   // Kanji Zeichnen — Deskriptor (Host rendert via KanjiWrite; Schreiben bewertet ungedeckelt = Meister-Pfad).
   function kanjiWriteEx(k) { return { typ: 'write', srsId: 'k:' + k.k, data: k, mode: 'kanji-write' }; }
-  // Grammatik: Fabriken aus Satz-Vorlagen (Satzbau/Partikel/Übersetzen) + GRAMMATIK_PLUS (mc/cloze).
+  // Grammatik: Fabriken aus Satz-Vorlagen (Satzbau/Partikel/Übersetzen) + GRAMMATIK_PLUS (mc/cloze)
+  // + für die Verbform-Muster (て/た/ない/辞書形) die generierten Konjugations-Drills — damit
+  // Grammatik auch in Lernlisten dediziert geübt wird (nicht nur als Übersetzungs-Fallback).
   function grammarExercises(g) {
     var out = [];
+    var form = ({ 'V て-Form': 'te', 'V た-Form': 'ta', 'V ない-Form': 'nai', 'V 辞書形 (Wörterbuchform)': 'dict' })[g.pattern];
+    if (form && kat().genVerbFormExercises && (window.VOKABULAR || []).length) {
+      out.push(function () {
+        var ex = (kat().genVerbFormExercises(form, 1) || [])[0];
+        if (ex) ex.srsId = 'g:' + g.pattern;
+        return ex || null;
+      });
+    }
     var T = (window.SATZ_TEMPLATES || {})[g.pattern];
     if (T && T.length) {
       out.push(function () { return fromTemplate(randPick(T), { type: 'order' }); });
@@ -438,7 +528,13 @@
     opts = opts || {}; var rng = opts.rng || Math.random; var score = opts.score || 0;
     var fac = exercisesFor(item); if (!fac.length) return null;
     var idx;
-    if (item.type === 'vocab') { idx = score < 40 ? 0 : (score < 70 ? 1 : 2); idx = Math.min(idx, fac.length - 1); }
+    if (item.type === 'vocab') {
+      // Verben: ab Lernstand 40 gelegentlich die Wörterbuchform, ab „beherrscht" (80)
+      // weitere freigeschaltete Formen — benotet wird dieselbe Vokabel-ID (global).
+      var vx = verbExtraExercise(item.data, score, rng);
+      if (vx) return vx;
+      idx = score < 40 ? 0 : (score < 70 ? 1 : 2); idx = Math.min(idx, fac.length - 1);
+    }
     else if (item.type === 'kanji') { idx = score >= 70 ? (fac.length - 1) : Math.floor(rng() * fac.length); }
     else { idx = Math.floor(rng() * fac.length); }
     return fac[idx]();
@@ -455,5 +551,6 @@
     vocabRecognizeMC: vocabRecognizeMC, vocabProduceMC: vocabProduceMC, vocabInput: vocabInput,
     kanjiMeaningMC: kanjiMeaningMC, kanjiPickMC: kanjiPickMC, kanjiWriteEx: kanjiWriteEx,
     grammarExercises: grammarExercises,
+    verbDictMC: verbDictMC, verbFormMC: verbFormMC, formUnlocked: formUnlocked,
   };
 })();
