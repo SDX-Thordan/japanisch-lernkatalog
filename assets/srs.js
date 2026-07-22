@@ -17,7 +17,6 @@
   var MIN_EASE = 1.3;
 
   /* ---------- Lernpfad/Gating-Konstanten (leicht justierbar) ---------- */
-  var MASTERY_REPS = 2;        // (Alt-Feld, bleibt für Migration/Stats)
   var LESSON_TEST_PASS = 0.8;  // Bestehensgrenze des Lektionstests
   var LESSON_READY_AT = 40;    // Lektion „erfüllt"/test-bereit, wenn jedes Kern-Item Score ≥ 40 hat
   var LESSON_TEST_N = 10;      // Aufgaben pro Lektionstest
@@ -806,7 +805,7 @@
     get: get, ensure: ensure, grade: grade,
     completeDaily: completeDaily, dailyGain: dailyGain, dailyHistory: dailyHistory,
     // Lernpunktzahl 0–100
-    effectiveScore: scoreOf, scoreOf: scoreOf, MASTER_AT: MASTER_AT,
+    effectiveScore: scoreOf, scoreOf: scoreOf, MASTER_AT: MASTER_AT, SCORE_THRESHOLDS: SCORE_THRESHOLDS,
     isDue: isDue, dueIds: dueIds,
     buildQueue: buildQueue, stats: stats, catalogStats: catalogStats, leeches: leeches,
     // Lernpfad / Gating

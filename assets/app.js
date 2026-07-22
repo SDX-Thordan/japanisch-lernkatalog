@@ -29,6 +29,12 @@
   function esc(s){ return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
   function ruby(base, reading){ if(!reading||reading===base) return esc(base); return '<ruby>'+esc(base)+'<rt>'+esc(reading)+'</rt></ruby>'; }
   function rubyPair(disp, read){ return (disp!==read) ? ruby(disp, read) : esc(disp); }
+  // Schreibform eines Vokabels: Kanji-Schreibung, sonst Kana.
+  function writtenForm(v){ return (v.kanji&&v.kanji.length)?v.kanji:v.kana; }
+  // ます-/Prompt-Form: „Kanji（Kana）", wenn eine abweichende Kanji-Schreibung existiert, sonst Kana.
+  function masuPrompt(v){ return (v.kanji&&v.kanji.length&&v.kanji!==v.kana)?v.kanji+'（'+v.kana+'）':v.kana; }
+  // Einheitliche „Weiter →"-Schaltfläche (type=button) mit Klick-Handler; optionale Zusatzklasse.
+  function makeNextButton(onClick, extraCls){ const nx=el('button','btn-primary'+(extraCls?' '+extraCls:''),'Weiter →'); nx.type='button'; nx.addEventListener('click',onClick); return nx; }
   // Suchnormalisierung: kleinschreiben + Makrone falten (ō→o …), damit ASCII-Rōmaji wie „kyoshi" auch „kyōshi" trifft.
   function norm(s){ return String(s==null?'':s).toLowerCase()
     .replace(/[āáàâ]/g,'a').replace(/[īíìî]/g,'i').replace(/[ūúùû]/g,'u').replace(/[ēéèê]/g,'e').replace(/[ōóòô]/g,'o'); }
@@ -273,7 +279,7 @@
         const o=pool[Math.floor(Math.random()*pool.length)], oc=conjugate(o.kana,verbGroup(o.pos)), x=oc&&oc[form];
         if(x&&!seen[x]){ seen[x]=1; distract.push(x); } }
       const optionen=shuffle([correct].concat(distract.slice(0,3)));
-      const prompt=(v.kanji&&v.kanji.length&&v.kanji!==v.kana)?v.kanji+'（'+v.kana+'）':v.kana;
+      const prompt=masuPrompt(v);
       return { typ:'mc', frage:prompt+' → ?（'+label+'）', optionen:optionen, richtig:optionen.indexOf(correct),
         erkl:(form==='dict'?cleanVerb(v.kana):c.dict)+' → '+correct+(v.de?' — '+v.de:'') };
     });
@@ -364,7 +370,7 @@
   function vocabRow(w,listsOn){
     // Verben: Stichwort = Wörterbuchform; die ます-Form erscheint erst beim Aufklappen.
     const dd=verbDictDisplay(w);
-    const written=dd?dd.written:((w.kanji&&w.kanji.length)?w.kanji:w.kana);
+    const written=dd?dd.written:(writtenForm(w));
     const readKana=dd?dd.kana:w.kana;
     const showKana=written!==readKana;
     const row=el('div','v-row item'); row.dataset.filter=String(w.lesson);
@@ -373,7 +379,7 @@
     row.dataset.search=norm([w.kanji,w.kana,w.romaji,w.de,w.pos,(dd?dd.written+' '+dd.kana:''),(bsp?bsp.jp+' '+bsp.de+' '+(bsp.note||''):'')].join(' '));
     // Erweiterte Infos (ます-Form bei Verben, Beispielsatz + Notiz) klappen per Klick auf.
     if(bsp||dd)row.dataset.ext='1';
-    const masuLine=dd?'<div class="v-masu-inline"><span class="v-masu-lbl">ます-Form</span> <span class="ja">'+esc((w.kanji&&w.kanji.length&&w.kanji!==w.kana)?w.kanji+'（'+w.kana+'）':w.kana)+'</span></div>':'';
+    const masuLine=dd?'<div class="v-masu-inline"><span class="v-masu-lbl">ます-Form</span> <span class="ja">'+esc(masuPrompt(w))+'</span></div>':'';
     const bspLine=bsp?'<div class="v-bsp-inline"><span class="ja">'+furiToRuby(bsp.jp)+'</span> — '+esc(bsp.de)+(bsp.note?'<span class="v-note"> · '+esc(bsp.note)+'</span>':'')+'</div>':'';
     const ext=(bsp||dd)?'<span class="v-more" aria-hidden="true" title="Mehr anzeigen">›</span>'+
       '<div class="v-ext">'+masuLine+bspLine+'</div>':'';
@@ -595,8 +601,7 @@
       d.dir.textContent='Aufgabe';
       const ex=Object.assign({},c.ex,{srsId:c.srsId});
       window.Exercises.renderExercise(ex,d.exHost,{ onResult:()=>{
-        const nx=el('button','btn-primary drill-ex-next','Weiter →'); nx.type='button';
-        nx.addEventListener('click',drillNext); d.exHost.appendChild(nx);
+        d.exHost.appendChild(makeNextButton(drillNext,'drill-ex-next'));
       }});
       return;
     }
@@ -634,7 +639,7 @@
       const g=verbGroup(v.pos); if(!g)return;
       const kana=allForms(v.kana,g); if(!kana)return;
       if(seen[kana.dict])return; seen[kana.dict]=1;
-      const dispSrc=(v.kanji&&v.kanji.length)?v.kanji:v.kana;
+      const dispSrc=writtenForm(v);
       const disp=allForms(dispSrc,g)||kana;
       list.push({v,g,kana,disp});
     });
@@ -697,16 +702,11 @@
     return h;
   }
   // Lernstand-Schwellen: 0 = Knospe (noch nicht gelernt), dann alle 20 % ein Blütenblatt.
-  const SCORE_THRESHOLDS=[20,40,60,80,100];
+  // Einzige Quelle ist SRS; Fallback identisch, falls srs.js (noch) nicht geladen ist.
+  const SCORE_THRESHOLDS=(window.SRS&&window.SRS.SCORE_THRESHOLDS)||[20,40,60,80,100];
   // Effektiver Lernstand (0–100) eines Items.
   function itemScore(id){ return (window.SRS&&window.SRS.effectiveScore)?window.SRS.effectiveScore(id):0; }
-  // Mini-Blüte für den Lernstand eines einzelnen Items (Vokabel/Grammatik/Kanji).
-  function scoreBadge(id){
-    const v=Math.round(itemScore(id));
-    const s=el('span','grp-flower',sakuraSvg(v,SCORE_THRESHOLDS,{cls:'sakura-sm'}));
-    s.title='Lernstand '+v+' %';
-    return s;
-  }
+  // Mini-Blüte (HTML) für den Lernstand eines einzelnen Items (Vokabel/Grammatik/Kanji).
   function scoreBadgeHtml(id){
     if(!(window.SRS&&window.SRS.effectiveScore))return '';
     const v=Math.round(itemScore(id));
@@ -835,7 +835,7 @@
   function frontHtml(c){
     if(c.t==='kanji')return '<div class="tr-big ja">'+esc(c.d.k)+'</div><div class="tr-q">On-/Kun-Lesung & Bedeutung?</div>';
     if(c.t==='vocab'){ const v=c.d, dd=verbDictDisplay(v);
-      const w=dd?dd.written:((v.kanji&&v.kanji.length)?v.kanji:v.kana), r=dd?dd.kana:v.kana;
+      const w=dd?dd.written:(writtenForm(v)), r=dd?dd.kana:v.kana;
       return '<div class="tr-word ja">'+ruby(w,r)+'</div><div class="tr-q">Lesung & Bedeutung?</div>'; }
     return '<div class="tr-pat ja">'+esc(c.d.pattern)+'</div><div class="tr-q">Bedeutung & Bildung?</div>';
   }
@@ -847,10 +847,10 @@
         (kunr?'<div class="reading-row"><span class="lbl kun">訓</span><span class="vals">'+esc(kunr)+'</span></div>':'')+'</div>'+
         (ex?'<div class="kc-examples">'+ex+'</div>':''); }
     if(c.t==='vocab'){ const v=c.d, dd=verbDictDisplay(v);
-      const written=dd?dd.written:((v.kanji&&v.kanji.length)?v.kanji:v.kana), read=dd?dd.kana:v.kana;
+      const written=dd?dd.written:(writtenForm(v)), read=dd?dd.kana:v.kana;
       const bsp=(window.VOKABULAR_BEISPIELE||{})[v.kana+'|'+v.lesson];
       // Rückseite = aufgeklappt: hier erscheint bei Verben auch die ます-Form.
-      const masu=dd?'<div class="tr-masu"><span class="v-masu-lbl">ます-Form</span> <span class="ja">'+esc((v.kanji&&v.kanji.length&&v.kanji!==v.kana)?v.kanji+'（'+v.kana+'）':v.kana)+'</span></div>':'';
+      const masu=dd?'<div class="tr-masu"><span class="v-masu-lbl">ます-Form</span> <span class="ja">'+esc(masuPrompt(v))+'</span></div>':'';
       return '<div class="tr-answer-jp ja">'+ruby(written,read)+'</div>'+
       '<div class="tr-mean">'+esc(v.de)+'</div>'+masu+
       '<div class="tr-tag"><span class="pos">'+esc(v.pos)+'</span> · Lektion '+v.lesson+'</div>'+
@@ -887,13 +887,7 @@
       const want=isNaN(tp)?window.SRS.nextPart(onlyLesson):tp;
       lessonPart=Math.max(1,Math.min(want,window.SRS.nextPart(onlyLesson),n||1));
     }
-    function lessonOf(c){ return c.type==='kanji'?window.SRS.kanjiLessonOf(c.data.level):c.data.lesson; }
     function refreshStats(){ const s=window.SRS.stats(); setText('h-streak',s.streakDays); setText('h-due',s.due); setText('h-learned',s.learned); setHtml('h-streak-flower',sakuraSvg(s.streakDays)); }
-    // Grammatik-Items einer Lektion mit Satz-Übungen → Beispiel-Aufgaben für den geführten Kurs.
-    function lessonGrammarExamples(L){
-      return (window.GRAMMATIK||[]).filter(g=>g.lesson===L && window.SATZ_TEMPLATES && window.SATZ_TEMPLATES[g.pattern])
-        .map(g=>({id:window.SRS.srsId('grammar',g),type:'grammar',data:g}));
-    }
     // Geführter Kurs EINES TEILS einer Lektion (~5–10 Min): NUR neue Items dieses Teils, didaktisch
     // geordnet Vokabeln → Grammatik → Beispiele → Kanji → Beispiele nochmal. Leer, wenn Teil schon gelernt.
     function buildLessonCourse(L,part){
@@ -936,14 +930,6 @@
         // Übungstyp je Item adaptiv aus der zentralen Registry (in render() über pickExercise).
       }
       total=deck.length; setup.classList.add('hidden'); done.classList.add('hidden'); stage.classList.remove('hidden'); render();
-    }
-    // Adaptive Modus-Wahl für Vokabeln: leicht → Erkennen, mittel → freier Abruf, fast gemeistert → Produktion (Tippen).
-    function pickVocabMode(id){
-      if(!window.SRS||!window.SRS.effectiveScore)return 'card';
-      const s=window.SRS.effectiveScore(id);
-      if(s<40)return 'recognize';
-      if(s<70)return 'card';
-      return 'type';
     }
     // Fehler-Feedback: kurzer Hinweis bei falscher Antwort (Beispiel/Notiz bzw. typischer Grammatikfehler).
     function mistakeHint(c){
@@ -1007,7 +993,7 @@
       const mount=body.querySelector('.h-ex'), nextWrap=body.querySelector('.h-next-wrap');
       window.Exercises.renderExercise(c.ex,mount,{ onResult:(ok)=>{
         if(ok===false){ const h=mistakeHint(c); if(h)nextWrap.insertAdjacentHTML('beforebegin',h); }
-        const nx=el('button','btn-primary h-next','Weiter →'); nx.type='button'; nx.addEventListener('click',()=>finishItem(null)); nextWrap.appendChild(nx); } });
+        nextWrap.appendChild(makeNextButton(()=>finishItem(null),'h-next')); } });
     }
     // TIPPEN (Produktion): Bedeutung → japanisches Wort eingeben. Romaji, Kana/Furigana ODER Kanji gelten als richtig.
     function renderTypeCard(c){
@@ -1035,7 +1021,7 @@
     function renderTeachCard(c){
       const d=c.data; let inner;
       if(c.type==='vocab'){
-        const written=(d.kanji&&d.kanji.length)?d.kanji:d.kana;
+        const written=writtenForm(d);
         const showKana=(d.kanji&&d.kanji.length&&d.kanji!==d.kana);
         const bsp=(window.VOKABULAR_BEISPIELE||{})[d.kana+'|'+d.lesson];
         inner='<div class="tc-badge">Neues Wort</div>'+
@@ -1074,7 +1060,7 @@
     }
     // ERKENNEN: Multiple-Choice (Wort → Bedeutung). Erste echte Abfrage, nachdem das Wort vorgestellt wurde.
     function renderRecognizeCard(c){
-      const d=c.data, written=(d.kanji&&d.kanji.length)?d.kanji:d.kana;
+      const d=c.data, written=writtenForm(d);
       const showKana=(d.kanji&&d.kanji.length&&d.kanji!==d.kana);
       // Distraktoren: andere Bedeutungen, bevorzugt aus derselben Lektion, sonst aus dem Gesamtwortschatz.
       const pool=(window.VOKABULAR||[]).filter(v=>v.de&&v.de!==d.de);
@@ -1094,8 +1080,7 @@
         body.querySelectorAll('.rc-opt').forEach(b=>{ b.disabled=true;
           if(b.dataset.de===d.de)b.classList.add('rc-correct'); else if(b===btn)b.classList.add('rc-wrong'); });
         if(!correct){ const h=mistakeHint(c); if(h)wrap.insertAdjacentHTML('beforebegin',h); }
-        const nx=el('button','btn-primary h-next','Weiter →'); nx.type='button';
-        nx.addEventListener('click',()=>finishItem(correct?1:0)); wrap.appendChild(nx); nx.focus();
+        const nx=makeNextButton(()=>finishItem(correct?1:0),'h-next'); wrap.appendChild(nx); nx.focus();
       }));
     }
     // ZENTRALE ÜBUNG: adaptiv eine Übung aus der Registry ziehen und einheitlich rendern.
@@ -1110,37 +1095,21 @@
       const mount=body.querySelector('.h-ex'), nextWrap=body.querySelector('.h-next-wrap');
       window.Exercises.renderExercise(ex,mount,{ onResult:(ok)=>{
         if(ok===false){ const h=mistakeHint(c); if(h)nextWrap.insertAdjacentHTML('beforebegin',h); }
-        const nx=el('button','btn-primary h-next','Weiter →'); nx.type='button'; nx.addEventListener('click',()=>finishItem(null)); nextWrap.appendChild(nx); } });
+        nextWrap.appendChild(makeNextButton(()=>finishItem(null),'h-next')); } });
     }
     function renderWriteCard(c){
-      const k=c.data;
-      body.innerHTML='<div class="tr-card kw-card"><div class="kw-head"><span class="tr-big ja">'+esc(k.k)+'</span>'+
-        '<span class="tr-q">'+esc(k.meaning||'')+' — schreibe das Kanji in richtiger Strichreihenfolge</span></div>'+
-        '<div class="kw-stage"></div><div class="kw-compare-host"></div><div class="kw-msg" aria-live="polite"></div>'+
-        '<div class="tr-controls"><button class="btn h-kw-guide" type="button">Vorlage</button>'+
-        '<button class="btn h-kw-play" type="button"><span class="msi" aria-hidden="true">play_arrow</span> Reihenfolge</button>'+
-        '<button class="btn h-kw-clear" type="button">Löschen</button>'+
-        '<button class="btn btn-again h-kw-again" type="button"><span class="msi" aria-hidden="true">refresh</span> Später</button></div></div>';
-      const mount=body.querySelector('.kw-stage'), msg=body.querySelector('.kw-msg'), cmp=body.querySelector('.kw-compare-host');
-      const size=Math.min(300,(stage.clientWidth||320)-40);
-      // Snap/Vorlage rein aus dem 0–100-Lernstand (Kanji werden nur übers Schreiben bewertet).
-      const m=window.KanjiWrite.writeMode(window.SRS.scoreOf(c.id));
-      fetch('assets/kanjivg/'+window.KanjiWrite.cpFile(k.k)).then(r=>r.text()).then(svg=>{
-        const w=window.KanjiWrite.create(mount,{svgText:svg,size:size,snap:m.snap,guide:m.guide,
-          onProgress:(i,n)=>{ cmp.innerHTML=''; msg.textContent='Strich '+i+' / '+n; },
-          onMistake:(strokeNo)=>{ msg.textContent='✗ Strich '+strokeNo+' passt nicht — nochmal'; },
-          onComplete:(clean)=>{
-            if(clean){ msg.textContent='✓ Sauber geschrieben!'; }
-            else { msg.textContent='✗ Mit Fehlern — Vergleich unten. Kein Fortschritt; gern „Löschen" und nochmal.'; w.showComparison(cmp); }
-            refreshStats();
-            // Nur saubere Schreibung gibt Punkte; unsauber rückt nur weiter (kein Score-Gewinn).
-            const nx=el('button','btn-primary h-next','Weiter →'); nx.type='button'; nx.addEventListener('click',()=>finishItem(clean?1:null)); body.querySelector('.tr-controls').appendChild(nx); }});
-        body.querySelector('.h-kw-guide').addEventListener('click',()=>w.toggleGuide());
-        body.querySelector('.h-kw-play').addEventListener('click',()=>w.play());
-        body.querySelector('.h-kw-clear').addEventListener('click',()=>{ w.clear(); cmp.innerHTML=''; });
-      }).catch(()=>{ msg.textContent='SVG konnte nicht geladen werden.'; });
-      // „Später": ans Ende schieben, ohne Bewertung.
-      body.querySelector('.h-kw-again').addEventListener('click',()=>{ const c2=deck.shift(); deck.push(c2); render(); });
+      // Snap/Vorlage rein aus dem 0–100-Lernstand (Kanji werden nur übers Schreiben bewertet);
+      // Breite aus der äußeren Bühne, „Später" schiebt ohne Bewertung ans Ende.
+      window.KanjiWrite.renderCard(body,c.data,{
+        cardClass:'tr-card kw-card', sizeHost:stage, sizeOffset:-40, id:c.id,
+        failMsg:'✗ Mit Fehlern — Vergleich unten. Kein Fortschritt; gern „Löschen" und nochmal.',
+        onLater:()=>{ const c2=deck.shift(); deck.push(c2); render(); },
+        onComplete:(clean,ctx)=>{
+          refreshStats();
+          // Nur saubere Schreibung gibt Punkte; unsauber rückt nur weiter (kein Score-Gewinn).
+          ctx.controls.appendChild(makeNextButton(()=>finishItem(clean?1:null),'h-next'));
+        }
+      });
     }
     function renderFlashcard(c){
       const fc={t:c.type,d:c.data};
@@ -1158,8 +1127,8 @@
       const ex=window.Exercises.fromTemplate(tpl,{});
       body.innerHTML='<div class="tr-card"><div class="h-ex-pat ja">'+esc(c.data.pattern)+'</div><div class="h-ex"></div><div class="h-next-wrap"></div></div>';
       const mount=body.querySelector('.h-ex'), nextWrap=body.querySelector('.h-next-wrap');
-      window.Exercises.renderExercise(ex,mount,{ onResult:()=>{ const nx=el('button','btn-primary h-next','Weiter →'); nx.type='button';
-        nx.addEventListener('click',()=>finishItem(null)); nextWrap.appendChild(nx); } });
+      window.Exercises.renderExercise(ex,mount,{ onResult:()=>{
+        nextWrap.appendChild(makeNextButton(()=>finishItem(null),'h-next')); } });
     }
     document.addEventListener('keydown',e=>{ if(stage.classList.contains('hidden'))return; if(e.code!=='Space')return;
       const reveal=body.querySelector('.h-reveal'), good=body.querySelector('.h-good'), advance=body.querySelector('.tc-next, .h-next');
@@ -1215,7 +1184,7 @@
       if(lbox&&window.SRS.leeches){ const ls=window.SRS.leeches(undefined,{limit:12});
         if(lpanel)lpanel.hidden=ls.length===0;
         lbox.innerHTML=ls.map(x=>{ const d=x.data;
-          const jp=x.type==='kanji'?d.k:(x.type==='vocab'?((d.kanji&&d.kanji.length)?d.kanji:d.kana):d.pattern);
+          const jp=x.type==='kanji'?d.k:(x.type==='vocab'?(writtenForm(d)):d.pattern);
           const de=x.type==='grammar'?(d.title||d.pattern):d.meaning||d.de||'';
           return '<div class="f-leech-item">'+sakuraSvg(x.score,SCORE_THRESHOLDS,{cls:'sakura-sm'})+
             '<span class="f-leech-jp ja">'+esc(jp)+'</span><span class="f-leech-de">'+esc(de)+'</span>'+
@@ -1347,7 +1316,7 @@
         bodyEl.innerHTML='<div class="lp-q"></div><div class="lp-q-next"></div>';
         const mount=bodyEl.querySelector('.lp-q'), nextWrap=bodyEl.querySelector('.lp-q-next');
         window.Exercises.renderExercise(qs[i],mount,{ onResult:res=>{ if(res)correct++;
-          const nx=el('button','btn-primary','Weiter →'); nx.type='button'; nx.addEventListener('click',()=>{ i++; show(); }); nextWrap.appendChild(nx); } });
+          nextWrap.appendChild(makeNextButton(()=>{ i++; show(); })); } });
       }
       function result(){
         const score=n?correct/n:0, r=window.SRS.recordLessonTest(L,score), pct=Math.round(score*100);
@@ -1430,28 +1399,16 @@
   }
   function renderWriteExercise(k, mount, opts){
     opts=opts||{};
-    mount.innerHTML='<div class="kw-card"><div class="kw-head"><span class="tr-big ja">'+esc(k.k)+'</span>'+
-      '<span class="tr-q">'+esc(k.meaning||'')+' — schreibe das Kanji in richtiger Strichreihenfolge</span></div>'+
-      '<div class="kw-stage"></div><div class="kw-compare-host"></div><div class="kw-msg" aria-live="polite"></div>'+
-      '<div class="tr-controls"><button class="btn h-kw-guide" type="button">Vorlage</button>'+
-      '<button class="btn h-kw-play" type="button"><span class="msi" aria-hidden="true">play_arrow</span> Reihenfolge</button>'+
-      '<button class="btn h-kw-clear" type="button">Löschen</button></div></div>';
-    const stage=mount.querySelector('.kw-stage'), msg=mount.querySelector('.kw-msg'), cmp=mount.querySelector('.kw-compare-host');
-    const size=Math.min(300,(mount.clientWidth||320)-20);
-    const m=window.KanjiWrite.writeMode(window.SRS&&window.SRS.scoreOf?window.SRS.scoreOf('k:'+k.k):0);
     let doneCalled=false;
-    fetch('assets/kanjivg/'+window.KanjiWrite.cpFile(k.k)).then(r=>r.text()).then(svg=>{
-      const w=window.KanjiWrite.create(stage,{svgText:svg,size:size,snap:m.snap,guide:m.guide,
-        onProgress:(i,n)=>{ cmp.innerHTML=''; msg.textContent='Strich '+i+' / '+n; },
-        onMistake:(no)=>{ msg.textContent='✗ Strich '+no+' passt nicht — nochmal'; },
-        onComplete:(clean)=>{
-          if(clean){ msg.textContent='✓ Sauber geschrieben!'; if(window.SRS&&window.SRS.grade)window.SRS.grade('k:'+k.k,1); }
-          else { msg.textContent='✗ Mit Fehlern — Vergleich unten.'; w.showComparison(cmp); }
-          if(!doneCalled){ doneCalled=true; if(opts.onDone)opts.onDone(clean); } }});
-      mount.querySelector('.h-kw-guide').addEventListener('click',()=>w.toggleGuide());
-      mount.querySelector('.h-kw-play').addEventListener('click',()=>w.play());
-      mount.querySelector('.h-kw-clear').addEventListener('click',()=>{ w.clear(); cmp.innerHTML=''; });
-    }).catch(()=>{ msg.textContent='SVG konnte nicht geladen werden.'; if(!doneCalled){ doneCalled=true; if(opts.onDone)opts.onDone(null); } });
+    const finish=(v)=>{ if(!doneCalled){ doneCalled=true; if(opts.onDone)opts.onDone(v); } };
+    window.KanjiWrite.renderCard(mount,k,{
+      sizeOffset:-20, id:'k:'+k.k,
+      onComplete:(clean)=>{
+        if(clean&&window.SRS&&window.SRS.grade)window.SRS.grade('k:'+k.k,1);
+        finish(clean);
+      },
+      onError:()=>finish(null)
+    });
   }
 
   /* ============================================================  FREIES ÜBEN (Zufallskarten je Quelle, ungated)  */
@@ -1531,9 +1488,9 @@
     const nameInp=document.getElementById('lst-create-name'), createBtn=document.getElementById('lst-create');
 
     function vocabFront(v){ const dd=verbDictDisplay(v);
-      const w=dd?dd.written:((v.kanji&&v.kanji.length)?v.kanji:v.kana); return ruby(w,dd?dd.kana:v.kana); }
+      const w=dd?dd.written:(writtenForm(v)); return ruby(w,dd?dd.kana:v.kana); }
     // Vorderseite/Glyph je Item-Typ (für die Item-Liste und den Karteikarten-Fallback).
-    function itemGlyph(o){ return o.type==='kanji'?o.data.k:(o.type==='grammar'?o.data.pattern:((o.data.kanji&&o.data.kanji.length)?o.data.kanji:o.data.kana)); }
+    function itemGlyph(o){ return o.type==='kanji'?o.data.k:(o.type==='grammar'?o.data.pattern:(writtenForm(o.data))); }
     function itemMeaning(o){ return o.type==='kanji'?(o.data.meaning||''):(o.type==='grammar'?(o.data.title||''):o.data.de); }
     function itemFrontHtml(o){ return o.type==='vocab'?vocabFront(o.data):esc(itemGlyph(o)); }
     function draw(){
@@ -1604,7 +1561,7 @@
       title.textContent=l.name;
       let deck=[], total=0;
       function start(){ deck=shuffle(window.SRS.listItems(l.id).slice()); total=deck.length; done.classList.add('hidden'); card.classList.remove('hidden'); render(); }
-      function addNext(){ if(nextWrap.querySelector('.lt-next'))return; const nx=el('button','btn-primary lt-next','Weiter →'); nx.type='button'; nx.addEventListener('click',()=>{ deck.shift(); render(); }); nextWrap.appendChild(nx); nx.focus(); }
+      function addNext(){ if(nextWrap.querySelector('.lt-next'))return; const nx=makeNextButton(()=>{ deck.shift(); render(); },'lt-next'); nextWrap.appendChild(nx); nx.focus(); }
       function render(){
         if(!deck.length){ card.classList.add('hidden'); done.classList.remove('hidden');
           done.innerHTML=total?'<div class="tr-done-in">Geschafft!<br>Alle '+total+' Einträge durch.</div><button class="btn-primary lt-restart" type="button"><span class="msi" aria-hidden="true">refresh</span> Nochmal</button>':'<div class="tr-done-in">Diese Liste ist leer.</div>';

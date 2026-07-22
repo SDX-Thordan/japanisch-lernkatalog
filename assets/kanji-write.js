@@ -18,6 +18,8 @@
   var GUIDE_BELOW = 60;     // Lernstand < 60: Vorlage sichtbar; ab 60 freihändig (Meistern nur freihändig)
 
   function cpFile(k) { return k.codePointAt(0).toString(16).padStart(5, '0') + '.svg'; }
+  // HTML-Escape: nutzt window.Katalog.esc (app.js), falls vorhanden — sonst identischer Fallback.
+  function esc(s) { var K = window.Katalog; if (K && K.esc) return K.esc(s); return String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;'); }
 
   // Übungsmodus rein aus dem 0–100-Lernstand: <30 Snap+Vorlage, 30–59 nur Vorlage, ≥60 freihändig.
   // (Bewertung läuft in jedem Modus über strokeMatches.)
@@ -89,13 +91,6 @@
       var cx = (ev.touches ? ev.touches[0].clientX : ev.clientX) - r.left;
       var cy = (ev.touches ? ev.touches[0].clientY : ev.clientY) - r.top;
       return { x: cx / r.width * BOX, y: cy / r.height * BOX };
-    }
-    function strokePath(d, color, width, prog) {
-      ctx.strokeStyle = color; ctx.lineWidth = width; ctx.lineCap = 'round'; ctx.lineJoin = 'round';
-      if (prog == null && window.Path2D) { ctx.save(); ctx.scale(scale, scale); ctx.stroke(new Path2D(d)); ctx.restore(); return; }
-      // progressiver Verlauf via Abtasten
-      var info = infos[arguments[4]];
-      // Fallback: nichts
     }
     function redraw() {
       ctx.clearRect(0, 0, size, size);
@@ -342,5 +337,49 @@
     load();
   }
 
-  window.KanjiWrite = { parseStrokes: parseStrokes, cpFile: cpFile, create: create, initPage: initPage, strokeMatches: strokeMatches, writeMode: writeMode };
+  // Gemeinsame Schreib-Karte: baut die .kw-card-Oberfläche in `host`, lädt das KanjiVG-SVG,
+  // erzeugt das Schreib-Widget und verdrahtet Vorlage/Reihenfolge/Löschen. Der Aufrufer steuert
+  // Score-Quelle, Größe und das Verhalten nach dem Abschluss über `opts`:
+  //   cardClass   – CSS-Klasse(n) der Karten-Hülle (Standard 'kw-card')
+  //   sizeHost    – Element, dessen Breite die Zeichenfläche bestimmt (Standard host)
+  //   sizeOffset  – Pixel-Korrektur auf die gemessene Breite (Standard 0)
+  //   id          – SRS-Id für Snap/Vorlage-Stufe (Standard 'k:'+k.k)
+  //   failMsg     – Meldung bei fehlerhaftem Abschluss (Standard Kurzform)
+  //   onLater(fn) – ergänzt einen „Später"-Button und verdrahtet ihn
+  //   onComplete(clean, ctx) – ctx = { widget, msgEl, cmpEl, controls }
+  //   onError()   – SVG konnte nicht geladen werden
+  function renderCard(host, k, opts) {
+    opts = opts || {};
+    var later = opts.onLater
+      ? '<button class="btn btn-again h-kw-again" type="button"><span class="msi" aria-hidden="true">refresh</span> Später</button>'
+      : '';
+    host.innerHTML = '<div class="' + (opts.cardClass || 'kw-card') + '"><div class="kw-head"><span class="tr-big ja">' + esc(k.k) + '</span>' +
+      '<span class="tr-q">' + esc(k.meaning || '') + ' — schreibe das Kanji in richtiger Strichreihenfolge</span></div>' +
+      '<div class="kw-stage"></div><div class="kw-compare-host"></div><div class="kw-msg" aria-live="polite"></div>' +
+      '<div class="tr-controls"><button class="btn h-kw-guide" type="button">Vorlage</button>' +
+      '<button class="btn h-kw-play" type="button"><span class="msi" aria-hidden="true">play_arrow</span> Reihenfolge</button>' +
+      '<button class="btn h-kw-clear" type="button">Löschen</button>' + later + '</div></div>';
+    var mount = host.querySelector('.kw-stage'), msg = host.querySelector('.kw-msg'), cmp = host.querySelector('.kw-compare-host');
+    var controls = host.querySelector('.tr-controls');
+    var widthEl = opts.sizeHost || host;
+    var size = Math.min(300, (widthEl.clientWidth || 320) + (opts.sizeOffset || 0));
+    var score = (window.SRS && window.SRS.scoreOf) ? window.SRS.scoreOf(opts.id || ('k:' + k.k)) : 0;
+    var m = writeMode(score);
+    if (opts.onLater) { var lb = host.querySelector('.h-kw-again'); if (lb) lb.addEventListener('click', opts.onLater); }
+    fetch('assets/kanjivg/' + cpFile(k.k)).then(function (r) { return r.text(); }).then(function (svg) {
+      var w = create(mount, { svgText: svg, size: size, snap: m.snap, guide: m.guide,
+        onProgress: function (i, n) { cmp.innerHTML = ''; msg.textContent = 'Strich ' + i + ' / ' + n; },
+        onMistake: function (no) { msg.textContent = '✗ Strich ' + no + ' passt nicht — nochmal'; },
+        onComplete: function (clean) {
+          if (clean) { msg.textContent = '✓ Sauber geschrieben!'; }
+          else { msg.textContent = opts.failMsg || '✗ Mit Fehlern — Vergleich unten.'; w.showComparison(cmp); }
+          if (opts.onComplete) opts.onComplete(clean, { widget: w, msgEl: msg, cmpEl: cmp, controls: controls });
+        } });
+      host.querySelector('.h-kw-guide').addEventListener('click', function () { w.toggleGuide(); });
+      host.querySelector('.h-kw-play').addEventListener('click', function () { w.play(); });
+      host.querySelector('.h-kw-clear').addEventListener('click', function () { w.clear(); cmp.innerHTML = ''; });
+    }).catch(function () { msg.textContent = 'SVG konnte nicht geladen werden.'; if (opts.onError) opts.onError(); });
+  }
+
+  window.KanjiWrite = { parseStrokes: parseStrokes, cpFile: cpFile, create: create, initPage: initPage, strokeMatches: strokeMatches, writeMode: writeMode, renderCard: renderCard };
 })();
