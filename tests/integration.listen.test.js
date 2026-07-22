@@ -135,4 +135,24 @@ describe('Listen-Seite', () => {
     expect(row.classList.contains('expanded')).toBe(true);
     // Klick auf den Entfernen-Button klappt NICHT auf (sondern entfernt).
   });
+
+  it('Eintrag entfernen lässt die Einträge-Ansicht offen und aktualisiert den Zähler', () => {
+    const l = win.SRS.createList('Entfern-Test');
+    win.SRS.addToList(l.id, win.VOKABULAR.slice(0, 3).map((v) => win.SRS.srsId('vocab', v)));
+    win.document.getElementById('lst-create-name').value = 'x';
+    click(win.document.getElementById('lst-create'));
+    const box = win.document.querySelector('.lst-items');
+    click(win.document.querySelector('.lst-show')); // Ansicht öffnen
+    expect(box.classList.contains('hidden')).toBe(false);
+    expect(box.querySelectorAll('.lst-item').length).toBe(3);
+
+    click(box.querySelector('.lst-item .lst-rm')); // erste Zeile entfernen
+    // Ansicht bleibt offen, nur die Zeile verschwindet
+    expect(box.classList.contains('hidden')).toBe(false);
+    expect(box.querySelectorAll('.lst-item').length).toBe(2);
+    // Zähler & Buttons aktualisiert, ohne Neuaufbau
+    expect(win.document.querySelector('.lst-count').textContent).toContain('2 Einträge');
+    expect(win.document.querySelector('.lst-show').textContent).toContain('(2)');
+    expect(win.SRS.listItems(l.id).length).toBe(2);
+  });
 });
