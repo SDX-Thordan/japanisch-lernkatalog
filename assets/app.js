@@ -1530,7 +1530,15 @@
         row.innerHTML='<span class="lst-jp ja">'+itemFrontHtml(o)+'</span><span class="lst-de">'+tag+esc(itemMeaning(o))+ext+'</span>';
         if(bsp){ row.dataset.ext='1'; row.addEventListener('click',e=>{ if(e.target.closest('.lst-rm'))return; row.classList.toggle('expanded'); }); }
         const rm=el('button','lst-rm','<span class="msi" aria-hidden="true">close</span>'); rm.type='button'; rm.title='Aus Liste entfernen';
-        rm.addEventListener('click',()=>{ window.SRS.removeFromList(l.id,[o.id]); draw(); });
+        // Nur die Zeile entfernen und Zähler/Buttons aktualisieren — NICHT die ganze Seite neu
+        // zeichnen, sonst klappt die geöffnete Einträge-Ansicht zu.
+        rm.addEventListener('click',()=>{
+          window.SRS.removeFromList(l.id,[o.id]); row.remove();
+          const card=box.closest('.lst-card'); const n=window.SRS.listItems(l.id).length;
+          const cnt=card&&card.querySelector('.lst-count'); if(cnt)cnt.textContent=n+' Einträge';
+          const trainBtn=card&&card.querySelector('.lst-train'); if(trainBtn)trainBtn.disabled=!n;
+          const showBtn=card&&card.querySelector('.lst-show'); if(showBtn)showBtn.textContent=n?'Einträge ('+n+')':'Einträge';
+        });
         row.appendChild(rm); box.appendChild(row); });
     }
 
