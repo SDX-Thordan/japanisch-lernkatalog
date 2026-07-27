@@ -1191,7 +1191,8 @@
             '<span class="f-leech-n" title="Fehlversuche">×'+x.lapses+'</span></div>'; }).join(''); }
     }
     draw();
-    const exp=document.getElementById('f-export'); if(exp)exp.addEventListener('click',()=>window.SRS.downloadBackup());
+    const exp=document.getElementById('f-export');
+    if(exp)exp.addEventListener('click',()=>runExport(exp,document.getElementById('f-msg'),'Sicherung',()=>window.SRS.downloadBackup()));
     const imp=document.getElementById('f-import'); const file=document.getElementById('f-file');
     if(imp&&file){ imp.addEventListener('click',()=>file.click());
       file.addEventListener('change',()=>{ const f=file.files&&file.files[0]; if(!f)return; const r=new FileReader();
@@ -1338,6 +1339,36 @@
 
   /* ============================================================  LISTEN-PICKER (geteilt: Vokabular-Seite)  */
   // Zähler am ＋-Button: „2+" statt „＋", wenn das Item schon in 2 Listen ist.
+  /* ---------- Export-Rückmeldung (nie stumm scheitern) ---------- */
+  // Statustext je Speicherweg; „was" ist die Bezeichnung des Exports (z. B. „Sicherung").
+  function saveMsg(res,what){
+    if(!res)return '✗ '+what+': Export fehlgeschlagen.';
+    if(res.how==='share')return '✓ '+what+' geteilt/gespeichert.';
+    if(res.how==='download')return '✓ '+what+' heruntergeladen.';
+    if(res.how==='clipboard')return '✓ '+what+' in die Zwischenablage kopiert (kein Dateizugriff möglich).';
+    if(res.how==='canceled')return 'Abgebrochen.';
+    return '✗ '+what+': Speichern nicht möglich — Text unten kopieren und sichern.';
+  }
+  // Letzte Rettung: JSON in einem Textfeld zum Kopieren anbieten (hinter dem Statusabsatz).
+  function showJsonFallback(afterEl,res){
+    const old=document.querySelector('.f-json'); if(old)old.remove();
+    if(!res||res.how!=='none'||!res.json||!afterEl)return;
+    const ta=el('textarea','f-json'); ta.readOnly=true; ta.value=res.json;
+    afterEl.parentNode.insertBefore(ta,afterEl.nextSibling);
+    try{ ta.focus(); ta.select(); }catch(e){}
+  }
+  // Export anstoßen und Ergebnis melden; Knopf ist währenddessen gesperrt (kein Doppelklick).
+  function runExport(btn,msgEl,what,fn){
+    if(btn)btn.disabled=true;
+    if(msgEl)msgEl.textContent=what+' wird erstellt …';
+    return Promise.resolve().then(fn).then(res=>{
+      if(msgEl){ msgEl.textContent=saveMsg(res,what); showJsonFallback(msgEl,res); }
+      return res;
+    }).catch(e=>{
+      if(msgEl)msgEl.textContent='✗ '+what+': '+(e&&e.message||e);
+    }).then(r=>{ if(btn)btn.disabled=false; return r; });
+  }
+
   function inListCount(id){ return (window.SRS&&window.SRS.listsContaining)?window.SRS.listsContaining(id).length:0; }
   function addBtnLabel(id){ const n=inListCount(id); return n>0?n+'+':'＋'; }
   function addBtnTitle(id,base){ const n=inListCount(id); return n>0?('In '+n+(n===1?' Liste':' Listen')+' — '+base):base; }
@@ -1514,7 +1545,7 @@
         del.addEventListener('click',()=>{ if(window.confirm('Liste „'+l.name+'" löschen? (Vokabeln selbst bleiben erhalten.)')){ window.SRS.deleteList(l.id); draw(); } });
         const exp=el('button','btn lst-export','<span class="msi" aria-hidden="true">download</span> Export'); exp.type='button';
         exp.title='Diese Liste als JSON-Datei exportieren (zum Teilen/Übertragen)';
-        exp.addEventListener('click',()=>window.SRS.downloadList(l.id));
+        exp.addEventListener('click',()=>runExport(exp,document.getElementById('lst-msg'),'Liste „'+l.name+'"',()=>window.SRS.downloadList(l.id)));
         actions.appendChild(train); actions.appendChild(show); actions.appendChild(ren); actions.appendChild(exp); actions.appendChild(del);
         root.appendChild(card);
       });
