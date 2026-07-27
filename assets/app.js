@@ -143,7 +143,7 @@
       {page:'ueben',href:'ueben.html',label:'Freies Üben',icon:'school'},
     ]},
     {group:'Mein Bereich', items:[
-      {page:'listen',href:'listen.html',label:'Listen',icon:'bookmarks'},
+      {page:'listen',href:'listen.html',label:'Listen',icon:'bookmarks',match:['listen','liste']},
       {page:'profil',href:'profil.html',label:'Profil',icon:'person'},
     ]},
   ];
@@ -152,7 +152,7 @@
   const BOTTOM=[
     {page:'heute',href:'heute.html',label:'Heute',icon:'today'},
     {page:'lernpfad',href:'lernpfad.html',label:'Lernpfad',icon:'route'},
-    {page:'listen',href:'listen.html',label:'Listen',icon:'bookmarks'},
+    {page:'listen',href:'listen.html',label:'Listen',icon:'bookmarks',match:['listen','liste']},
     {page:'nachschlagen',href:'vokabular.html',label:'Nachschlagen',icon:'menu_book',match:REFERENCE_PAGES},
     {page:'profil',href:'profil.html',label:'Profil',icon:'person'},
   ];
@@ -306,6 +306,23 @@
   /* ---------- Zustand für Listen-Seiten ---------- */
   let items=[], groups=[], activeFilter='all', activeType='all', query='';
 
+  /* Delegierte Klicks für Kanji-Karten (＋ zur Lernliste) — an jeden Container bindbar,
+     damit die Karten auch außerhalb der Kanji-Seite (Listen-Detailseite) funktionieren. */
+  function initKanjiClicks(content){
+    content.addEventListener('click',e=>{ const a=e.target.closest('.kc-add'); if(a&&window.SRS){ openListPicker(['k:'+a.dataset.kanji], a.dataset.word||a.dataset.kanji); } });
+  }
+  /* Delegierte Klicks für Vokabelzeilen: ＋ (Wort/Lektion) und Aufklappen der Beispiele. */
+  function initVocabClicks(content,listsOn){
+    content.addEventListener('click',e=>{
+      if(listsOn){
+        const a=e.target.closest('.v-add'); if(a){ e.stopPropagation(); openListPicker([a.dataset.vid],a.dataset.word); return; }
+        const al=e.target.closest('.v-add-lesson'); if(al){ const L=+al.dataset.lesson; const ids=(window.VOKABULAR||[]).filter(v=>v.lesson===L).map(v=>'v:'+v.kana+'|'+v.lesson); openListPicker(ids,'Lektion '+L); return; }
+      }
+      // Klick auf die Karte klappt die erweiterte Bedeutung (Beispiel) auf/zu.
+      const row=e.target.closest('.v-row.item'); if(row&&row.dataset.ext)row.classList.toggle('expanded');
+    });
+  }
+
   /* ============================================================  KANJI  */
   function renderKanji(content){
     const data=window.KANJI||[], byLevel={};
@@ -318,7 +335,7 @@
       group.appendChild(grid); content.appendChild(group);
     });
     buildChips(LEVEL_ORDER.filter(lv=>byLevel[lv]), v=>v);
-    content.addEventListener('click',e=>{ const a=e.target.closest('.kc-add'); if(a&&window.SRS){ openListPicker(['k:'+a.dataset.kanji], a.dataset.word||a.dataset.kanji); } });
+    initKanjiClicks(content);
   }
   function kanjiCard(k){
     const on=(k.on||[]).join('・'), kun=(k.kun||[]).join('・');
@@ -361,14 +378,7 @@
     });
     buildChips(Object.keys(byLesson).map(Number).sort((a,b)=>a-b), L=>'L'+L);
     buildTypeChips();
-    content.addEventListener('click',e=>{
-      if(listsOn){
-        const a=e.target.closest('.v-add'); if(a){ e.stopPropagation(); openListPicker([a.dataset.vid],a.dataset.word); return; }
-        const al=e.target.closest('.v-add-lesson'); if(al){ const L=+al.dataset.lesson; const ids=(window.VOKABULAR||[]).filter(v=>v.lesson===L).map(v=>'v:'+v.kana+'|'+v.lesson); openListPicker(ids,'Lektion '+L); return; }
-      }
-      // Klick auf die Karte klappt die erweiterte Bedeutung (Beispiel) auf/zu.
-      const row=e.target.closest('.v-row.item'); if(row&&row.dataset.ext)row.classList.toggle('expanded');
-    });
+    initVocabClicks(content,listsOn);
   }
   // Gestapelte Vokabel-Karte (handytauglich): (Lesung klein) / Wort / Übersetzung; Blüte oben rechts.
   // Suchindex für Verben: alle Formen (Kana + Schreibung) samt Rōmaji, damit „okiru", „おきる",
@@ -798,9 +808,10 @@
     values.forEach(v=>box.appendChild(mk(String(v),labelFn(v))));
   }
   // Wortart-Chips (nur Vokabular-Seite).
-  function buildTypeChips(){
+  // Ohne Argument die Wortarten (Vokabular-Seite); mit defs eine andere Chip-Reihe (Listen-Detailseite).
+  function buildTypeChips(defs){
     const box=document.getElementById('type-filters'); if(!box)return;
-    const defs=[['all','Alle'],['noun','Nomen'],['verb','Verben'],['adj','Adjektive'],['adv','Adverbien'],['part','Partikel']];
+    defs=defs||[['all','Alle'],['noun','Nomen'],['verb','Verben'],['adj','Adjektive'],['adv','Adverbien'],['part','Partikel']];
     defs.forEach(([val,label])=>{ const c=el('button','chip'+(val==='all'?' on':'')); c.textContent=label; c.dataset.tval=val;
       c.addEventListener('click',()=>{ activeType=val; box.querySelectorAll('.chip').forEach(x=>x.classList.toggle('on',x.dataset.tval===val)); applyFilter(); });
       box.appendChild(c); });
@@ -1528,16 +1539,121 @@
   }
 
   /* ============================================================  LISTEN (persönliche Vokabellisten)  */
+  /* ---------- Listen-Trainer + Item-Darstellung (geteilt: listen.html & liste.html) ---------- */
+  function vocabFront(v){ const dd=verbDictDisplay(v);
+    const w=dd?dd.written:(writtenForm(v)); return ruby(w,dd?dd.kana:v.kana); }
+  // Vorderseite/Glyph je Item-Typ (für die Item-Liste und den Karteikarten-Fallback).
+  function itemGlyph(o){ return o.type==='kanji'?o.data.k:(o.type==='grammar'?o.data.pattern:(writtenForm(o.data))); }
+  function itemMeaning(o){ return o.type==='kanji'?(o.data.meaning||''):(o.type==='grammar'?(o.data.title||''):o.data.de); }
+  function itemFrontHtml(o){ return o.type==='vocab'?vocabFront(o.data):esc(itemGlyph(o)); }
+
+  /* ----- Trainer: gemischte, adaptive Übungen aus der zentralen Registry ----- */
+  let tov=null;
+  function ensureTrainer(){
+    if(tov)return tov;
+    tov=el('div','lt-overlay'); tov.hidden=true;
+    tov.innerHTML='<div class="lt-modal" role="dialog" aria-modal="true" aria-label="Liste üben">'+
+      '<div class="lt-head"><span class="lt-title"></span>'+
+        '<button class="drill-close lt-close" type="button" aria-label="Schließen"><span class="msi" aria-hidden="true">close</span></button></div>'+
+      '<div class="lt-top"><span class="lt-prog"></span></div>'+
+      '<div class="lt-card"><div class="lt-ex"></div><div class="lt-next-wrap"></div></div>'+
+      '<div class="lt-done hidden"></div></div>';
+    document.body.appendChild(tov);
+    tov.querySelector('.lt-close').addEventListener('click',()=>{ tov.hidden=true; });
+    tov.addEventListener('click',e=>{ if(e.target===tov)tov.hidden=true; });
+    document.addEventListener('keydown',e=>{ if(tov.hidden)return;
+      if(e.key==='Escape'){ tov.hidden=true; return; }
+      if(e.code==='Space'){ const nx=tov.querySelector('.lt-next'); if(nx){ e.preventDefault(); nx.click(); } } });
+    return tov;
+  }
+  function openTrainer(l){
+    const ov=ensureTrainer();
+    const q=s=>ov.querySelector(s);
+    const title=q('.lt-title'), prog=q('.lt-prog'), card=q('.lt-card'),
+      exMount=q('.lt-ex'), nextWrap=q('.lt-next-wrap'), done=q('.lt-done');
+    title.textContent=l.name;
+    let deck=[], total=0;
+    function start(){ deck=shuffle(window.SRS.listItems(l.id).slice()); total=deck.length; done.classList.add('hidden'); card.classList.remove('hidden'); render(); }
+    function addNext(){ if(nextWrap.querySelector('.lt-next'))return; const nx=makeNextButton(()=>{ deck.shift(); render(); },'lt-next'); nextWrap.appendChild(nx); nx.focus(); }
+    function render(){
+      if(!deck.length){ card.classList.add('hidden'); done.classList.remove('hidden');
+        done.innerHTML=total?'<div class="tr-done-in">Geschafft!<br>Alle '+total+' Einträge durch.</div><button class="btn-primary lt-restart" type="button"><span class="msi" aria-hidden="true">refresh</span> Nochmal</button>':'<div class="tr-done-in">Diese Liste ist leer.</div>';
+        const rs=done.querySelector('.lt-restart'); if(rs)rs.addEventListener('click',start); return; }
+      const learned=total-deck.length; prog.textContent='Aufgabe '+(learned+1)+' / '+total;
+      exMount.innerHTML=''; nextWrap.innerHTML='';
+      const o=deck[0];
+      const score=(window.SRS&&window.SRS.scoreOf)?window.SRS.scoreOf(o.id):0;
+      const ex=(window.Exercises&&window.Exercises.pickExercise)?window.Exercises.pickExercise({id:o.id,type:o.type,data:o.data},{score}):null;
+      if(!ex){ exMount.innerHTML='<div class="lt-jp ja">'+itemFrontHtml(o)+'</div><div class="lt-de">'+esc(itemMeaning(o))+'</div>'; addNext(); return; }
+      renderAnyExercise(ex, exMount, { onDone:()=>{ addNext(); } });
+    }
+    ov.hidden=false; start();
+  }
+
+  /* ============================================================  LISTE (Detailseite einer Lernliste)
+     liste.html?id=l1 — zeigt die Einträge wie im Katalog (Vokabelzeilen, Kanji- und Grammatikkarten)
+     und nutzt dieselbe Such-/Filter-Maschinerie wie die Katalogseiten: init() sammelt danach die
+     .item/.group-Knoten aus #content ein, initSearch()/initToggles() binden die Toolbar. */
+  function listeIdFromUrl(){ try{ return new URLSearchParams(location.search).get('id')||''; }catch(e){ return ''; } }
+  function renderListe(content){
+    if(!window.SRS)return;
+    const list=(window.SRS.lists()||[]).find(x=>x.id===listeIdFromUrl());
+    const titleEl=document.getElementById('li-title'), subEl=document.getElementById('li-sub'),
+      actionsEl=document.getElementById('li-actions');
+    if(!list){
+      if(titleEl)titleEl.textContent='Liste nicht gefunden';
+      if(subEl)subEl.textContent='Diese Lernliste gibt es nicht (mehr).';
+      if(actionsEl)actionsEl.innerHTML='<a class="btn" href="listen.html"><span class="msi" aria-hidden="true">arrow_back</span> Alle Listen</a>';
+      return;
+    }
+    function head(){
+      const objs=window.SRS.listItems(list.id);
+      if(titleEl)titleEl.textContent=list.name;
+      if(subEl)subEl.textContent=objs.length+(objs.length===1?' Eintrag':' Einträge')+' · Vokabeln, Kanji und Grammatik dieser Liste.';
+      if(!actionsEl)return;
+      actionsEl.innerHTML='';
+      const train=el('button','btn-primary li-train','<span class="msi" aria-hidden="true">play_arrow</span> Üben');
+      train.type='button'; train.disabled=!objs.length;
+      train.addEventListener('click',()=>openTrainer(list));
+      const exp=el('button','btn li-export','<span class="msi" aria-hidden="true">download</span> Export'); exp.type='button';
+      exp.addEventListener('click',()=>runExport(exp,document.getElementById('li-msg'),'Liste „'+list.name+'"',()=>window.SRS.downloadList(list.id)));
+      const back=el('a','btn li-back','<span class="msi" aria-hidden="true">arrow_back</span> Alle Listen'); back.href='listen.html';
+      actionsEl.appendChild(train); actionsEl.appendChild(exp); actionsEl.appendChild(back);
+    }
+    // Ein Eintrag als Katalog-Element + Entfernen-Knopf. Der Klick auf ✕ darf die Karte NICHT
+    // aufklappen → direkter Listener mit stopPropagation (wie .lst-rm auf der Listen-Seite).
+    function mountItem(o){
+      const node=o.type==='kanji'?kanjiCard(o.data)
+        :(o.type==='grammar'?grammarCard(o.data,o.data.lesson):vocabRow(o.data,true));
+      node.dataset.type=o.type; // Typ-Chips dieser Seite filtern nach Vokabel/Kanji/Grammatik
+      const rm=el('button','li-rm','<span class="msi" aria-hidden="true">close</span>');
+      rm.type='button'; rm.title='Aus dieser Liste entfernen';
+      rm.addEventListener('click',e=>{
+        e.stopPropagation();
+        window.SRS.removeFromList(list.id,[o.id]);
+        const i=items.indexOf(node); if(i>=0)items.splice(i,1);
+        node.remove(); head(); applyFilter();
+      });
+      node.appendChild(rm);
+      return node;
+    }
+    head();
+    const objs=window.SRS.listItems(list.id);
+    [['vocab','語彙 Vokabeln','vocab-list'],['kanji','漢字 Kanji','kanji-grid'],['grammar','文法 Grammatik','gp-list']].forEach(([t,label,boxCls])=>{
+      const arr=objs.filter(o=>o.type===t); if(!arr.length)return;
+      const group=el('section','group'); group.dataset.group=t;
+      group.appendChild(groupHead(label,'',arr.length));
+      const box=el('div',boxCls); arr.forEach(o=>box.appendChild(mountItem(o)));
+      group.appendChild(box); content.appendChild(group);
+    });
+    buildTypeChips([['all','Alle'],['vocab','Vokabeln'],['kanji','Kanji'],['grammar','Grammatik']]);
+    initVocabClicks(content,true); initKanjiClicks(content); initCollapse(content);
+  }
+
   function initListen(){
     const root=document.getElementById('lst-root'); if(!root||!window.SRS)return;
     const nameInp=document.getElementById('lst-create-name'), createBtn=document.getElementById('lst-create');
 
-    function vocabFront(v){ const dd=verbDictDisplay(v);
-      const w=dd?dd.written:(writtenForm(v)); return ruby(w,dd?dd.kana:v.kana); }
-    // Vorderseite/Glyph je Item-Typ (für die Item-Liste und den Karteikarten-Fallback).
-    function itemGlyph(o){ return o.type==='kanji'?o.data.k:(o.type==='grammar'?o.data.pattern:(writtenForm(o.data))); }
-    function itemMeaning(o){ return o.type==='kanji'?(o.data.meaning||''):(o.type==='grammar'?(o.data.title||''):o.data.de); }
-    function itemFrontHtml(o){ return o.type==='vocab'?vocabFront(o.data):esc(itemGlyph(o)); }
     function draw(){
       const ls=window.SRS.lists();
       root.innerHTML='';
@@ -1560,7 +1676,10 @@
         const exp=el('button','btn lst-export','<span class="msi" aria-hidden="true">download</span> Export'); exp.type='button';
         exp.title='Diese Liste als JSON-Datei exportieren (zum Teilen/Übertragen)';
         exp.addEventListener('click',()=>runExport(exp,document.getElementById('lst-msg'),'Liste „'+l.name+'"',()=>window.SRS.downloadList(l.id)));
-        actions.appendChild(train); actions.appendChild(show); actions.appendChild(ren); actions.appendChild(exp); actions.appendChild(del);
+        const open=el('a','btn lst-open','<span class="msi" aria-hidden="true">open_in_new</span> Öffnen');
+        open.href='liste.html?id='+encodeURIComponent(l.id);
+        open.title='Alle Einträge mit Suche und Filter anzeigen';
+        actions.appendChild(train); actions.appendChild(open); actions.appendChild(show); actions.appendChild(ren); actions.appendChild(exp); actions.appendChild(del);
         root.appendChild(card);
       });
     }
@@ -1585,49 +1704,6 @@
           const showBtn=card&&card.querySelector('.lst-show'); if(showBtn)showBtn.textContent=n?'Einträge ('+n+')':'Einträge';
         });
         row.appendChild(rm); box.appendChild(row); });
-    }
-
-    /* ----- Trainer: gemischte, adaptive Übungen aus der zentralen Registry ----- */
-    let tov=null;
-    function ensureTrainer(){
-      if(tov)return tov;
-      tov=el('div','lt-overlay'); tov.hidden=true;
-      tov.innerHTML='<div class="lt-modal" role="dialog" aria-modal="true" aria-label="Liste üben">'+
-        '<div class="lt-head"><span class="lt-title"></span>'+
-          '<button class="drill-close lt-close" type="button" aria-label="Schließen"><span class="msi" aria-hidden="true">close</span></button></div>'+
-        '<div class="lt-top"><span class="lt-prog"></span></div>'+
-        '<div class="lt-card"><div class="lt-ex"></div><div class="lt-next-wrap"></div></div>'+
-        '<div class="lt-done hidden"></div></div>';
-      document.body.appendChild(tov);
-      tov.querySelector('.lt-close').addEventListener('click',()=>{ tov.hidden=true; });
-      tov.addEventListener('click',e=>{ if(e.target===tov)tov.hidden=true; });
-      document.addEventListener('keydown',e=>{ if(tov.hidden)return;
-        if(e.key==='Escape'){ tov.hidden=true; return; }
-        if(e.code==='Space'){ const nx=tov.querySelector('.lt-next'); if(nx){ e.preventDefault(); nx.click(); } } });
-      return tov;
-    }
-    function openTrainer(l){
-      const ov=ensureTrainer();
-      const q=s=>ov.querySelector(s);
-      const title=q('.lt-title'), prog=q('.lt-prog'), card=q('.lt-card'),
-        exMount=q('.lt-ex'), nextWrap=q('.lt-next-wrap'), done=q('.lt-done');
-      title.textContent=l.name;
-      let deck=[], total=0;
-      function start(){ deck=shuffle(window.SRS.listItems(l.id).slice()); total=deck.length; done.classList.add('hidden'); card.classList.remove('hidden'); render(); }
-      function addNext(){ if(nextWrap.querySelector('.lt-next'))return; const nx=makeNextButton(()=>{ deck.shift(); render(); },'lt-next'); nextWrap.appendChild(nx); nx.focus(); }
-      function render(){
-        if(!deck.length){ card.classList.add('hidden'); done.classList.remove('hidden');
-          done.innerHTML=total?'<div class="tr-done-in">Geschafft!<br>Alle '+total+' Einträge durch.</div><button class="btn-primary lt-restart" type="button"><span class="msi" aria-hidden="true">refresh</span> Nochmal</button>':'<div class="tr-done-in">Diese Liste ist leer.</div>';
-          const rs=done.querySelector('.lt-restart'); if(rs)rs.addEventListener('click',start); return; }
-        const learned=total-deck.length; prog.textContent='Aufgabe '+(learned+1)+' / '+total;
-        exMount.innerHTML=''; nextWrap.innerHTML='';
-        const o=deck[0];
-        const score=(window.SRS&&window.SRS.scoreOf)?window.SRS.scoreOf(o.id):0;
-        const ex=(window.Exercises&&window.Exercises.pickExercise)?window.Exercises.pickExercise({id:o.id,type:o.type,data:o.data},{score}):null;
-        if(!ex){ exMount.innerHTML='<div class="lt-jp ja">'+itemFrontHtml(o)+'</div><div class="lt-de">'+esc(itemMeaning(o))+'</div>'; addNext(); return; }
-        renderAnyExercise(ex, exMount, { onDone:()=>{ addNext(); } });
-      }
-      ov.hidden=false; start();
     }
 
     if(createBtn)createBtn.addEventListener('click',()=>{ const nm=(nameInp.value||'').trim(); if(!nm){ nameInp.focus(); return; } window.SRS.createList(nm); nameInp.value=''; draw(); });
@@ -1686,6 +1762,7 @@
       else if(page==='vokabular')renderVocab(content);
       else if(page==='grammatik')renderGrammar(content);
       else if(page==='verben')renderVerben(content);
+      else if(page==='liste')renderListe(content);
       items=Array.prototype.slice.call(content.querySelectorAll('.item'));
       groups=Array.prototype.slice.call(content.querySelectorAll('.group'));
       applyFilter();

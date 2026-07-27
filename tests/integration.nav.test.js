@@ -55,6 +55,12 @@ describe('renderNav', () => {
     expect(win.document.querySelector('.subnav-tab.active').title).toBe('Kanji');
     expect([...win.document.querySelectorAll('#topnav .nav-tab')].every((a) => a.title)).toBe(true);
   });
+
+  it('auf der Listen-Detailseite bleibt „Listen" aktiv (match-Liste)', () => {
+    const win = page('liste');
+    expect(win.document.querySelector('#bottomnav .bn-tab.active').textContent).toContain('Listen');
+    expect(win.document.querySelector('#topnav .nav-tab.active').textContent).toContain('Listen');
+  });
 });
 
 describe('Scroll: Menüs kompakt als Icons', () => {

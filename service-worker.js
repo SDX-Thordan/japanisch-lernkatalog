@@ -14,7 +14,7 @@ try { importScripts('assets/version.js'); } catch (e) {}
 var CACHE = 'katalog-' + (self.APP_VERSION || 'dev');
 
 var ASSETS = [
-  './', 'index.html', 'heute.html', 'lernpfad.html', 'listen.html', 'grammatik.html', 'vokabular.html', 'kanji.html',
+  './', 'index.html', 'heute.html', 'lernpfad.html', 'listen.html', 'liste.html', 'grammatik.html', 'vokabular.html', 'kanji.html',
   'schreiben.html', 'verben.html', 'profil.html', 'ueben.html',
   'assets/style.css', 'assets/app.js', 'assets/srs.js', 'assets/exercises.js', 'assets/kanji-write.js', 'assets/version.js', 'assets/ota.js',
   'assets/data/kanji.js', 'assets/data/vokabular.js', 'assets/data/grammatik.js',

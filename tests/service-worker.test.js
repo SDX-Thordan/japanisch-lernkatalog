@@ -2,7 +2,7 @@
 // network-first für Kern-Code + Katalogdaten, cache-first für KanjiVG/Font. Wir laden den
 // SW-Code in einen gemockten Worker-Scope (self/caches/fetch/importScripts) und rufen die Handler auf.
 import { describe, it, expect } from 'vitest';
-import { readFileSync } from 'node:fs';
+import { readFileSync, readdirSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, resolve } from 'node:path';
 
@@ -91,5 +91,11 @@ describe('service-worker', () => {
     const res = await handleFetch(handlers, ORIGIN + '/assets/kanjivg/05b66.svg');
     expect(res.tag).toBe('cache-svg');
     expect(fetchCalls()).toBe(0);
+  });
+
+  it('precached JEDE Seite im Wurzelverzeichnis (neue Seiten dürfen offline nicht fehlen)', () => {
+    const pages = readdirSync(ROOT).filter((f) => f.endsWith('.html'));
+    const listed = CODE.slice(CODE.indexOf('var ASSETS'), CODE.indexOf('];', CODE.indexOf('var ASSETS')));
+    pages.forEach((p) => expect(listed).toContain("'" + p + "'"));
   });
 });
