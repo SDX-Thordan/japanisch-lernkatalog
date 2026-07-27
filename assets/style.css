@@ -814,8 +814,19 @@ body.drill-open { overflow: hidden; }
 .ex-opt { font-family: var(--font-ja-sans); font-size: 1.05rem; background: var(--surface); border: 1.5px solid var(--border); border-radius: 9px; padding: .5rem 1rem; cursor: pointer; transition: all .12s; }
 .ex-opt:hover:not(:disabled) { border-color: var(--accent); }
 .ex-opt:disabled { cursor: default; opacity: .85; }
+/* Lesungs-Zuordnung: zwei Spalten 音/訓 mit Mehrfachauswahl.
+   „sel" (angeklickt) steht VOR correct/wrong — nach dem Prüfen muss die Auswertungsfarbe gewinnen. */
+.ex-readings { display: flex; gap: 1rem; align-items: flex-start; margin: .6rem 0 .9rem; }
+.ex-rcol { flex: 1 1 0; min-width: 0; }
+.ex-rlbl { font-size: .82rem; color: var(--muted); margin-bottom: .45rem; display: flex; align-items: center; gap: .4rem; }
+.ex-rcol .ex-options { flex-direction: column; flex-wrap: nowrap; }
+.ex-opt.sel { border-color: var(--accent); background: var(--chip); font-weight: 700; }
+@media (max-width: 560px) { .ex-readings { flex-direction: column; gap: .7rem; } }
+
 .ex-opt.correct { background: var(--good); border-color: var(--good); color: #fff; }
 .ex-opt.wrong { background: var(--accent); border-color: var(--accent); color: #fff; }
+/* richtig, aber nicht angeklickt: als verpasste Lösung markieren */
+.ex-opt.missed { border-style: dashed; border-color: var(--good); color: var(--good); background: transparent; }
 .ex-feedback { margin-top: .8rem; font-weight: 700; }
 .ex-feedback.ok { color: var(--good); }
 .ex-feedback.no { color: var(--accent); }
