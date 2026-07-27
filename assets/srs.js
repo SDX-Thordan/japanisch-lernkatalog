@@ -773,28 +773,68 @@
     addToList(l.id, items);
     return { ok: true, list: store.lists[l.id], added: items.length, skipped: skipped };
   }
-  function downloadList(id, filename) {
-    var json = exportListJSON(id); if (!json) return;
-    var l = store.lists[id];
-    filename = filename || ('liste-' + String(l.name || id).replace(/[^\wäöüÄÖÜß-]+/g, '_').slice(0, 40) + '.json');
-    try {
-      var blob = new Blob([json], { type: 'application/json' });
-      var url = URL.createObjectURL(blob);
-      var a = document.createElement('a');
-      a.href = url; a.download = filename; document.body.appendChild(a); a.click();
-      document.body.removeChild(a); setTimeout(function () { URL.revokeObjectURL(url); }, 0);
-    } catch (e) {}
+  /* JSON sichern — plattformgerecht. In der Android-App verpufft ein <a download> mit blob:-URL
+     wirkungslos (die WebView hat keinen Download-Manager) — genau daran scheiterte der Export
+     bisher, und zwar lautlos. Deshalb: nativ über Filesystem+Share (Teilen-Dialog), im Browser
+     der klassische Download, sonst Zwischenablage; als letzte Stufe wird das JSON zurückgegeben,
+     damit die Oberfläche ein Kopierfeld anbieten kann. Löst NIE mit einem Fehler auf. */
+  function isNativeApp() {
+    try { return !!(window.Capacitor && window.Capacitor.isNativePlatform && window.Capacitor.isNativePlatform()); } catch (e) { return false; }
   }
-
-  function downloadBackup(filename) {
-    filename = filename || 'katalog-fortschritt.json';
+  // Capacitor registriert native Plugins unter window.Capacitor.Plugins.* — ohne Bundler nutzbar
+  // (wie in assets/ota.js). Enum-Werte deshalb als String-Literale: Directory.Cache='CACHE'.
+  function capPlugin(name) {
+    try { return (window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins[name]) || null; } catch (e) { return null; }
+  }
+  function saveViaShare(filename, json) {
+    var FS = capPlugin('Filesystem'), SH = capPlugin('Share');
+    if (!FS || !SH || !FS.writeFile || !SH.share) return Promise.reject(new Error('no-plugins'));
+    return FS.writeFile({ path: filename, data: json, directory: 'CACHE', encoding: 'utf8' })
+      .then(function (r) {
+        if (r && r.uri) return r.uri;
+        return FS.getUri({ path: filename, directory: 'CACHE' }).then(function (g) { return g && g.uri; });
+      })
+      // KEIN text: mitgeben — Android priorisiert sonst text/plain und hängt die Datei nicht an.
+      .then(function (uri) { return SH.share({ title: filename, url: uri, dialogTitle: 'Speichern oder teilen' }); });
+  }
+  function saveViaDownload(filename, json) {
+    var blob = new Blob([json], { type: 'application/json' });
+    var url = URL.createObjectURL(blob);
+    var a = document.createElement('a');
+    a.href = url; a.download = filename; document.body.appendChild(a); a.click();
+    document.body.removeChild(a); setTimeout(function () { URL.revokeObjectURL(url); }, 0);
+    return true;
+  }
+  function copyJson(json) {
     try {
-      var blob = new Blob([exportJSON()], { type: 'application/json' });
-      var url = URL.createObjectURL(blob);
-      var a = document.createElement('a');
-      a.href = url; a.download = filename; document.body.appendChild(a); a.click();
-      document.body.removeChild(a); setTimeout(function () { URL.revokeObjectURL(url); }, 0);
+      if (navigator.clipboard && navigator.clipboard.writeText) return navigator.clipboard.writeText(json);
     } catch (e) {}
+    return Promise.reject(new Error('no-clipboard'));
+  }
+  function saveJson(filename, json) {
+    var first = isNativeApp()
+      ? saveViaShare(filename, json).then(function () { return { ok: true, how: 'share' }; })
+      : new Promise(function (res) { res(saveViaDownload(filename, json)); }).then(function () { return { ok: true, how: 'download' }; });
+    return first.catch(function (e) {
+      // Abbruch im Teilen-Dialog ist kein Fehler.
+      var msg = String((e && e.message) || e || '');
+      if (/cancel/i.test(msg)) return { ok: false, how: 'canceled' };
+      return copyJson(json)
+        .then(function () { return { ok: true, how: 'clipboard' }; })
+        .catch(function () { return { ok: false, how: 'none', error: msg, json: json }; });
+    });
+  }
+  function listFileName(id) {
+    var l = store.lists && store.lists[id];
+    return 'liste-' + String((l && l.name) || id).replace(/[^\wäöüÄÖÜß-]+/g, '_').slice(0, 40) + '.json';
+  }
+  function downloadList(id, filename) {
+    var json = exportListJSON(id);
+    if (!json) return Promise.resolve({ ok: false, how: 'none', error: 'unknown-list' });
+    return saveJson(filename || listFileName(id), json);
+  }
+  function downloadBackup(filename) {
+    return saveJson(filename || 'katalog-fortschritt.json', exportJSON());
   }
 
   /* ---------- Test-/Konfig-Hooks ---------- */
@@ -819,7 +859,7 @@
     // Persönliche Vokabellisten
     createList: createList, renameList: renameList, deleteList: deleteList,
     addToList: addToList, removeFromList: removeFromList, lists: lists, listItems: listItems, listsContaining: listsContaining,
-    exportListJSON: exportListJSON, importListJSON: importListJSON, downloadList: downloadList,
+    exportListJSON: exportListJSON, importListJSON: importListJSON, downloadList: downloadList, saveJson: saveJson,
     exportJSON: exportJSON, importJSON: importJSON, downloadBackup: downloadBackup, reset: reset,
     snapshot: snapshot, forecast: forecast,
     _useStorage: useStorage,

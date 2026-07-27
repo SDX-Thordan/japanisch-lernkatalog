@@ -44,6 +44,18 @@ describe('Listen Export/Import (einzelne Liste)', () => {
     expect(parsed.items).toHaveLength(2);
   });
 
+  it('Export-Knopf meldet das Ergebnis in #lst-msg', async () => {
+    win.navigator.clipboard = { writeText: () => Promise.resolve() };
+    const l = win.SRS.createList('Export-Test');
+    win.SRS.addToList(l.id, [win.SRS.srsId('vocab', win.VOKABULAR[0])]);
+    win.document.getElementById('lst-create-name').value = 'x';
+    click(win.document.getElementById('lst-create')); // draw()
+    click(win.document.querySelector('.lst-export'));
+    await tick(); await tick(); await tick();
+    expect(win.document.getElementById('lst-msg').textContent).toContain('✓');
+    expect(win.document.getElementById('lst-msg').textContent).toContain('Export-Test');
+  });
+
   it('Import über die UI legt eine NEUE Liste an und meldet Übersprungenes', async () => {
     const json = JSON.stringify({ type: 'katalog_liste', v: 1, name: 'Geteilt',
       items: [win.SRS.srsId('vocab', win.VOKABULAR[0]), 'v:gibtsnicht|9', 'k:' + win.KANJI[0].k] });

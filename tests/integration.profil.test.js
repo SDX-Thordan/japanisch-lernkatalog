@@ -118,6 +118,23 @@ describe('Fortschritt-Seite', () => {
     expect(w.document.getElementById('f-update-apply').hidden).toBe(true);
   });
 
+  it('Export-Knopf meldet den Erfolg (kein stiller Fehlschlag mehr)', async () => {
+    win.navigator.clipboard = { writeText: () => Promise.resolve() }; // jsdom hat kein createObjectURL
+    win.document.getElementById('f-export').dispatchEvent(new win.Event('click', { bubbles: true }));
+    await tick(); await tick(); await tick();
+    expect(win.document.getElementById('f-msg').textContent).toContain('✓');
+    expect(win.document.getElementById('f-export').disabled).toBe(false); // wieder bedienbar
+  });
+
+  it('kann gar nicht gespeichert werden, erscheint das JSON zum Kopieren', async () => {
+    win.document.getElementById('f-export').dispatchEvent(new win.Event('click', { bubbles: true }));
+    await tick(); await tick(); await tick();
+    expect(win.document.getElementById('f-msg').textContent).toContain('✗');
+    const ta = win.document.querySelector('textarea.f-json');
+    expect(ta).toBeTruthy();
+    expect(JSON.parse(ta.value).v).toBe(1);
+  });
+
   it('Export liefert gültiges JSON, Import (merge) stellt Items wieder her', () => {
     win.SRS.grade('k:水', 1, '2026-06-23');
     const text = win.SRS.exportJSON();
