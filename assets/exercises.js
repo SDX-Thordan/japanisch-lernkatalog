@@ -170,6 +170,15 @@
       if (!Array.isArray(answer) || answer.length !== ex.solution.length) return false;
       return answer.every(function (x, i) { return x === ex.solution[i]; });
     }
+    // Lesungen: je Spalte (音/訓) muss GENAU die richtige Menge gewählt sein — Reihenfolge egal.
+    if (ex.typ === 'readings') {
+      if (!Array.isArray(answer) || answer.length !== ex.columns.length) return false;
+      return ex.columns.every(function (c, i) {
+        var a = (answer[i] || []).slice().sort(function (x, y) { return x - y; });
+        var r = c.richtig.slice().sort(function (x, y) { return x - y; });
+        return a.length === r.length && a.every(function (v, j) { return v === r[j]; });
+      });
+    }
     return null; // translate: Selbstkontrolle
   }
 
@@ -190,6 +199,7 @@
     if (ex.typ === 'cloze') return renderCloze(ex, mount, finish);
     if (ex.typ === 'order') return renderOrder(ex, mount, finish);
     if (ex.typ === 'input') return renderInput(ex, mount, finish);
+    if (ex.typ === 'readings') return renderReadings(ex, mount, finish);
     if (ex.typ === 'translate') return renderTranslate(ex, mount, finish);
   }
 
@@ -282,6 +292,53 @@
       finish(ok);
     });
     mount.appendChild(target); mount.appendChild(bank); mount.appendChild(check);
+  }
+
+  // Lesungs-Zuordnung: zwei Spalten (音/訓) mit Mehrfachauswahl, ein „Prüfen"-Knopf.
+  function renderReadings(ex, mount, finish) {
+    mount.appendChild(el('div', 'ex-frage ja big', esc(ex.frage)));
+    if (ex.q) mount.appendChild(el('div', 'ex-subprompt', esc(ex.q)));
+    var wrap = el('div', 'ex-readings');
+    var cols = ex.columns.map(function (c) {
+      var col = el('div', 'ex-rcol'); col.dataset.kind = c.kind;
+      col.appendChild(el('div', 'ex-rlbl', '<span class="lbl' + (c.kind === 'kun' ? ' kun' : '') + '">' + esc(c.label) + '</span> ' + esc(c.title)));
+      var opts = el('div', 'ex-options');
+      c.optionen.forEach(function (o) {
+        var b = el('button', 'ex-opt ja', esc(o)); b.type = 'button'; b.setAttribute('aria-pressed', 'false');
+        b.addEventListener('click', function () {
+          if (mount.querySelector('.ex-feedback')) return; // nach dem Prüfen gesperrt
+          var on = b.classList.toggle('sel');
+          b.setAttribute('aria-pressed', on ? 'true' : 'false');
+        });
+        opts.appendChild(b);
+      });
+      col.appendChild(opts); wrap.appendChild(col);
+      return { def: c, buttons: Array.prototype.slice.call(opts.querySelectorAll('.ex-opt')) };
+    });
+    mount.appendChild(wrap);
+    var check = el('button', 'btn-primary ex-check', 'Prüfen'); check.type = 'button';
+    check.addEventListener('click', function () {
+      if (mount.querySelector('.ex-feedback')) return;
+      var answer = cols.map(function (c) {
+        var sel = [];
+        c.buttons.forEach(function (b, i) { if (b.classList.contains('sel')) sel.push(i); });
+        return sel;
+      });
+      var ok = gradeAnswer(ex, answer);
+      cols.forEach(function (c) {
+        c.buttons.forEach(function (b, i) {
+          b.disabled = true;
+          var right = c.def.richtig.indexOf(i) !== -1, chosen = b.classList.contains('sel');
+          if (right && chosen) b.classList.add('correct');
+          else if (right) b.classList.add('missed');   // richtig, aber nicht gewählt
+          else if (chosen) b.classList.add('wrong');
+        });
+      });
+      check.disabled = true;
+      feedback(mount, ok, ex.erkl);
+      finish(ok);
+    });
+    mount.appendChild(check);
   }
 
   function renderTranslate(ex, mount, finish) {
@@ -491,6 +548,64 @@
     return { typ: 'mc', srsId: 'k:' + k.k, frage: k.meaning, frageJa: false, optJa: true, big: true, q: 'Welches Kanji passt?',
       optionen: optionen, richtig: optionen.indexOf(correct), erkl: k.meaning + ' = ' + correct, gradeOpts: KANJI_GRADE_OPTS, mode: 'kanji-pick' };
   }
+  /* ---------- Kanji-Lesungen zuordnen (zwei Spalten 音/訓, Mehrfachauswahl) ----------
+     Fragt die im Katalog hinterlegten (= häufigen) Lesungen ab. Eine Spalte entfällt, wenn die
+     Lesungsliste leer ist (11 Kanji haben keine Kun-Lesung). */
+  function stripOku(r) { return String(r).replace(/-/g, ''); }
+  // Distraktoren derselben Lesungsart anderer Kanji — bevorzugt gleiche Stufe (A1.7 hat nur 3 Kanji
+  // → Gesamtbestand als Rückfall) und gleiche Okurigana-Form, damit das Format nichts verrät.
+  // Ausgeschlossen sind Lesungen, die ohne Okurigana mit einer Lösung zusammenfallen (み vs. み-る).
+  function readingDistractors(k, kind, need, pool) {
+    var all = pool || window.KANJI || [];
+    var correct = k[kind] || [];
+    var forbidden = {};
+    correct.forEach(function (r) { forbidden[stripOku(r)] = 1; });
+    var hasOku = correct.some(function (r) { return r.indexOf('-') !== -1; });
+    function collect(sameLevel, sameShape) {
+      var out = [];
+      all.forEach(function (x) {
+        if (x.k === k.k) return;
+        if (sameLevel && x.level !== k.level) return;
+        (x[kind] || []).forEach(function (r) {
+          if (forbidden[stripOku(r)]) return;
+          if (sameShape && (r.indexOf('-') !== -1) !== hasOku) return;
+          out.push(r);
+        });
+      });
+      return out;
+    }
+    var tiers = [collect(true, true), collect(true, false), collect(false, true), collect(false, false)];
+    var seen = {}, picked = [];
+    tiers.forEach(function (t) {
+      if (picked.length >= need) return;
+      uniqueSample(t, need * 3).forEach(function (r) {
+        if (picked.length >= need || seen[r] || forbidden[stripOku(r)]) return;
+        seen[r] = 1; picked.push(r);
+      });
+    });
+    return picked.slice(0, need);
+  }
+  var READING_COLS = [
+    { kind: 'on', label: '音', title: 'On-Lesung (Katakana)' },
+    { kind: 'kun', label: '訓', title: 'Kun-Lesung (Hiragana)' },
+  ];
+  function kanjiReadingsEx(k, pool) {
+    var columns = [];
+    READING_COLS.forEach(function (d) {
+      var correct = uniqueSample(k[d.kind] || [], 4);
+      if (!correct.length) return;
+      var distract = readingDistractors(k, d.kind, Math.max(2, 5 - correct.length), pool);
+      var optionen = shuffle(correct.concat(distract));
+      columns.push({ kind: d.kind, label: d.label, title: d.title, optionen: optionen,
+        richtig: correct.map(function (r) { return optionen.indexOf(r); }) });
+    });
+    if (!columns.length) return null;
+    return { typ: 'readings', srsId: 'k:' + k.k, frage: k.k, mode: 'kanji-readings', gradeOpts: KANJI_GRADE_OPTS,
+      q: 'Welche Lesungen gehören zu diesem Kanji? (mehrere möglich)', columns: columns,
+      erkl: k.k + ' — ' + READING_COLS.map(function (d) {
+        return (k[d.kind] || []).length ? d.label + ' ' + k[d.kind].join('・') : '';
+      }).filter(Boolean).join(' · ') + ' — ' + k.meaning };
+  }
   // Kanji Zeichnen — Deskriptor (Host rendert via KanjiWrite; Schreiben bewertet ungedeckelt = Meister-Pfad).
   function kanjiWriteEx(k) { return { typ: 'write', srsId: 'k:' + k.k, data: k, mode: 'kanji-write' }; }
   // Grammatik: Fabriken aus Satz-Vorlagen (Satzbau/Partikel/Übersetzen) + GRAMMATIK_PLUS (mc/cloze)
@@ -527,7 +642,9 @@
     if (!item) return [];
     var t = item.type, d = item.data;
     if (t === 'vocab') return [function () { return vocabRecognizeMC(d); }, function () { return vocabProduceMC(d); }, function () { return vocabInput(d); }];
-    if (t === 'kanji') return [function () { return kanjiMeaningMC(d); }, function () { return kanjiPickMC(d); }, function () { return kanjiWriteEx(d); }];
+    // Reihenfolge zählt: Schreiben MUSS letzter Eintrag bleiben (pickExercise wählt bei ≥70 den letzten).
+    if (t === 'kanji') return [function () { return kanjiMeaningMC(d); }, function () { return kanjiPickMC(d); },
+      function () { return kanjiReadingsEx(d) || kanjiMeaningMC(d); }, function () { return kanjiWriteEx(d); }];
     if (t === 'grammar') return grammarExercises(d);
     return [];
   }
@@ -558,7 +675,7 @@
     // Zentrale Registry + neue Builder
     exercisesFor: exercisesFor, pickExercise: pickExercise,
     vocabRecognizeMC: vocabRecognizeMC, vocabProduceMC: vocabProduceMC, vocabInput: vocabInput,
-    kanjiMeaningMC: kanjiMeaningMC, kanjiPickMC: kanjiPickMC, kanjiWriteEx: kanjiWriteEx,
+    kanjiMeaningMC: kanjiMeaningMC, kanjiPickMC: kanjiPickMC, kanjiWriteEx: kanjiWriteEx, kanjiReadingsEx: kanjiReadingsEx,
     grammarExercises: grammarExercises,
     verbDictMC: verbDictMC, verbFormMC: verbFormMC, formUnlocked: formUnlocked,
   };

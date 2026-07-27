@@ -83,7 +83,9 @@ describe('exercisesFor / pickExercise — adaptiv', () => {
   });
   it('exercisesFor liefert Fabriken je Typ', () => {
     expect(Ex.exercisesFor({ type: 'vocab', data: win.VOKABULAR[0] }).length).toBe(3);
-    expect(Ex.exercisesFor({ type: 'kanji', data: win.KANJI[0] }).length).toBe(3);
+    expect(Ex.exercisesFor({ type: 'kanji', data: win.KANJI[0] }).length).toBe(4); // + Lesungen
+    // Schreiben MUSS letzter Eintrag bleiben — pickExercise wählt bei Score ≥ 70 den letzten.
+    expect(Ex.exercisesFor({ type: 'kanji', data: win.KANJI[0] }).pop()().typ).toBe('write');
   });
 });
 
