@@ -1,0 +1,70 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<!-- OTA so früh wie möglich bestätigen (capgo notifyAppReady), bevor große Daten-Skripte laden. -->
+<script src="assets/ota.js"></script>
+<title>Lernliste · 単語帳 — Go! Nihongo</title>
+<link rel="stylesheet" href="assets/style.css">
+<link rel="icon" href="assets/icons/icon-192.png">
+<link rel="manifest" href="manifest.webmanifest">
+<meta name="theme-color" content="#b23a2e">
+<link rel="apple-touch-icon" href="assets/icons/icon-192.png">
+</head>
+<body data-page="liste">
+
+<header class="topbar">
+  <div class="topbar-inner">
+    <a class="brand" href="index.html" aria-label="Go! Nihongo"><span class="brand-name">Go!</span><span class="brand-jp">日本語</span></a>
+    <nav id="topnav" class="nav" aria-label="Hauptnavigation"></nav>
+  </div>
+</header>
+
+<main>
+  <div class="page-intro">
+    <span class="kicker">単語帳 · Eigene Lernliste</span>
+    <h1 id="li-title">Lernliste</h1>
+    <p id="li-sub">Alle Einträge dieser Liste — mit Suche, Filter und den gewohnten Karten.</p>
+    <div class="li-actions" id="li-actions"></div>
+    <p class="f-msg" id="li-msg" role="status"></p>
+  </div>
+
+  <div class="toolbar">
+    <div class="toolbar-row">
+      <label class="search">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/></svg>
+        <input id="search-input" type="search" placeholder="In dieser Liste suchen: Wort, Lesung, Rōmaji, Bedeutung …" autocomplete="off" spellcheck="false">
+      </label>
+      <button class="toggle" id="toggle-readings" type="button" aria-pressed="true"><span class="dot"></span>Furigana</button>
+      <button class="toggle" id="toggle-cards" type="button" aria-pressed="false"><span class="dot"></span>Karteikarten</button>
+      <button class="toggle toggle-filters" id="toggle-filters" type="button" aria-pressed="false"><span class="dot"></span>Filter</button>
+    </div>
+    <div class="filter-row"><span class="filter-label">Art</span><div class="chips" id="type-filters"></div></div>
+  </div>
+
+  <p class="count" id="count"></p>
+  <div id="content"></div>
+  <div class="empty hidden" id="empty">Keine Treffer. Suche oder Filter anpassen.</div>
+</main>
+
+<footer>
+  <span class="brand-name">Go! Nihongo</span> · Eine Lernliste im Detail — Einträge wie im Katalog, mit Suche und Filter.
+</footer>
+
+<script src="assets/data/kanji.js"></script>
+<script src="assets/data/vokabular.js"></script>
+<script src="assets/data/vokabular_beispiele.js"></script>
+<script src="assets/data/vokabular_tags.js"></script>
+<script src="assets/data/grammatik.js"></script>
+<script src="assets/data/grammatik_extra.js"></script>
+<script src="assets/data/grammatik_furigana.js"></script>
+<script src="assets/data/grammatik_plus.js"></script>
+<script src="assets/data/saetze.js"></script>
+<script src="assets/srs.js"></script>
+<script src="assets/exercises.js"></script>
+<script src="assets/kanji-write.js"></script>
+<script src="assets/version.js"></script>
+<script src="assets/app.js"></script>
+</body>
+</html>

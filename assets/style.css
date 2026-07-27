@@ -1034,3 +1034,14 @@ a.lp-part:hover { border-color: var(--accent); }
 .lt-back .lt-jp, .lt-back .lt-de { color: var(--good); }
 .lt-controls { display: flex; gap: .6rem; justify-content: center; margin-top: auto; padding-top: 1.4rem; }
 .lt-done { text-align: center; padding: 2rem 1rem; }
+
+/* ---------- Listen-Detailseite (liste.html) ---------- */
+.li-actions { display: flex; flex-wrap: wrap; gap: .5rem; margin-top: .8rem; }
+/* Entfernen-Knopf oben rechts auf der jeweiligen Karte/Zeile (alle drei Container sind relativ) */
+.li-rm { position: absolute; top: .35rem; right: .35rem; z-index: 2; display: inline-flex; align-items: center; justify-content: center;
+  width: 1.7rem; height: 1.7rem; padding: 0; border: 1px solid var(--border); border-radius: 7px;
+  background: var(--surface); color: var(--muted); cursor: pointer; }
+.li-rm:hover { border-color: var(--accent); color: var(--accent); }
+.li-rm .msi { font-size: 1rem; }
+.gp { position: relative; }
+.v-row .li-rm, .kanji-card .li-rm { top: .3rem; right: .3rem; }
