@@ -510,6 +510,29 @@
     return (plus&&plus.uebungen)?plus.uebungen.slice():[];
   }
 
+  /* ---------- Angefangene Übungsrunden merken (Fortsetzen nach Schließen) ----------
+     Wahrheit ist die Modulmap; sessionStorage ist nur ein Spiegel, damit eine Runde auch
+     einen Seitenwechsel (listen.html ↔ liste.html) oder ein Neuladen übersteht. Der Spiegel
+     darf nie allein tragen: bei leerer Herkunft (file://, jsdom, manche App-Umgebungen)
+     wirft sessionStorage. Gespeichert wird die RESTLISTE + Anzahl erledigter Aufgaben —
+     die Gesamtzahl ergibt sich daraus und heilt sich, wenn Einträge entfernt wurden. */
+  const SESS_KEY='katalog_session_v1';
+  const sessMem={};
+  function sessAll(){ try{ return JSON.parse(sessionStorage.getItem(SESS_KEY))||{}; }catch(e){ return null; } }
+  function sessGet(key){ const all=sessAll(); return (all&&all[key])||sessMem[key]||null; }
+  function sessSet(key,val){ sessMem[key]=val; const all=sessAll(); if(all){ all[key]=val; try{ sessionStorage.setItem(SESS_KEY,JSON.stringify(all)); }catch(e){} } }
+  function sessClear(key){ delete sessMem[key]; const all=sessAll(); if(all){ delete all[key]; try{ sessionStorage.setItem(SESS_KEY,JSON.stringify(all)); }catch(e){} } }
+  // „↻ Neu starten“ im Overlay-Kopf — fragt nach, sobald schon Fortschritt besteht (der Knopf
+  // sitzt in derselben Daumenzone, deren Fehlgriffe wir gerade abstellen).
+  function restartButton(onRestart,hasProgress,text){
+    const b=el('button','ov-restart','<span class="msi" aria-hidden="true">refresh</span>');
+    b.type='button'; b.title='Runde neu starten'; b.setAttribute('aria-label','Runde neu starten');
+    b.addEventListener('click',()=>{ if(hasProgress()&&!window.confirm(text||'Runde neu starten? Der bisherige Fortschritt dieser Runde geht verloren.'))return; onRestart(); });
+    return b;
+  }
+  // „· fortgesetzt“-Markierung für die Fortschrittszeile (nur beim ersten Rendern nach dem Wiederaufnehmen).
+  function resumedTag(on){ return on?' <span class="ov-resumed">fortgesetzt</span>':''; }
+
   /* ============================================================
      GRAMMATIK-DRILL — Beispielsätze in beide Richtungen übersetzen
      (Modal-Overlay, lazy aufgebaut, von der Grammatik-Karte gestartet)
@@ -554,7 +577,9 @@
     drill.next.addEventListener('click',drillNext);
     drill.again.addEventListener('click',drillAgain);
     drill.close.addEventListener('click',closeDrill);
-    ov.addEventListener('click',e=>{ if(e.target===ov)closeDrill(); });
+    // Kein Schließen beim Klick auf den Hintergrund: mitten in der Übung war das ein
+    // versehentlicher Abbruch. Beenden nur über ✕ oder Escape.
+    drill.close.parentNode.insertBefore(restartButton(drillRestart,()=>drill.total>drill.deck.length),drill.close);
     document.addEventListener('keydown',drillKey);
     return drill;
   }
@@ -573,7 +598,16 @@
     d.pattern.textContent=opts.pattern||'';
     d.title.textContent=opts.title||'';
     d.build=opts.build;
-    d.deck=shuffle(d.build()); d.total=d.deck.length;
+    d.sKey='drill:'+(opts.key||opts.pattern||'x');
+    // Angefangene Runde fortsetzen; eine bereits beantwortete Aufgabe wird dabei übersprungen
+    // (sie ist schon in den Lernstand eingeflossen — erneut stellen hieße doppelt werten).
+    const s0=sessGet(d.sKey); let deck=null;
+    if(s0&&Array.isArray(s0.deck)&&s0.deck.length){
+      deck=s0.deck.slice(); let done=s0.done|0;
+      if(s0.answered){ deck.shift(); done++; }
+      if(deck.length){ d.deck=deck; d.total=done+deck.length; d.resumed=true; } else deck=null;
+    }
+    if(!deck){ sessClear(d.sKey); d.deck=shuffle(d.build()); d.total=d.deck.length; d.resumed=false; }
     d.ov.hidden=false; document.body.classList.add('drill-open');
     drillRender();
   }
@@ -583,7 +617,7 @@
     const extra=(window.GRAMMATIK_EXTRA&&window.GRAMMATIK_EXTRA[g.pattern])||[];
     const all=(g.beispiele||[]).concat(extra);
     const drillable=all.filter(b=>b.jp&&b.de);
-    openPracticeSession({ pattern:g.pattern, title:g.title, build:()=>{
+    openPracticeSession({ key:'g:'+g.pattern, pattern:g.pattern, title:g.title, build:()=>{
       const items=[];
       structuredExercises(g.pattern,plus).forEach(ex=>items.push({kind:'ex',ex:ex,srsId:'g:'+g.pattern}));
       drillable.forEach(b=>{ items.push({kind:'tr',dir:'jp2de',b:b}); items.push({kind:'tr',dir:'de2jp',b:b}); });
@@ -592,7 +626,7 @@
   }
   // Verbformen-Runde (辞書形・て・た・ない) aus echten Verben — vom Hub & der Verben-Seite aus aufrufbar.
   function openVerbFormPractice(){
-    openPracticeSession({ pattern:'動詞', title:'Verbformen 辞書形・て・た・ない', build:()=>{
+    openPracticeSession({ key:'verbforms', pattern:'動詞', title:'Verbformen 辞書形・て・た・ない', build:()=>{
       const items=[];
       [['dict','V 辞書形 (Wörterbuchform)',3],['te','V て-Form',3],['ta','V た-Form',2],['nai','V ない-Form',2]].forEach(grp=>{
         genVerbFormExercises(grp[0],grp[2]).forEach(ex=>items.push({kind:'ex',ex:ex,srsId:'g:'+grp[1]}));
@@ -601,7 +635,9 @@
     }});
   }
   function closeDrill(){ if(!drill)return; drill.ov.hidden=true; document.body.classList.remove('drill-open'); }
-  function drillRestart(){ const d=drill; d.deck=shuffle(d.build?d.build():[]); d.total=d.deck.length; drillRender(); }
+  function drillRestart(){ const d=drill; if(d.sKey)sessClear(d.sKey); d.resumed=false; d.deck=shuffle(d.build?d.build():[]); d.total=d.deck.length; drillRender(); }
+  // Restliste + Anzahl erledigter Aufgaben sichern (answered = beantwortet, „Weiter“ noch offen).
+  function drillSave(answered){ const d=drill; if(d&&d.sKey)sessSet(d.sKey,{deck:d.deck,done:d.total-d.deck.length,answered:!!answered}); }
   function drillRender(){
     const d=drill;
     if(!d.deck.length){
@@ -614,17 +650,21 @@
       } else {
         d.done.innerHTML='<div class="drill-done-in">Für diesen Punkt gibt es noch nichts zum Üben.</div>';
       }
+      if(d.sKey)sessClear(d.sKey); // Runde durch → nichts mehr fortzusetzen
       return;
     }
     d.done.classList.add('hidden'); d.card.classList.remove('hidden');
     const learned=d.total-d.deck.length;
-    d.prog.textContent='Aufgabe '+(learned+1)+' / '+d.total;
+    d.prog.innerHTML='Aufgabe '+(learned+1)+' / '+d.total+resumedTag(d.resumed);
+    d.resumed=false;
+    drillSave(false);
     const c=d.deck[0];
     if(c.kind==='ex'){
       d.trBox.classList.add('hidden'); d.exHost.classList.remove('hidden'); d.exHost.innerHTML='';
       d.dir.textContent='Aufgabe';
       const ex=Object.assign({},c.ex,{srsId:c.srsId});
       window.Exercises.renderExercise(ex,d.exHost,{ onResult:()=>{
+        drillSave(true); // bewertet — beim Fortsetzen wird diese Aufgabe übersprungen
         d.exHost.appendChild(makeNextButton(drillNext,'drill-ex-next'));
       }});
       return;
@@ -1292,7 +1332,9 @@
       const actions=card.querySelector('.lp-actions');
       const learn=el('a','btn lp-learn',ready?'Weiter üben':('Teil '+np+' lernen'));
       learn.href=ready?'heute.html':('heute.html?lesson='+L+'&teil='+np); actions.appendChild(learn);
-      if(ready){ const t=el('button','btn-primary lp-test-btn',st.testPassed?'Test wiederholen':'Test starten'); t.type='button';
+      // Angefangener Test? Dann kündigt der Knopf das Fortsetzen an.
+      if(ready){ const pend=sessGet('lessontest:'+L);
+        const t=el('button','btn-primary lp-test-btn',pend?'Test fortsetzen':(st.testPassed?'Test wiederholen':'Test starten')); t.type='button';
         t.addEventListener('click',()=>openLessonTest(L)); actions.appendChild(t);
         // „als gelernt" markiert, aber noch nicht voll gemeistert und Test noch nicht bestanden → Hinweis aufs Gate.
         if(st.learned&&!st.coreMastered&&!st.testPassed)
@@ -1317,6 +1359,7 @@
       for(let L=1;L<=25;L++)grid.appendChild(lessonCard(L));
       root.innerHTML=''; root.appendChild(grid);
     }
+    let lpRestart=null;
     function ensureOverlay(){
       if(overlay)return overlay;
       overlay=el('div','lp-overlay'); overlay.hidden=true;
@@ -1324,27 +1367,43 @@
         '<div class="lp-modal-head"><span class="lp-modal-title"></span><button class="drill-close lp-close" type="button" aria-label="Schließen"><span class="msi" aria-hidden="true">close</span></button></div>'+
         '<div class="lp-modal-top"><span class="lp-modal-prog"></span></div><div class="lp-modal-body"></div></div>';
       document.body.appendChild(overlay);
-      overlay.querySelector('.lp-close').addEventListener('click',closeTest);
-      overlay.addEventListener('click',e=>{ if(e.target===overlay)closeTest(); });
+      const cl=overlay.querySelector('.lp-close');
+      cl.addEventListener('click',closeTest);
+      // Kein Schließen beim Klick auf den Hintergrund — ein Fehlgriff verwarf sonst den halben Test.
+      cl.parentNode.insertBefore(restartButton(()=>{ if(lpRestart)lpRestart(); },()=>!!(overlay&&overlay.dataset.i&&overlay.dataset.i!=='0'),
+        'Test neu starten? Das bisherige Ergebnis wird verworfen.'),cl);
       return overlay;
     }
-    function closeTest(){ if(overlay){ overlay.hidden=true; document.body.classList.remove('drill-open'); } }
+    function closeTest(){ if(overlay){ overlay.hidden=true; document.body.classList.remove('drill-open'); draw(); } }
     function openLessonTest(L){
       const ov=ensureOverlay();
       const title=ov.querySelector('.lp-modal-title'), progEl=ov.querySelector('.lp-modal-prog'), bodyEl=ov.querySelector('.lp-modal-body');
       title.textContent='Test · Lektion '+L;
-      const qs=window.Exercises.buildLessonTest(L); let i=0, correct=0; const n=qs.length;
+      // Angefangenen Test fortsetzen: die GENERIERTEN Fragen werden mitgesichert — neu erzeugen
+      // würde andere Fragen (und andere Antwortreihenfolgen) liefern.
+      const sKey='lessontest:'+L, sess=sessGet(sKey);
+      let qs, i, correct, resumed=false;
+      if(sess&&Array.isArray(sess.qs)&&sess.qs.length){ qs=sess.qs; i=sess.i|0; correct=sess.correct|0; resumed=true; }
+      else { qs=window.Exercises.buildLessonTest(L); i=0; correct=0; }
+      const n=qs.length;
+      lpRestart=()=>{ sessClear(sKey); qs=window.Exercises.buildLessonTest(L); i=0; correct=0; resumed=false; ov.dataset.i='0'; show(); };
       ov.hidden=false; document.body.classList.add('drill-open');
       function show(){
         if(!n){ progEl.textContent=''; bodyEl.innerHTML='<div class="tr-done-in">Für diese Lektion gibt es noch keine Testaufgaben.</div>'; return; }
         if(i>=n)return result();
-        progEl.textContent='Frage '+(i+1)+' / '+n;
+        ov.dataset.i=String(i);
+        sessSet(sKey,{qs:qs,i:i,correct:correct});
+        progEl.innerHTML='Frage '+(i+1)+' / '+n+resumedTag(resumed);
+        resumed=false;
         bodyEl.innerHTML='<div class="lp-q"></div><div class="lp-q-next"></div>';
         const mount=bodyEl.querySelector('.lp-q'), nextWrap=bodyEl.querySelector('.lp-q-next');
+        // Punkt VOR dem „Weiter“ buchen: wer dazwischen schließt, verliert ihn sonst.
         window.Exercises.renderExercise(qs[i],mount,{ onResult:res=>{ if(res)correct++;
+          sessSet(sKey,{qs:qs,i:i+1,correct:correct});
           nextWrap.appendChild(makeNextButton(()=>{ i++; show(); })); } });
       }
       function result(){
+        sessClear(sKey); ov.dataset.i='0';
         const score=n?correct/n:0, r=window.SRS.recordLessonTest(L,score), pct=Math.round(score*100);
         progEl.textContent='';
         bodyEl.innerHTML='<div class="lp-result '+(r.passed?'ok':'no')+'">'+(r.passed?'Bestanden!':'Leider nicht bestanden')+
@@ -1473,7 +1532,8 @@
     vocab:{ data:()=>window.VOKABULAR||[], label:'語彙 Vokabeln' },
     grammar:{ data:()=>window.GRAMMATIK||[], label:'文法 Grammatik' },
   };
-  let freeOv=null;
+  let freeOv=null, freeRestart=null;
+  function closeFree(){ if(freeOv){ freeOv.hidden=true; document.body.classList.remove('drill-open'); } }
   function ensureFreeDom(){
     if(freeOv)return freeOv;
     const ov=el('div','lt-overlay'); ov.hidden=true;
@@ -1486,10 +1546,12 @@
         '<button class="btn btn-next fr-good hidden" type="button">Gewusst →</button></div></div>'+
       '<div class="lt-done hidden"></div></div>';
     document.body.appendChild(ov);
-    ov.querySelector('.lt-close').addEventListener('click',()=>{ ov.hidden=true; });
-    ov.addEventListener('click',e=>{ if(e.target===ov)ov.hidden=true; });
-    document.addEventListener('keydown',e=>{ if(freeOv.hidden)return;
-      if(e.key==='Escape'){ freeOv.hidden=true; return; }
+    ov.querySelector('.lt-close').addEventListener('click',closeFree);
+    // Kein Schließen beim Klick auf den Hintergrund (versehentlicher Abbruch mitten in der Runde).
+    const cl=ov.querySelector('.lt-close');
+    cl.parentNode.insertBefore(restartButton(()=>{ if(freeRestart)freeRestart(); },()=>!!(freeOv&&freeOv.dataset.done&&freeOv.dataset.done!=='0')),cl);
+    document.addEventListener('keydown',e=>{ if(!freeOv||freeOv.hidden)return;
+      if(e.key==='Escape'){ closeFree(); return; }
       if(e.code==='Space'){ e.preventDefault(); const g=freeOv.querySelector('.fr-good'),r=freeOv.querySelector('.fr-reveal');
         if(g&&!g.classList.contains('hidden'))g.click(); else if(r&&!r.classList.contains('hidden'))r.click(); } });
     freeOv=ov; return ov;
@@ -1500,13 +1562,28 @@
     const ov=ensureFreeDom(), q=s=>ov.querySelector(s);
     const title=q('.lt-title'),prog=q('.lt-prog'),card=q('.lt-card'),front=q('.lt-front'),back=q('.lt-back'),done=q('.lt-done'),reveal=q('.fr-reveal'),again=q('.fr-again'),good=q('.fr-good');
     title.textContent='Freies Üben · '+cfg.label;
-    let deck=[], total=0;
-    function start(){ deck=shuffle(data.slice()).slice(0,10).map(d=>({t:source,d:d})); total=deck.length; done.classList.add('hidden'); card.classList.remove('hidden'); render(); }
+    const sKey='free:'+source;
+    let deck=[], total=0, resumed=false;
+    function save(){ ov.dataset.done=String(total-deck.length);
+      sessSet(sKey,{ids:deck.map(c=>window.SRS?window.SRS.srsId(c.t,c.d):null).filter(Boolean),done:total-deck.length}); }
+    function start(){ sessClear(sKey); deck=shuffle(data.slice()).slice(0,10).map(d=>({t:source,d:d})); total=deck.length; resumed=false;
+      ov.dataset.done='0'; done.classList.add('hidden'); card.classList.remove('hidden'); render(); }
+    // Angefangene Runde wiederherstellen (Karten über ihre SRS-ID auflösen).
+    function resume(s){
+      if(!window.SRS)return false;
+      const idx={}; data.forEach(d=>{ const id=window.SRS.srsId(source,d); if(id)idx[id]=d; });
+      const rest=(s.ids||[]).map(x=>idx[x]).filter(Boolean).map(d=>({t:source,d:d}));
+      if(!rest.length)return false;
+      deck=rest; total=(s.done|0)+rest.length; resumed=true;
+      ov.dataset.done=String(s.done|0); done.classList.add('hidden'); card.classList.remove('hidden'); render();
+      return true;
+    }
     function render(){
-      if(!deck.length){ card.classList.add('hidden'); done.classList.remove('hidden');
+      if(!deck.length){ sessClear(sKey); card.classList.add('hidden'); done.classList.remove('hidden');
         done.innerHTML='<div class="tr-done-in">Runde geschafft — '+total+' Karten.</div><button class="btn-primary fr-restart" type="button"><span class="msi" aria-hidden="true">refresh</span> Neue Runde</button>';
         done.querySelector('.fr-restart').addEventListener('click',start); return; }
-      const learned=total-deck.length; prog.textContent='Karte '+(learned+1)+' / '+total;
+      const learned=total-deck.length; prog.innerHTML='Karte '+(learned+1)+' / '+total+resumedTag(resumed);
+      resumed=false; save();
       const c=deck[0]; front.innerHTML=frontHtml(c); back.innerHTML=backHtml(c);
       back.classList.add('hidden'); reveal.classList.remove('hidden'); again.classList.add('hidden'); good.classList.add('hidden');
     }
@@ -1514,7 +1591,10 @@
     reveal.onclick=()=>{ back.classList.remove('hidden'); reveal.classList.add('hidden'); again.classList.remove('hidden'); good.classList.remove('hidden'); };
     good.onclick=()=>{ grade(1); deck.shift(); render(); };
     again.onclick=()=>{ grade(0); const c=deck.shift(); deck.push(c); render(); };
-    ov.hidden=false; start();
+    ov.hidden=false; document.body.classList.add('drill-open');
+    freeRestart=start;
+    const sess=sessGet(sKey);
+    if(!(sess&&resume(sess)))start();
   }
   // Kanji-Seite: „Üben" = Schreiben üben (Strichreihenfolge), führt zur Schreib-Seite.
   function addKanjiSchreibenButton(){
@@ -1548,10 +1628,11 @@
   function itemFrontHtml(o){ return o.type==='vocab'?vocabFront(o.data):esc(itemGlyph(o)); }
 
   /* ----- Trainer: gemischte, adaptive Übungen aus der zentralen Registry ----- */
-  let tov=null;
+  let tov=null, trainerRestart=null;
+  function closeTrainer(){ if(tov){ tov.hidden=true; document.body.classList.remove('drill-open'); } }
   function ensureTrainer(){
     if(tov)return tov;
-    tov=el('div','lt-overlay'); tov.hidden=true;
+    tov=el('div','lt-overlay'); tov.id='trainer-overlay'; tov.hidden=true;
     tov.innerHTML='<div class="lt-modal" role="dialog" aria-modal="true" aria-label="Liste üben">'+
       '<div class="lt-head"><span class="lt-title"></span>'+
         '<button class="drill-close lt-close" type="button" aria-label="Schließen"><span class="msi" aria-hidden="true">close</span></button></div>'+
@@ -1559,10 +1640,12 @@
       '<div class="lt-card"><div class="lt-ex"></div><div class="lt-next-wrap"></div></div>'+
       '<div class="lt-done hidden"></div></div>';
     document.body.appendChild(tov);
-    tov.querySelector('.lt-close').addEventListener('click',()=>{ tov.hidden=true; });
-    tov.addEventListener('click',e=>{ if(e.target===tov)tov.hidden=true; });
+    const cl=tov.querySelector('.lt-close');
+    cl.addEventListener('click',closeTrainer);
+    // Kein Schließen beim Klick auf den Hintergrund (versehentlicher Abbruch mitten in der Runde).
+    cl.parentNode.insertBefore(restartButton(()=>{ if(trainerRestart)trainerRestart(); },()=>!!(tov&&tov.dataset.done!=='0'&&tov.dataset.done)),cl);
     document.addEventListener('keydown',e=>{ if(tov.hidden)return;
-      if(e.key==='Escape'){ tov.hidden=true; return; }
+      if(e.key==='Escape'){ closeTrainer(); return; }
       if(e.code==='Space'){ const nx=tov.querySelector('.lt-next'); if(nx){ e.preventDefault(); nx.click(); } } });
     return tov;
   }
@@ -1572,22 +1655,39 @@
     const title=q('.lt-title'), prog=q('.lt-prog'), card=q('.lt-card'),
       exMount=q('.lt-ex'), nextWrap=q('.lt-next-wrap'), done=q('.lt-done');
     title.textContent=l.name;
-    let deck=[], total=0;
-    function start(){ deck=shuffle(window.SRS.listItems(l.id).slice()); total=deck.length; done.classList.add('hidden'); card.classList.remove('hidden'); render(); }
+    const sKey='trainer:'+l.id;
+    let deck=[], total=0, resumed=false;
+    function save(answered){ ov.dataset.done=String(total-deck.length); sessSet(sKey,{ids:deck.map(o=>o.id),done:total-deck.length,answered:!!answered}); }
+    function start(){ sessClear(sKey); deck=shuffle(window.SRS.listItems(l.id).slice()); total=deck.length; resumed=false;
+      ov.dataset.done='0'; done.classList.add('hidden'); card.classList.remove('hidden'); render(); }
+    // Angefangene Runde wiederherstellen; inzwischen entfernte Einträge fallen still weg.
+    function resume(s){
+      const idx={}; window.SRS.listItems(l.id).forEach(o=>{ idx[o.id]=o; });
+      let rest=(s.ids||[]).map(x=>idx[x]).filter(Boolean), doneN=s.done|0;
+      if(s.answered&&rest.length){ rest.shift(); doneN++; }
+      if(!rest.length)return false;
+      deck=rest; total=doneN+rest.length; resumed=true;
+      ov.dataset.done=String(doneN); done.classList.add('hidden'); card.classList.remove('hidden'); render();
+      return true;
+    }
     function addNext(){ if(nextWrap.querySelector('.lt-next'))return; const nx=makeNextButton(()=>{ deck.shift(); render(); },'lt-next'); nextWrap.appendChild(nx); nx.focus(); }
     function render(){
-      if(!deck.length){ card.classList.add('hidden'); done.classList.remove('hidden');
+      if(!deck.length){ sessClear(sKey); card.classList.add('hidden'); done.classList.remove('hidden');
         done.innerHTML=total?'<div class="tr-done-in">Geschafft!<br>Alle '+total+' Einträge durch.</div><button class="btn-primary lt-restart" type="button"><span class="msi" aria-hidden="true">refresh</span> Nochmal</button>':'<div class="tr-done-in">Diese Liste ist leer.</div>';
         const rs=done.querySelector('.lt-restart'); if(rs)rs.addEventListener('click',start); return; }
-      const learned=total-deck.length; prog.textContent='Aufgabe '+(learned+1)+' / '+total;
+      const learned=total-deck.length; prog.innerHTML='Aufgabe '+(learned+1)+' / '+total+resumedTag(resumed);
+      resumed=false; save(false);
       exMount.innerHTML=''; nextWrap.innerHTML='';
       const o=deck[0];
       const score=(window.SRS&&window.SRS.scoreOf)?window.SRS.scoreOf(o.id):0;
       const ex=(window.Exercises&&window.Exercises.pickExercise)?window.Exercises.pickExercise({id:o.id,type:o.type,data:o.data},{score}):null;
-      if(!ex){ exMount.innerHTML='<div class="lt-jp ja">'+itemFrontHtml(o)+'</div><div class="lt-de">'+esc(itemMeaning(o))+'</div>'; addNext(); return; }
-      renderAnyExercise(ex, exMount, { onDone:()=>{ addNext(); } });
+      if(!ex){ exMount.innerHTML='<div class="lt-jp ja">'+itemFrontHtml(o)+'</div><div class="lt-de">'+esc(itemMeaning(o))+'</div>'; save(true); addNext(); return; }
+      renderAnyExercise(ex, exMount, { onDone:()=>{ save(true); addNext(); } });
     }
-    ov.hidden=false; start();
+    ov.hidden=false; document.body.classList.add('drill-open');
+    trainerRestart=start;
+    const sess=sessGet(sKey);
+    if(!(sess&&resume(sess)))start(); // angefangene Runde fortsetzen, sonst frisch beginnen
   }
 
   /* ============================================================  LISTE (Detailseite einer Lernliste)
@@ -1782,7 +1882,7 @@
      Vor init() gesetzt, damit Render-Code (z. B. Grammatik-Übungen) sie schon nutzen kann. */
   window.Katalog = {
     el, esc, ruby, rubyPair, norm, furiToRuby, kanaToRomaji, shuffle,
-    conjugate, allForms, verbGroup, genVerbFormExercises, sakuraPetals, sakuraSvg, lsGet, lsSet
+    conjugate, allForms, verbGroup, genVerbFormExercises, sakuraPetals, sakuraSvg, lsGet, lsSet, sessGet, sessSet, sessClear
   };
 
   if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',init); else init();
