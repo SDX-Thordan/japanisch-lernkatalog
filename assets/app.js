@@ -36,8 +36,12 @@
   // Einheitliche „Weiter →"-Schaltfläche (type=button) mit Klick-Handler; optionale Zusatzklasse.
   function makeNextButton(onClick, extraCls){ const nx=el('button','btn-primary'+(extraCls?' '+extraCls:''),'Weiter →'); nx.type='button'; nx.addEventListener('click',onClick); return nx; }
   // Suchnormalisierung: kleinschreiben + Makrone falten (ō→o …), damit ASCII-Rōmaji wie „kyoshi" auch „kyōshi" trifft.
+  // Zusätzlich: Trennstriche entfernen (Kun-Lesung „み-る" wird über „みる" gefunden) und „・" zu einem
+  // Leerzeichen machen — NICHT löschen, sonst entstünden Treffer quer über zwei Lesungen hinweg.
+  // Der Chōonpu „ー" (コーヒー) bleibt selbstverständlich unangetastet. Wirkt auf Index UND Suchbegriff.
   function norm(s){ return String(s==null?'':s).toLowerCase()
-    .replace(/[āáàâ]/g,'a').replace(/[īíìî]/g,'i').replace(/[ūúùû]/g,'u').replace(/[ēéèê]/g,'e').replace(/[ōóòô]/g,'o'); }
+    .replace(/[āáàâ]/g,'a').replace(/[īíìî]/g,'i').replace(/[ūúùû]/g,'u').replace(/[ēéèê]/g,'e').replace(/[ōóòô]/g,'o')
+    .replace(/[-‐‑–—]/g,'').replace(/[・／]/g,' '); }
   // Kompakte Hepburn-Umschrift von Kana → Rōmaji (nur für den Suchindex der Verbformen).
   const ROMA_DI={'きゃ':'kya','きゅ':'kyu','きょ':'kyo','しゃ':'sha','しゅ':'shu','しょ':'sho','ちゃ':'cha','ちゅ':'chu','ちょ':'cho','にゃ':'nya','にゅ':'nyu','にょ':'nyo','ひゃ':'hya','ひゅ':'hyu','ひょ':'hyo','みゃ':'mya','みゅ':'myu','みょ':'myo','りゃ':'rya','りゅ':'ryu','りょ':'ryo','ぎゃ':'gya','ぎゅ':'gyu','ぎょ':'gyo','じゃ':'ja','じゅ':'ju','じょ':'jo','びゃ':'bya','びゅ':'byu','びょ':'byo','ぴゃ':'pya','ぴゅ':'pyu','ぴょ':'pyo'};
   const ROMA_MO={'あ':'a','い':'i','う':'u','え':'e','お':'o','か':'ka','き':'ki','く':'ku','け':'ke','こ':'ko','が':'ga','ぎ':'gi','ぐ':'gu','げ':'ge','ご':'go','さ':'sa','し':'shi','す':'su','せ':'se','そ':'so','ざ':'za','じ':'ji','ず':'zu','ぜ':'ze','ぞ':'zo','た':'ta','ち':'chi','つ':'tsu','て':'te','と':'to','だ':'da','ぢ':'ji','づ':'zu','で':'de','ど':'do','な':'na','に':'ni','ぬ':'nu','ね':'ne','の':'no','は':'ha','ひ':'hi','ふ':'fu','へ':'he','ほ':'ho','ば':'ba','び':'bi','ぶ':'bu','べ':'be','ぼ':'bo','ぱ':'pa','ぴ':'pi','ぷ':'pu','ぺ':'pe','ぽ':'po','ま':'ma','み':'mi','む':'mu','め':'me','も':'mo','や':'ya','ゆ':'yu','よ':'yo','ら':'ra','り':'ri','る':'ru','れ':'re','ろ':'ro','わ':'wa','を':'o','ん':'n','ー':''};
@@ -367,6 +371,16 @@
     });
   }
   // Gestapelte Vokabel-Karte (handytauglich): (Lesung klein) / Wort / Übersetzung; Blüte oben rechts.
+  // Suchindex für Verben: alle Formen (Kana + Schreibung) samt Rōmaji, damit „okiru", „おきる",
+  // „起きる" und „たべて" dieselbe Zeile finden wie die ます-Form — wie auf der Verben-Seite (verbCard).
+  function verbSearchIndex(w){
+    const g=verbGroup(w.pos||''); if(g<=0)return '';
+    const f=allForms(w.kana,g); if(!f)return '';
+    const disp=allForms(writtenForm(w),g)||{};
+    const keys=['dict','te','ta','nai'];
+    const kana=keys.map(k=>f[k]).filter(Boolean);
+    return kana.concat(kana.map(kanaToRomaji)).concat(keys.map(k=>disp[k]).filter(Boolean)).join(' ');
+  }
   function vocabRow(w,listsOn){
     // Verben: Stichwort = Wörterbuchform; die ます-Form erscheint erst beim Aufklappen.
     const dd=verbDictDisplay(w);
@@ -376,7 +390,7 @@
     const row=el('div','v-row item'); row.dataset.filter=String(w.lesson);
     row.dataset.type=vocabType(w.pos);
     const bsp=(window.VOKABULAR_BEISPIELE||{})[w.kana+'|'+w.lesson];
-    row.dataset.search=norm([w.kanji,w.kana,w.romaji,w.de,w.pos,(dd?dd.written+' '+dd.kana:''),(bsp?bsp.jp+' '+bsp.de+' '+(bsp.note||''):'')].join(' '));
+    row.dataset.search=norm([w.kanji,w.kana,w.romaji,w.de,w.pos,verbSearchIndex(w),(bsp?bsp.jp+' '+bsp.de+' '+(bsp.note||''):'')].join(' '));
     // Erweiterte Infos (ます-Form bei Verben, Beispielsatz + Notiz) klappen per Klick auf.
     if(bsp||dd)row.dataset.ext='1';
     const masuLine=dd?'<div class="v-masu-inline"><span class="v-masu-lbl">ます-Form</span> <span class="ja">'+esc(masuPrompt(w))+'</span></div>':'';
