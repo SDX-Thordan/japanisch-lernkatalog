@@ -69,4 +69,21 @@ describe('Grammatik-Seite', () => {
     const trShown = !!(trBox && !trBox.classList.contains('hidden') && promptEl && promptEl.textContent.length > 0);
     expect(exShown || trShown).toBe(true);
   });
+
+  it('Lektion 12 hat ein eigenes のほうが-Muster — auch per Rōmaji auffindbar', () => {
+    const g = win.GRAMMATIK.filter((x) => x.lesson === 12);
+    const hou = g.find((x) => x.pattern.indexOf('のほうが') !== -1);
+    expect(hou).toBeTruthy();
+    expect(hou.beispiele.length).toBeGreaterThan(2);
+    // jeder Beispielsatz hat Furigana-Daten
+    hou.beispiele.forEach((b) => expect(win.GRAMMATIK_FURIGANA[b.jp]).toBeTruthy());
+    // „Mehr erklären“ samt Übungen vorhanden
+    expect(win.GRAMMATIK_PLUS[hou.pattern].uebungen.length).toBeGreaterThan(0);
+    // Suchindex trifft Kana UND die gängigen Rōmaji-Schreibweisen
+    const card = [...win.document.querySelectorAll('.gp.item')]
+      .find((c) => c.querySelector('.gp-pattern').textContent.indexOf('のほうが') !== -1);
+    ['ほうが', 'houga', 'hou ga', 'hō ga'].forEach((q) => {
+      expect(card.dataset.search.indexOf(win.Katalog.norm(q))).toBeGreaterThan(-1);
+    });
+  });
 });
