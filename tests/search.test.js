@@ -49,6 +49,12 @@ describe('norm() — Trennzeichen', () => {
     expect(K.norm('コーヒー')).toBe('コーヒー');
     expect(K.norm('kyōshi')).toBe('kyoshi');
   });
+
+  it('vereinheitlicht lange Vokale in Rōmaji (houga = hoo ga = hō ga)', () => {
+    expect(K.norm('houga')).toBe(K.norm('hō ga').replace(' ', ''));
+    expect(K.norm('hoo')).toBe('ho');
+    expect(K.norm('yuubinkyoku')).toBe(K.norm('yūbinkyoku'));
+  });
 });
 
 describe('Vokabelsuche findet Verben über beide Formen', () => {

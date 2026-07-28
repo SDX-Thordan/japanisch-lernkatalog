@@ -846,4 +846,22 @@ window.GRAMMATIK_PLUS = {
       { typ: "mc", frage: "Im Muster „N1 は N2 が Adj.“ markiert は …", optionen: ["das Thema", "das Objekt", "den Ort", "das Werkzeug"], richtig: 0, erkl: "は = Thema (N1)." },
     ],
   },
+  "N1 のほうが N2 より ～です": {
+    erklaerung_lang: "のほうが wählt aus zwei Möglichkeiten die aus, auf die das Adjektiv stärker zutrifft. Wörtlich: „die Seite von N1“ (ほう = Seite, Richtung). Deshalb ist es die natürliche Antwort auf eine どちらが-Frage. Der Vergleichspartner mit より darf wegfallen, wenn er schon genannt wurde.",
+    kontrast: [
+      { a: "N1 は N2 より ～です", b: "N1 のほうが N2 より ～です", note: "Beide vergleichen; のほうが betont N1 als die zutreffendere Seite („eher N1“) und antwortet auf どちらが." },
+      { a: "のほうが", b: "の中でいちばん", note: "のほうが vergleicht ZWEI Dinge, の中で～いちばん wählt aus DREI oder mehr aus." },
+    ],
+    fehler: [
+      "のほうが braucht の: nicht ×「夏ほうが」, sondern 夏のほうが.",
+      "Nach のほうが steht kein は: nicht ×「夏のほうがは」.",
+      "Bei drei oder mehr Dingen nicht のほうが, sondern の中で ～が いちばん ～.",
+    ],
+    uebungen: [
+      { typ: "mc", frage: "夏＿ほうが冬より暑いです。", optionen: ["の", "が", "は", "を"], richtig: 0, erkl: "ほう ist ein Nomen — davor steht の: 夏のほうが." },
+      { typ: "cloze", satz: "コーヒーと紅茶とどちらがいいですか。… コーヒー＿ほうがいいです。", luecke: "の", erkl: "Antwort auf どちらが: N のほうが ～です." },
+      { typ: "mc", frage: "Was betont のほうが?", optionen: ["die zutreffendere von zwei Seiten", "den Ort", "die Uhrzeit", "den Grund"], richtig: 0, erkl: "ほう = Seite/Richtung → „eher diese Seite“." },
+      { typ: "mc", frage: "Drei Restaurants vergleichen — welche Struktur?", optionen: ["この中でここがいちばん安いです", "ここのほうが安いです", "ここはより安いです", "ここがほうが安いです"], richtig: 0, erkl: "Ab drei Dingen: ～の中で ～が いちばん ～." },
+    ],
+  },
 };
