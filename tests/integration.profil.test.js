@@ -1,6 +1,6 @@
 // Integrationstest: Fortschritt-Seite — Statistik/Forecast + Reset über die UI.
 import { describe, it, expect, beforeEach } from 'vitest';
-import { loadScripts } from './helpers/load.js';
+import { loadScripts, waitFor } from './helpers/load.js';
 
 function fakeStorage() {
   const d = {};
@@ -51,6 +51,9 @@ beforeEach(() => {
 });
 
 function tick() { return new Promise((r) => setTimeout(r, 0)); }
+// Der Import läuft über einen FileReader — auf die Meldezeile warten, nicht auf feste Ticks.
+const msgText = (w) => w.document.getElementById('f-msg').textContent;
+const awaitMsg = (w) => waitFor(() => msgText(w).length > 0, { label: 'Meldung in #f-msg' });
 
 describe('Fortschritt-Seite', () => {
   it('rendert Punkte-pro-Tag-Balken (30) und Aktivitäts-Kalender-Zellen', () => {
@@ -66,10 +69,24 @@ describe('Fortschritt-Seite', () => {
     const file = win.document.getElementById('f-file');
     Object.defineProperty(file, 'files', { value: [new win.Blob([json], { type: 'application/json' })], configurable: true });
     file.dispatchEvent(new win.Event('change'));
-    await tick(); await tick();
+    await awaitMsg(win);
     expect(win.document.querySelectorAll('#f-calendar .cal-cell.l1, #f-calendar .cal-cell.l2, #f-calendar .cal-cell.l3, #f-calendar .cal-cell.l4').length).toBeGreaterThanOrEqual(1);
     const heights = [...win.document.querySelectorAll('#f-activity .act-bar-fill')].map((e) => e.style.height);
     expect(heights.some((h) => h === '100%')).toBe(true);
+  });
+
+  it('unlesbare Datei → Hinweis statt stiller Wirkungslosigkeit', async () => {
+    // FileReader-Doppelgänger, der scheitert (der Handler löst ihn über das Fenster-Global auf).
+    win.FileReader = function () {
+      this.readAsText = () => { setTimeout(() => { if (this.onerror) this.onerror(new win.Event('error')); }, 0); };
+    };
+    const file = win.document.getElementById('f-file');
+    Object.defineProperty(file, 'files', { value: [new win.Blob(['egal'])], configurable: true });
+    file.dispatchEvent(new win.Event('change'));
+    await awaitMsg(win);
+    expect(msgText(win)).toContain('✗');
+    expect(msgText(win)).toContain('gelesen');
+    expect(file.value).toBe(''); // dieselbe Datei lässt sich erneut wählen
   });
 
   it('rendert 7 Forecast-Balken und Statistik', () => {

@@ -1353,8 +1353,13 @@
     const imp=document.getElementById('f-import'); const file=document.getElementById('f-file');
     if(imp&&file){ imp.addEventListener('click',()=>file.click());
       file.addEventListener('change',()=>{ const f=file.files&&file.files[0]; if(!f)return; const r=new FileReader();
-        r.onload=()=>{ const res=window.SRS.importJSON(String(r.result),{merge:true}); const msg=document.getElementById('f-msg');
-          if(msg)msg.textContent=res.ok?'✓ Fortschritt importiert (zusammengeführt).':'✗ Datei ungültig oder falsche Version.'; draw(); }; r.readAsText(f); }); }
+        const say=t=>{ const msg=document.getElementById('f-msg'); if(msg)msg.textContent=t; file.value=''; draw(); };
+        r.onload=()=>{ const res=window.SRS.importJSON(String(r.result),{merge:true});
+          say(res.ok?'✓ Fortschritt importiert (zusammengeführt).':'✗ Datei ungültig oder falsche Version.'); };
+        // Ohne onerror bliebe ein fehlgeschlagener Lesevorgang komplett stumm — der Nutzer sähe
+        // weder Erfolg noch Fehler und hielte den Import für wirkungslos.
+        r.onerror=()=>say('✗ Datei konnte nicht gelesen werden.');
+        r.readAsText(f); }); }
     const rst=document.getElementById('f-reset'); if(rst)rst.addEventListener('click',()=>{
       if(window.confirm('Wirklich den gesamten Fortschritt löschen? Tipp: vorher exportieren.')){ window.SRS.reset(); const msg=document.getElementById('f-msg'); if(msg)msg.textContent='Fortschritt zurückgesetzt.'; draw(); } });
     // App-Update (OTA): NUR hier, kein Auto-Banner. Diagnose-Zeile zeigt, welches Bundle
@@ -2064,13 +2069,15 @@
       impFile.addEventListener('change',()=>{
         const f=impFile.files&&impFile.files[0]; if(!f)return;
         const r=new FileReader();
+        const say=t=>{ if(msg)msg.textContent=t; impFile.value=''; draw(); };
         r.onload=()=>{
           const res=window.SRS.importListJSON(String(r.result));
-          if(msg)msg.textContent=res.ok
+          say(res.ok
             ?('✓ Liste „'+res.list.name+'" importiert ('+res.added+' Einträge'+(res.skipped?', '+res.skipped+' unbekannte übersprungen':'')+').')
-            :'✗ Keine gültige Listen-Datei (bitte einen Listen-Export wählen, nicht die Komplett-Sicherung).';
-          impFile.value=''; draw();
+            :'✗ Keine gültige Listen-Datei (bitte einen Listen-Export wählen, nicht die Komplett-Sicherung).');
         };
+        // Ohne onerror bliebe ein fehlgeschlagener Lesevorgang komplett stumm.
+        r.onerror=()=>say('✗ Datei konnte nicht gelesen werden.');
         r.readAsText(f);
       });
     }

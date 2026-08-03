@@ -1,6 +1,6 @@
 // Integrationstest: Listen-Seite — anlegen, Items zeigen/entfernen, Trainer öffnen + Richtung.
 import { describe, it, expect, beforeEach } from 'vitest';
-import { loadScripts } from './helpers/load.js';
+import { loadScripts, waitFor } from './helpers/load.js';
 
 function fakeStorage() {
   const d = {};
@@ -30,6 +30,9 @@ beforeEach(() => {
 function click(e) { e.dispatchEvent(new win.Event('click', { bubbles: true })); }
 
 function tick() { return new Promise((r) => setTimeout(r, 0)); }
+// Der Import läuft über einen FileReader — auf die Meldezeile warten, nicht auf feste Ticks.
+const msgText = (win) => win.document.getElementById('lst-msg').textContent;
+const awaitMsg = (win) => waitFor(() => msgText(win).length > 0, { label: 'Meldung in #lst-msg' });
 
 describe('Listen Export/Import (einzelne Liste)', () => {
   it('Export-Button vorhanden; exportListJSON liefert Name + IDs', () => {
@@ -62,7 +65,7 @@ describe('Listen Export/Import (einzelne Liste)', () => {
     const file = win.document.getElementById('lst-import-file');
     Object.defineProperty(file, 'files', { value: [new win.Blob([json], { type: 'application/json' })], configurable: true });
     file.dispatchEvent(new win.Event('change'));
-    await tick(); await tick();
+    await awaitMsg(win);
     const l = win.SRS.lists().find((x) => x.name === 'Geteilt');
     expect(l.items).toHaveLength(2); // unbekannte ID übersprungen
     expect(win.document.getElementById('lst-msg').textContent).toContain('2 Einträge');
@@ -75,9 +78,24 @@ describe('Listen Export/Import (einzelne Liste)', () => {
     const file = win.document.getElementById('lst-import-file');
     Object.defineProperty(file, 'files', { value: [new win.Blob([win.SRS.exportJSON()], { type: 'application/json' })], configurable: true });
     file.dispatchEvent(new win.Event('change'));
-    await tick(); await tick();
+    await awaitMsg(win);
     expect(win.SRS.lists().length).toBe(0);
-    expect(win.document.getElementById('lst-msg').textContent).toContain('✗');
+    expect(msgText(win)).toContain('✗');
+  });
+
+  it('unlesbare Datei → Hinweis statt stiller Wirkungslosigkeit', async () => {
+    // FileReader-Doppelgänger, der scheitert (die Handler lösen ihn über das Fenster-Global auf).
+    win.FileReader = function () {
+      this.readAsText = () => { setTimeout(() => { if (this.onerror) this.onerror(new win.Event('error')); }, 0); };
+    };
+    const file = win.document.getElementById('lst-import-file');
+    Object.defineProperty(file, 'files', { value: [new win.Blob(['egal'])], configurable: true });
+    file.dispatchEvent(new win.Event('change'));
+    await awaitMsg(win);
+    expect(msgText(win)).toContain('✗');
+    expect(msgText(win)).toContain('gelesen');
+    expect(win.SRS.lists().length).toBe(0);
+    expect(file.value).toBe(''); // dieselbe Datei lässt sich erneut wählen
   });
 
   it('Roundtrip: Export → Import ergibt dieselben Einträge (Lernstand bleibt unberührt)', () => {
