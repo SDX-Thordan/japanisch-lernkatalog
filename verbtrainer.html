@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<!-- OTA so früh wie möglich bestätigen (capgo notifyAppReady), bevor große Daten-Skripte laden. -->
+<script src="assets/ota.js"></script>
+<title>Verbformen-Trainer · 動詞 — Go! Nihongo</title>
+<link rel="stylesheet" href="assets/style.css">
+<link rel="icon" href="assets/icons/icon-192.png">
+<link rel="manifest" href="manifest.webmanifest">
+<meta name="theme-color" content="#b23a2e">
+<link rel="apple-touch-icon" href="assets/icons/icon-192.png">
+</head>
+<body data-page="verbtrainer">
+
+<header class="topbar">
+  <div class="topbar-inner">
+    <a class="brand" href="index.html" aria-label="Go! Nihongo"><span class="brand-name">Go!</span><span class="brand-jp">日本語</span></a>
+    <nav id="topnav" class="nav" aria-label="Hauptnavigation"></nav>
+  </div>
+</header>
+
+<main>
+  <div class="page-intro">
+    <span class="kicker">動詞 · Verbformen-Trainer</span>
+    <h1>Verbformen üben <span class="jp">動詞</span></h1>
+    <p>Wähle eine Quelle und die Formen, die du üben möchtest. Der Trainer läuft dann endlos und
+       fragt die gewählten Formen kreuz und quer ab — jede Richtung kommt vor, auch die Rückrichtung.
+       Getippt wird frei; wenn eine Form mehrfach danebengeht, hilft Multiple Choice aus.</p>
+  </div>
+
+  <div id="vt-root"></div>
+</main>
+
+<footer>
+  <span class="brand-name">Go! Nihongo</span> · Verbformen aus echten Verben bilden — in beide Richtungen, endlos.
+</footer>
+
+<script src="assets/data/vokabular.js"></script>
+<script src="assets/data/vokabular_beispiele.js"></script>
+<script src="assets/data/grammatik.js"></script>
+<script src="assets/srs.js"></script>
+<script src="assets/exercises.js"></script>
+<script src="assets/version.js"></script>
+<script src="assets/app.js"></script>
+</body>
+</html>

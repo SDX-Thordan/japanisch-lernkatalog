@@ -49,10 +49,15 @@ test('Grammatik: ein „Üben"-Knopf öffnet die kombinierte Session', async ({ 
   await expect(page.locator('.drill-overlay .drill-prog')).toContainText('Aufgabe');
 });
 
-test('Freies Üben: „Verbformen" öffnet generierte MC-Aufgaben', async ({ page }) => {
-  await page.goto('/ueben.html');
-  await page.click('[data-src="verbforms"]');
-  await expect(page.locator('.drill-overlay .drill-ex .ex-opt').first()).toBeVisible();
+test('Verbformen-Trainer: Auswahl starten → endlose Umform-Aufgaben', async ({ page }) => {
+  await page.goto('/verbtrainer.html');
+  await expect(page.locator('.vt-form')).toHaveCount(10);
+  await page.click('.vt-go');
+  const ov = page.locator('#verbtrainer-overlay');
+  await expect(ov).toBeVisible();
+  await expect(ov.locator('.vt-dir')).toContainText('→');
+  await expect(ov.locator('.vt-prog')).toContainText('Aufgabe 1');
+  await expect(ov.locator('.vt-ex .ex-input')).toBeVisible();
 });
 
 test('Schreiben lädt das KanjiVG-Canvas', async ({ page }) => {

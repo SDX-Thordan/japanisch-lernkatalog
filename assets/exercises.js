@@ -170,6 +170,8 @@
       if (!Array.isArray(answer) || answer.length !== ex.solution.length) return false;
       return answer.every(function (x, i) { return x === ex.solution[i]; });
     }
+    // Tippen: dieselbe Akzeptanzlogik wie renderInput — hier ohne DOM prüfbar.
+    if (ex.typ === 'input') return acceptsInput(answer, ex);
     // Lesungen: je Spalte (音/訓) muss GENAU die richtige Menge gewählt sein — Reihenfolge egal.
     if (ex.typ === 'readings') {
       if (!Array.isArray(answer) || answer.length !== ex.columns.length) return false;
@@ -250,21 +252,40 @@
     mount.appendChild(inp); mount.appendChild(btn);
   }
 
-  // Tippen (Produktion): Bedeutung → japanisch eingeben; akzeptiert Kanji/Kana/Rōmaji (acceptsVocabInput).
+  /* Tippen (Produktion) — zwei Betriebsarten:
+     a) ex.accept = Vokabel-Objekt → liberaler Abgleich (Kanji/Kana/Rōmaji, bei Verben zusätzlich
+        die Wörterbuchform, s. vocabForms).
+     b) ex.antworten = Liste erwarteter Schreibungen → EXAKTER Abgleich. Nötig für den Verbformen-
+        Trainer: dort wäre „かう" über vocabForms fälschlich eine gültige Antwort auf die て-Form.
+     Für b) liefert ex.loesung den Text der Musterlösung und ex.placeholder den Eingabe-Hinweis. */
+  function inputSolutions(ex) {
+    return (ex.antworten && ex.antworten.length) ? ex.antworten : vocabForms(ex.accept);
+  }
+  function acceptsInput(value, ex) {
+    var t = nrm(value); if (!t) return false;
+    if (ex.antworten && ex.antworten.length)
+      return ex.antworten.some(function (f) { return nrm(f) === t; });
+    return acceptsVocabInput(value, ex.accept);
+  }
   function renderInput(ex, mount, finish) {
     var big = !!ex.big;
-    mount.appendChild(el('div', big ? 'ex-frage big' : 'ex-prompt', esc(ex.prompt)));
+    // Japanischer Prompt (Verbformen): Ruby wie auf der Verben-Seite, sonst reiner Text.
+    var pHtml = ex.promptJa
+      ? ((ex.furigana && kat().ruby) ? kat().ruby(ex.prompt, ex.furigana) : autoFuri(ex.prompt))
+      : esc(ex.prompt);
+    mount.appendChild(el('div', (big ? 'ex-frage big' : 'ex-prompt') + (ex.promptJa ? ' ja' : ''), pHtml));
     if (big && ex.q) mount.appendChild(el('div', 'ex-subprompt', esc(ex.q)));
     var inp = el('input', 'ex-input'); inp.type = 'text';
     inp.setAttribute('autocomplete', 'off'); inp.setAttribute('autocapitalize', 'off');
     inp.setAttribute('autocorrect', 'off'); inp.setAttribute('spellcheck', 'false');
-    inp.setAttribute('aria-label', 'Antwort'); inp.placeholder = 'Rōmaji, Kana oder Kanji …';
+    inp.setAttribute('aria-label', 'Antwort');
+    inp.placeholder = ex.placeholder || 'Rōmaji, Kana oder Kanji …';
     var btn = el('button', 'btn-primary ex-check', 'Prüfen'); btn.type = 'button';
     function check() {
       if (mount.querySelector('.ex-feedback')) return;
-      var ok = acceptsVocabInput(inp.value, ex.accept);
+      var ok = acceptsInput(inp.value, ex);
       inp.disabled = true;
-      feedback(mount, ok, ok ? '' : ('Lösung: ' + vocabForms(ex.accept).join(' · ')));
+      feedback(mount, ok, ok ? '' : ('Lösung: ' + (ex.loesung || inputSolutions(ex).join(' · '))));
       finish(ok);
     }
     btn.addEventListener('click', check);
@@ -457,14 +478,29 @@
      „Freigeschaltet" = die Lektion, in der die Form eingeführt wird (aus GRAMMATIK abgeleitet:
      て L14 · ない L17 · 辞書形 L18 · た L19), ist über den Lernpfad erreicht. Alle Übungen
      benoten die kanonische Vokabel-ID (v:kana|lesson) → Fortschritt bleibt global. */
-  var VERB_FORM_INTRO = { te: 'V て-Form', nai: 'V ない-Form', dict: 'V 辞書形 (Wörterbuchform)', ta: 'V た-Form' };
-  var VERB_FORM_FALLBACK_LESSON = { te: 14, nai: 17, dict: 18, ta: 19 };
+  /* Jede Verbform zeigt auf ein ECHTES Muster aus window.GRAMMATIK. Das ist zweierlei Grundlage:
+     (a) die Freischaltung über den Lernpfad und (b) die SRS-ID der Verbform-Übungen. Eine
+     erfundene 'g:'-ID wäre eine Waise — stats() und dueIds() iterieren über store.items und
+     würden sie dauerhaft als „gelernt"/„fällig" mitzählen, ohne dass sie je im Katalog auftaucht.
+     Gegatet sind NUR die vier Formen aus VERB_FORM_GATED; ます & Co. sind Grundinventar ab L4. */
+  var VERB_FORM_INTRO = {
+    masu: 'V ます／ました', masen: 'V ます／ました', mashita: 'V ます／ました',
+    mashou: '～ませんか／～ましょう', tai: 'V たいです',
+    te: 'V て-Form', nai: 'V ない-Form', dict: 'V 辞書形 (Wörterbuchform)', ta: 'V た-Form',
+    nakatta: '普通形 (Plain-/Umgangsform)'
+  };
+  var VERB_FORM_FALLBACK_LESSON = { masu: 4, masen: 4, mashita: 4, mashou: 6, tai: 13,
+    te: 14, nai: 17, dict: 18, ta: 19, nakatta: 20 };
+  var VERB_FORM_GATED = { te: 1, nai: 1, dict: 1, ta: 1 };
+  function formPattern(form) { return VERB_FORM_INTRO[form] || null; }
+  function formGated(form) { return !!VERB_FORM_GATED[form]; }
   function formLesson(form) {
     var pat = VERB_FORM_INTRO[form];
     var g = (window.GRAMMATIK || []).filter(function (x) { return x.pattern === pat; })[0];
     return (g && g.lesson) || VERB_FORM_FALLBACK_LESSON[form] || 99;
   }
   function formUnlocked(form) {
+    if (!VERB_FORM_GATED[form]) return true; // ます/ましょう/たい/なかった: kein eigenes Gate
     if (!(window.SRS && window.SRS.maxUnlockedLesson)) return true;
     return window.SRS.maxUnlockedLesson() >= formLesson(form);
   }
@@ -678,5 +714,6 @@
     kanjiMeaningMC: kanjiMeaningMC, kanjiPickMC: kanjiPickMC, kanjiWriteEx: kanjiWriteEx, kanjiReadingsEx: kanjiReadingsEx,
     grammarExercises: grammarExercises,
     verbDictMC: verbDictMC, verbFormMC: verbFormMC, formUnlocked: formUnlocked,
+    formPattern: formPattern, formLesson: formLesson, formGated: formGated,
   };
 })();
