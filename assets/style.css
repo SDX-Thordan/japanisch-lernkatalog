@@ -1057,3 +1057,23 @@ a.lp-part:hover { border-color: var(--accent); }
   color: var(--accent); background: var(--chip); border-radius: 999px; padding: .1rem .5rem; margin-left: .5rem; vertical-align: middle; }
 /* ✕ ist jetzt der einzige Zeige-Ausgang (Hintergrund-Tipp schließt nicht mehr) → auf Touch größer */
 @media (max-width: 760px) { .drill-close { min-width: 2.4rem; min-height: 2.4rem; } }
+
+/* ---------- Verbformen-Trainer: Auswahlseite + Endlos-Overlay ---------- */
+.vt-sec { margin: 1.4rem 0; }
+.vt-lbl { font-size: 1.05rem; margin: 0 0 .35rem; }
+.vt-hint { color: var(--muted); font-size: .88rem; margin: 0 0 .6rem; }
+.vt-srcs .chip:disabled { opacity: .45; cursor: default; }
+/* Formen-Mehrfachauswahl: je Knopf der deutsche Name über der Beispielform. */
+.vt-forms { gap: .55rem; }
+.ex-opt.vt-form { display: flex; flex-direction: column; align-items: flex-start; gap: .1rem;
+  min-width: 8.5rem; padding: .5rem .8rem; font-family: inherit; text-align: left; position: relative; }
+.vt-form-de { font-size: .82rem; font-weight: 700; color: var(--muted); }
+.ex-opt.vt-form.sel .vt-form-de { color: var(--accent); }
+.vt-form-ja { font-family: var(--font-ja-sans); font-size: 1.05rem; color: var(--ink); }
+.ex-opt.vt-locked { opacity: .5; }
+.vt-lock { position: absolute; top: .35rem; right: .45rem; font-size: .95rem; color: var(--muted); }
+.vt-start { border-top: 1px solid var(--border); padding-top: 1rem; }
+.vt-sum { color: var(--muted); font-size: .92rem; margin: 0 0 .7rem; }
+.vt-go:disabled { opacity: .5; cursor: default; }
+/* Kopfzeile im Overlay: Richtungs-Pille links, laufender Zähler rechts. */
+.vt-top { display: flex; align-items: center; justify-content: space-between; gap: .6rem; flex-wrap: wrap; }

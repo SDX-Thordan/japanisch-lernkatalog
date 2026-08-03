@@ -142,6 +142,7 @@
       {page:'kanji',href:'kanji.html',label:'Kanji',icon:'translate'},
       {page:'verben',href:'verben.html',label:'Verben',icon:'bolt'},
       {page:'schreiben',href:'schreiben.html',label:'Schreiben',icon:'draw'},
+      {page:'verbtrainer',href:'verbtrainer.html',label:'Verbtrainer',icon:'model_training'},
       {page:'ueben',href:'ueben.html',label:'Freies Üben',icon:'school'},
     ]},
     {group:'Mein Bereich', items:[
@@ -149,7 +150,7 @@
       {page:'profil',href:'profil.html',label:'Profil',icon:'person'},
     ]},
   ];
-  const REFERENCE_PAGES=['vokabular','grammatik','kanji','verben','schreiben','ueben'];
+  const REFERENCE_PAGES=['vokabular','grammatik','kanji','verben','schreiben','verbtrainer','ueben'];
   // Untere App-Leiste: 5 Primärziele; „Nachschlagen" ist ein Hub (Einstieg Vokabular).
   const BOTTOM=[
     {page:'heute',href:'heute.html',label:'Heute',icon:'today'},
@@ -303,6 +304,104 @@
       dict:c.dict, te:c.te, ta:c.ta, nai:c.nai,
       nakatta:c.nai.replace(/ない$/,'なかった'), tai:stem+'たい'
     };
+  }
+
+  /* ============================================================  VERBFORMEN-TRAINER · Datenschicht
+     „Form A → Form B" ist KEIN Konjugieren, sondern Nachschlagen: allForms() liefert pro Verb alle
+     zehn Formen auf einmal, also entsteht jede Richtung (auch die Rückrichtung „て → ます") einfach
+     dadurch, dass zwei Spalten derselben Zeile gezogen werden. Berechnet wird zweimal — einmal auf
+     der Kana-Schreibung, einmal auf der Kanji-Schreibung (Ruby-Muster wie in renderVerben). */
+  const VT_ORDER=['dict','masu','masen','mashita','mashou','te','ta','nai','nakatta','tai'];
+  const VT_LABEL={dict:'Wörterbuchform',masu:'ます-Form',masen:'ません-Form',mashita:'ました-Form',
+    mashou:'ましょう-Form',te:'て-Form',ta:'た-Form',nai:'ない-Form',nakatta:'なかった-Form',tai:'たい-Form'};
+  // Endung, die entsteht, wenn man die Gruppe-II-Regel stur auf alles anwendet — der typische Fehler.
+  const VT_NAIVE={dict:'る',masu:'ます',masen:'ません',mashita:'ました',mashou:'ましょう',
+    te:'て',ta:'た',nai:'ない',nakatta:'なかった',tai:'たい'};
+
+  // Konjugierbare Verben einer Quelle ('all' oder eine Listen-ID), je Wörterbuchform nur einmal.
+  function vtVerbs(src){
+    const vocab=(src==='all')?(window.VOKABULAR||[])
+      :((window.SRS&&window.SRS.listItems)?window.SRS.listItems(src):[])
+        .filter(o=>o&&o.type==='vocab').map(o=>o.data);
+    const seen={}, out=[];
+    vocab.forEach(v=>{
+      if(!v||!/^V\./.test(v.pos||''))return;
+      const g=verbGroup(v.pos); if(g<=0)return;          // nicht konjugierbar
+      const kana=allForms(v.kana,g); if(!kana)return;    // z. B. Gruppe III ohne し/き
+      if(seen[kana.dict])return; seen[kana.dict]=1;
+      out.push({v:v, g:g, kana:kana, disp:allForms(writtenForm(v),g)||kana});
+    });
+    if(src!=='all')return out;
+    // Freigeschaltete Lektionen bevorzugen — aber erst NACH dem Verbfilter zählen: die frühen
+    // Lektionen enthalten kaum Verben, und ein leerer Trainer wäre schlechter als ein weiter Pool.
+    const max=(window.SRS&&window.SRS.maxUnlockedLesson)?window.SRS.maxUnlockedLesson():25;
+    const within=out.filter(o=>o.v.lesson<=max);
+    return within.length>=4?within:out;
+  }
+
+  /* Genau eine Form gewählt → die Zitierform als implizite Gegenform, damit trotzdem in beide
+     Richtungen geübt wird. Wörterbuchform zuerst (sie ist in dieser App das Stichwort); ist sie
+     gesperrt oder selbst die gewählte Form, weicht es auf ます/ません aus — die sind nie gegatet. */
+  function vtPartner(only){
+    const open=f=>!window.Exercises||!window.Exercises.formUnlocked||window.Exercises.formUnlocked(f);
+    const prefer=(only==='dict')?['masu','masen']:['dict','masu','masen'];
+    for(let i=0;i<prefer.length;i++){ if(prefer[i]!==only&&open(prefer[i]))return prefer[i]; }
+    return only==='masu'?'masen':'masu';
+  }
+  /* Geordnetes Paar [von, nach] mit garantiert A≠B — ohne Wiederholungsschleife, weil Tests
+     Math.random auf einen festen Wert setzen und eine do…while dort in den Guard liefe. */
+  function vtPair(forms,rnd){
+    rnd=rnd||Math.random;
+    const pool=(forms||[]).slice();
+    if(pool.length<2)pool.push(vtPartner(pool[0]));
+    const n=pool.length;
+    const i=Math.min(n-1,Math.floor(rnd()*n));
+    let j=Math.min(n-2,Math.floor(rnd()*(n-1))); if(j>=i)j++;
+    return [pool[i],pool[j]];
+  }
+  // Gültige Eingaben für eine Zielform: Kana, Kanji-Schreibung und die Rōmaji-Umschrift.
+  function vtAccept(o,to){
+    const kana=o.kana[to], disp=o.disp[to], acc=[kana];
+    if(disp&&disp!==kana)acc.push(disp);
+    const r=kanaToRomaji(kana); if(r)acc.push(r);
+    return acc;
+  }
+  /* Distraktoren: erst der naive Gruppe-II-Fehler, dann andere Formen DESSELBEN Verbs, zuletzt
+     dieselbe Zielform fremder Verben. Die Ausgangsform ist ausgeschlossen — sie steht ja im Prompt. */
+  let vtAllCache=null;
+  function vtOptions(o,from,to,pool){
+    const correct=o.kana[to];
+    const seen={}; seen[correct]=1; seen[o.kana[from]]=1;
+    const dis=[], push=x=>{ if(x&&!seen[x]){ seen[x]=1; dis.push(x); } };
+    push(o.kana.masu.slice(0,-2)+VT_NAIVE[to]);
+    shuffle(VT_ORDER.slice()).forEach(f=>push(o.kana[f]));
+    const wide=(pool&&pool.length>3)?pool:(vtAllCache||(vtAllCache=vtVerbs('all')));
+    let guard=0;
+    while(dis.length<3&&guard<40&&wide.length){ guard++;
+      push(wide[Math.floor(Math.random()*wide.length)].kana[to]); }
+    return shuffle([correct].concat(dis.slice(0,3)));
+  }
+  /* Eine Aufgabe „von → nach". Gewertet wird NUR die Zielform (g:<Muster>), nie die Vokabel-ID.
+     Die Richtungsangabe darf NICHT in frage/prompt stehen — ruby() legte die Lesung sonst über
+     den ganzen Satz statt über das Verb; sie steht in der Kopfzeile und im Subprompt. */
+  function vtTask(o,from,to,mode,pool){
+    const pat=(window.Exercises&&window.Exercises.formPattern)?window.Exercises.formPattern(to):null;
+    const srsId=pat?('g:'+pat):null;
+    const pDisp=o.disp[from], pKana=o.kana[from], aDisp=o.disp[to], aKana=o.kana[to];
+    const erkl=pKana+' → '+aKana+(o.v.de?' — '+o.v.de:'');
+    const q='Bilde die '+VT_LABEL[to]+'.';
+    if(mode==='mc'){
+      const optionen=vtOptions(o,from,to,pool);
+      // Auswählen ist leichter als Produzieren → halber Punktgewinn (Vorbild: Kanji-MC).
+      if(optionen.length>=2)
+        return { typ:'mc', srsId:srsId, big:true, frage:pDisp, furigana:pKana, q:q, optJa:true,
+          optionen:optionen, richtig:optionen.indexOf(aKana), erkl:erkl,
+          gradeOpts:{gainScale:0.5}, mode:'vt-mc-'+to };
+      // zu wenige Distraktoren → doch tippen lassen
+    }
+    return { typ:'input', srsId:srsId, big:true, promptJa:true, prompt:pDisp, furigana:pKana, q:q,
+      antworten:vtAccept(o,to), loesung:(aDisp!==aKana?(aDisp+'（'+aKana+'）'):aKana),
+      placeholder:'Kana oder Rōmaji …', erkl:erkl, mode:'vt-input-'+to };
   }
 
   /* ---------- Zustand für Listen-Seiten ---------- */
@@ -624,16 +723,6 @@
       const items=[];
       structuredExercises(g.pattern,plus).forEach(ex=>items.push({kind:'ex',ex:ex,srsId:'g:'+g.pattern}));
       drillable.forEach(b=>{ items.push({kind:'tr',dir:'jp2de',b:b}); items.push({kind:'tr',dir:'de2jp',b:b}); });
-      return items;
-    }});
-  }
-  // Verbformen-Runde (辞書形・て・た・ない) aus echten Verben — vom Hub & der Verben-Seite aus aufrufbar.
-  function openVerbFormPractice(){
-    openPracticeSession({ key:'verbforms', pattern:'動詞', title:'Verbformen 辞書形・て・た・ない', build:()=>{
-      const items=[];
-      [['dict','V 辞書形 (Wörterbuchform)',3],['te','V て-Form',3],['ta','V た-Form',2],['nai','V ない-Form',2]].forEach(grp=>{
-        genVerbFormExercises(grp[0],grp[2]).forEach(ex=>items.push({kind:'ex',ex:ex,srsId:'g:'+grp[1]}));
-      });
       return items;
     }});
   }
@@ -1606,19 +1695,109 @@
     const a=el('a','btn-primary page-ueben page-schreiben','<span class="msi" aria-hidden="true">draw</span> Schreiben üben');
     a.href='schreiben.html'; host.appendChild(a);
   }
-  // Freies-Üben-Hub (ueben.html): Quelle wählen → Karteikarten bzw. Verbform-Aufgaben.
+  // Freies-Üben-Hub (ueben.html): Quelle wählen → Karteikarten.
   function initUeben(){
     const root=document.getElementById('ueben-root'); if(!root)return;
     root.addEventListener('click',e=>{ const b=e.target.closest('[data-src]'); if(!b)return;
-      if(b.dataset.src==='verbforms')openVerbFormPractice(); else openFreePractice(b.dataset.src); });
+      openFreePractice(b.dataset.src); });
   }
-  // Verben-Seite: „Formen üben"-Knopf (generierte て/た/ない-Runde) in die Toolbar.
+  // Verben-Seite: Verweis auf den Verbformen-Trainer (löst den früheren festen Drill ab).
   function addVerbenFormButton(){
-    if(!window.Exercises)return;
     const host=document.querySelector('.toolbar .toolbar-row')||document.querySelector('.toolbar');
     if(!host)return;
-    const b=el('button','btn-primary page-ueben','<span class="msi" aria-hidden="true">play_arrow</span> Formen üben'); b.type='button';
-    b.addEventListener('click',openVerbFormPractice); host.appendChild(b);
+    const a=el('a','btn-primary page-ueben','<span class="msi" aria-hidden="true">play_arrow</span> Formen üben');
+    a.href='verbtrainer.html'; host.appendChild(a);
+  }
+
+  /* ---------- Verbformen-Trainer: Auswahlseite (verbtrainer.html) ---------- */
+  const VT_SRC_KEY='katalog_vt_src', VT_FORMS_KEY='katalog_vt_forms';
+  const VT_DEFAULT_FORMS=['masu','dict'];
+  function vtFormOpen(f){ return !window.Exercises||!window.Exercises.formUnlocked||window.Exercises.formUnlocked(f); }
+  // Gespeicherte Auswahl laden und gegen die aktuelle Freischaltung filtern (Lernpfad kann
+  // zurückgesetzt worden sein). Fallback-Kette: gespeichert → ます+辞書形 → ます.
+  function vtLoadForms(){
+    const raw=lsGet(VT_FORMS_KEY);
+    let sel=(raw?String(raw).split(','):VT_DEFAULT_FORMS).filter(f=>VT_LABEL[f]&&vtFormOpen(f));
+    if(!sel.length)sel=VT_DEFAULT_FORMS.filter(vtFormOpen);
+    if(!sel.length)sel=['masu'];
+    return sel;
+  }
+  function initVerbtrainer(){
+    const root=document.getElementById('vt-root');
+    if(!root||!window.SRS||!window.Exercises)return;
+    let src=lsGet(VT_SRC_KEY)||'all', forms=vtLoadForms();
+
+    function sources(){
+      const max=window.SRS.maxUnlockedLesson?window.SRS.maxUnlockedLesson():25;
+      const out=[{id:'all',label:'Alle Verben',hint:'bis L'+max,n:vtVerbs('all').length}];
+      (window.SRS.lists()||[]).forEach(l=>out.push({id:l.id,label:l.name,hint:'Liste',n:vtVerbs(l.id).length}));
+      return out;
+    }
+    function section(title,sub){
+      const s=el('section','vt-sec');
+      s.appendChild(el('h2','vt-lbl',esc(title)));
+      if(sub)s.appendChild(el('p','vt-hint',sub));
+      return s;
+    }
+    function draw(){
+      const srcs=sources();
+      // Quelle, die inzwischen leer (oder gelöscht) ist, still auf „Alle Verben" zurücknehmen.
+      const cur=srcs.filter(s=>s.id===src)[0];
+      if(!cur||!cur.n){ src='all'; lsSet(VT_SRC_KEY,src); }
+      const pool=vtVerbs(src);
+      root.innerHTML='';
+
+      /* --- Quelle (Einfachauswahl, wie die Filter-Chips im Katalog) --- */
+      const s1=section('Quelle','Woraus sollen die Verben kommen?');
+      const chips=el('div','chips vt-srcs');
+      srcs.forEach(o=>{
+        const c=el('button','chip vt-src'+(o.id===src?' on':'')); c.type='button'; c.dataset.src=o.id;
+        c.textContent=o.label+' ('+o.n+')'; c.title=o.hint;
+        if(!o.n){ c.disabled=true; c.title='Diese Liste enthält keine konjugierbaren Verben.'; }
+        else c.addEventListener('click',()=>{ src=o.id; lsSet(VT_SRC_KEY,src); draw(); });
+        chips.appendChild(c);
+      });
+      s1.appendChild(chips);
+      if(srcs.length<2)s1.appendChild(el('p','vt-hint','Eigene Listen legst du unter <a href="listen.html">Listen</a> an.'));
+      root.appendChild(s1);
+
+      /* --- Formen (Mehrfachauswahl nach dem Muster der Lesungs-Übung) --- */
+      const s2=section('Formen','Mindestens eine. Gesperrte Formen schaltest du im Lernpfad frei.');
+      const box=el('div','ex-options vt-forms');
+      const sample=pool[0];
+      VT_ORDER.forEach(f=>{
+        const open=vtFormOpen(f), on=forms.indexOf(f)!==-1;
+        const b=el('button','ex-opt vt-form'+(open?'':' vt-locked')+(on?' sel':'')); b.type='button';
+        b.dataset.form=f; b.setAttribute('aria-pressed',on?'true':'false');
+        b.innerHTML='<span class="vt-form-de">'+esc(VT_LABEL[f])+'</span>'+
+          (sample?'<span class="vt-form-ja ja">'+esc(sample.kana[f])+'</span>':'')+
+          (open?'':'<span class="msi vt-lock" aria-hidden="true">lock</span>');
+        if(!open){ b.disabled=true;
+          b.title='Ab Lektion '+window.Exercises.formLesson(f)+' — im Lernpfad freischalten.'; }
+        else b.addEventListener('click',()=>{
+          const i=forms.indexOf(f);
+          if(i===-1)forms.push(f); else if(forms.length>1)forms.splice(i,1); // eine Form muss bleiben
+          lsSet(VT_FORMS_KEY,forms.join(',')); draw();
+        });
+        box.appendChild(b);
+      });
+      s2.appendChild(box);
+      root.appendChild(s2);
+
+      /* --- Zusammenfassung + Start --- */
+      const s3=el('section','vt-sec vt-start');
+      const k=forms.length;
+      const sum=k<2
+        ? 'Nur eine Form gewählt — geübt wird in beide Richtungen gegen die '+VT_LABEL[vtPartner(forms[0])]+'.'
+        : pool.length+' Verben · '+k+' Formen · '+(k*(k-1))+' Richtungen — der Trainer läuft endlos.';
+      s3.appendChild(el('p','vt-sum',esc(pool.length?sum:'Diese Quelle enthält keine konjugierbaren Verben.')));
+      const go=el('button','btn-primary vt-go','<span class="msi" aria-hidden="true">play_arrow</span> Training starten');
+      go.type='button'; go.disabled=!pool.length;
+      go.addEventListener('click',()=>openVerbtrainer({src:src,forms:forms,label:(sources().filter(o=>o.id===src)[0]||{}).label||''}));
+      s3.appendChild(go);
+      root.appendChild(s3);
+    }
+    draw();
   }
 
   /* ============================================================  LISTEN (persönliche Vokabellisten)  */
@@ -1691,6 +1870,73 @@
     trainerRestart=start;
     const sess=sessGet(sKey);
     if(!(sess&&resume(sess)))start(); // angefangene Runde fortsetzen, sonst frisch beginnen
+  }
+
+  /* ============================================================  VERBFORMEN-TRAINER · Endlos-Overlay
+     Bewusst NICHT das drill-Overlay: der Drill lebt von einem festen Deck (Restliste sichern,
+     beantwortete Aufgabe beim Fortsetzen überspringen, Fertig-Screen bei leerem Deck). Hier wird
+     jede Aufgabe frisch gewürfelt — es gibt kein Deck, kein Rundenende und nichts zu puffern.
+     Geteilt werden nur die kleinen Bausteine: sess*, restartButton, resumedTag, makeNextButton. */
+  let vtOv=null, vtS=null;
+  function closeVerbtrainer(){ if(vtOv){ vtOv.hidden=true; document.body.classList.remove('drill-open'); } }
+  function ensureVerbtrainerDom(){
+    if(vtOv)return vtOv;
+    vtOv=el('div','lt-overlay'); vtOv.id='verbtrainer-overlay'; vtOv.hidden=true;
+    vtOv.innerHTML='<div class="lt-modal" role="dialog" aria-modal="true" aria-label="Verbformen üben">'+
+      '<div class="lt-head"><span class="lt-title"></span>'+
+        '<button class="drill-close lt-close" type="button" aria-label="Schließen"><span class="msi" aria-hidden="true">close</span></button></div>'+
+      '<div class="lt-top vt-top"><span class="drill-dir vt-dir"></span><span class="lt-prog vt-prog"></span></div>'+
+      '<div class="lt-card"><div class="lt-ex vt-ex"></div><div class="lt-next-wrap vt-next-wrap"></div></div></div>';
+    document.body.appendChild(vtOv);
+    const cl=vtOv.querySelector('.lt-close');
+    cl.addEventListener('click',closeVerbtrainer);
+    // Kein Schließen beim Klick auf den Hintergrund (versehentlicher Abbruch mitten in der Übung).
+    cl.parentNode.insertBefore(restartButton(vtRestart,()=>!!(vtS&&vtS.done>0),
+      'Zähler zurücksetzen? Die gesammelten Lernpunkte bleiben erhalten, nur die Anzeige beginnt neu.'),cl);
+    document.addEventListener('keydown',e=>{ if(!vtOv||vtOv.hidden)return;
+      if(e.key==='Escape'){ closeVerbtrainer(); return; }
+      if(e.code==='Space'){ const nx=vtOv.querySelector('.vt-next'); if(nx){ e.preventDefault(); nx.click(); } } });
+    return vtOv;
+  }
+  function vtSave(){ if(vtS)sessSet(vtS.sKey,{done:vtS.done,right:vtS.right,miss:vtS.miss}); }
+  function vtRestart(){ if(!vtS)return; vtS.done=0; vtS.right=0; vtS.miss={}; vtS.resumed=false;
+    sessClear(vtS.sKey); vtNext(); }
+  function openVerbtrainer(cfg){
+    const pool=vtVerbs(cfg.src);
+    if(!pool.length)return false;
+    vtAllCache=null; // Lernpfad kann seit dem letzten Mal weiter freigeschaltet sein
+    const ov=ensureVerbtrainerDom();
+    // Der Schlüssel kodiert die Auswahl — eine andere Quelle/Formenmenge hat ihren eigenen Zähler.
+    const sKey='verbtrainer:'+cfg.src+'|'+(cfg.forms||[]).slice().sort().join('+');
+    const s0=sessGet(sKey)||{};
+    vtS={ ov:ov, sKey:sKey, pool:pool, forms:(cfg.forms||[]).slice(),
+      done:s0.done|0, right:s0.right|0, miss:s0.miss||{}, resumed:(s0.done|0)>0 };
+    ov.querySelector('.lt-title').textContent='Verbformen · '+(cfg.label||'');
+    ov.hidden=false; document.body.classList.add('drill-open');
+    vtNext();
+    return true;
+  }
+  // „Nachschub" ist hier einfach die nächste Zufallsaufgabe — darum endet der Trainer nie.
+  function vtNext(){
+    const s=vtS; if(!s)return;
+    const q=x=>s.ov.querySelector(x);
+    const o=s.pool[Math.floor(Math.random()*s.pool.length)];
+    const pr=vtPair(s.forms), from=pr[0], to=pr[1];
+    // Zweimal falsch in Folge auf derselben ZIELFORM → Multiple Choice als Stütze;
+    // eine richtige Antwort setzt zurück, danach wird wieder getippt.
+    const mode=((s.miss[to]|0)>=2)?'mc':'input';
+    const ex=vtTask(o,from,to,mode,s.pool);
+    q('.vt-dir').innerHTML='<span class="ja">'+esc(VT_LABEL[from])+'</span> → <span class="ja">'+esc(VT_LABEL[to])+'</span>';
+    q('.vt-prog').innerHTML='Aufgabe '+(s.done+1)+' · '+s.right+' richtig'+resumedTag(s.resumed);
+    s.resumed=false;
+    const host=q('.vt-ex'), nxw=q('.vt-next-wrap');
+    host.innerHTML=''; nxw.innerHTML='';
+    window.Exercises.renderExercise(ex,host,{ onResult:ok=>{
+      s.done++; if(ok)s.right++;
+      s.miss[to]=ok?0:((s.miss[to]|0)+1);
+      vtSave(); // erst NACH der Wertung sichern → ein Abbruch davor kann nichts doppelt zählen
+      const nx=makeNextButton(vtNext,'vt-next'); nxw.appendChild(nx); nx.focus();
+    }});
   }
 
   /* ============================================================  LISTE (Detailseite einer Lernliste)
@@ -1855,7 +2101,12 @@
   }
 
   /* ============================================================  INIT  */
+  // Genau einmal aufbauen: ein zweites DOMContentLoaded (oder ein manuell gefeuertes) würde sonst
+  // die Navigation verdoppeln, Listener mehrfach binden und Seiten mit eigenem Zustand — etwa die
+  // Formenauswahl im Verbtrainer — mitten im Betrieb auf die Startwerte zurücksetzen.
+  let inited=false;
   function init(){
+    if(inited)return; inited=true;
     const page=document.body.dataset.page;
     renderNav(page);
     renderFooterVersion();
@@ -1873,6 +2124,7 @@
     if(page==='kanji')addKanjiSchreibenButton();
     if(page==='verben')addVerbenFormButton();
     if(page==='ueben')initUeben();
+    if(page==='verbtrainer')initVerbtrainer();
     if(page==='heute')initHeute();
     if(page==='profil')initProfil();
     if(page==='schreiben')initSchreiben();
@@ -1885,7 +2137,8 @@
      Vor init() gesetzt, damit Render-Code (z. B. Grammatik-Übungen) sie schon nutzen kann. */
   window.Katalog = {
     el, esc, ruby, rubyPair, norm, furiToRuby, kanaToRomaji, shuffle,
-    conjugate, allForms, verbGroup, genVerbFormExercises, sakuraPetals, sakuraSvg, lsGet, lsSet, sessGet, sessSet, sessClear
+    conjugate, allForms, verbGroup, genVerbFormExercises, sakuraPetals, sakuraSvg, lsGet, lsSet, sessGet, sessSet, sessClear,
+    vtVerbs, vtPair, vtPartner, vtTask, vtAccept, VT_ORDER, VT_LABEL
   };
 
   if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',init); else init();
