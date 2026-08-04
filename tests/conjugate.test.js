@@ -48,6 +48,16 @@ describe('conjugate() — Grundformen aus der ます-Form', () => {
     expect(c.te).toBe('行って');
     expect(c.ta).toBe('行った');
   });
+  it('Gruppe I Ausnahme あります → Verneinung ない (nicht あらない)', () => {
+    const c = K.conjugate('あります', 1);
+    expect(c.dict).toBe('ある');
+    expect(c.te).toBe('あって');   // て/た folgen der Regel
+    expect(c.ta).toBe('あった');
+    expect(c.nai).toBe('ない');    // ← die Ausnahme
+    expect(K.allForms('あります', 1).nakatta).toBe('なかった');
+    // andere る-Verben der Gruppe I bleiben regelmäßig
+    expect(K.conjugate('かえります', 1).nai).toBe('かえらない');
+  });
   it('Gruppe II: たべます → たべる/たべて/たべた/たべない', () => {
     expect(K.conjugate('たべます', 2)).toEqual({
       dict: 'たべる', te: 'たべて', ta: 'たべた', nai: 'たべない',

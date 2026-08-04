@@ -655,8 +655,22 @@ table.conj-table tbody tr:last-child th, table.conj-table tbody tr:last-child td
 [data-ext] { cursor: pointer; }
 .v-more { display: inline-block; margin-left: .4rem; color: var(--accent); font-weight: 700; transition: transform .15s; transform: rotate(0deg); }
 [data-ext].expanded .v-more { transform: rotate(90deg); }
-.v-ext { max-height: 0; overflow: hidden; opacity: 0; transition: max-height .18s ease, opacity .18s ease; }
-[data-ext].expanded .v-ext, body.searching [data-ext] .v-ext { max-height: 12rem; opacity: 1; }
+/* visibility zusätzlich zu max-height: sonst bleibt der „Alle Formen“-Knopf im zugeklappten
+   Zustand fokussierbar und anklickbar — overflow:hidden blendet nur optisch aus. */
+.v-ext { max-height: 0; overflow: hidden; opacity: 0; visibility: hidden; transition: max-height .18s ease, opacity .18s ease, visibility .18s; }
+/* Großzügiger Deckel: bei Verben stehen hier Gruppe, Hinweis, ます-Form UND Beispiel samt Notiz —
+   auf schmalen Displays umbrechen die schnell auf mehr als die früheren 12rem. */
+[data-ext].expanded .v-ext, body.searching [data-ext] .v-ext { max-height: 26rem; opacity: 1; visibility: visible; }
+/* Verbblock im aufgeklappten Bereich: Gruppen-Chip + „Alle Formen“, darunter ggf. der Hinweis. */
+.v-vgrp { display: flex; align-items: center; gap: .5rem; flex-wrap: wrap; margin-top: .3rem; }
+.v-vgrp-lbl { margin-right: 0; background: var(--chip-on); color: #fff; }
+.v-forms { display: inline-flex; align-items: center; gap: .25rem; font: inherit; font-size: .78rem; font-weight: 700;
+  color: var(--indigo); background: var(--surface-2); border: 1px solid var(--border); border-radius: 999px;
+  padding: .12rem .6rem .12rem .45rem; cursor: pointer; }
+.v-forms:hover { border-color: var(--accent); color: var(--accent-d); }
+.v-forms .msi { font-size: .95rem; }
+.v-vnote { font-size: .8rem; color: var(--indigo); background: var(--surface-2); border-left: 3px solid var(--indigo);
+  border-radius: 0 6px 6px 0; padding: .3rem .55rem; margin-top: .35rem; }
 .tr-back .readings { margin: .4rem 0; }
 .tr-back .kc-examples { border-top: 1px dashed var(--border); padding-top: .5rem; margin-top: .5rem; display: flex; flex-direction: column; gap: .3rem; }
 .tr-back .ex { font-size: .92rem; display: flex; flex-wrap: wrap; gap: .35rem; }
@@ -1003,8 +1017,8 @@ a.lp-part:hover { border-color: var(--accent); }
 .lst-rm:hover { color: #fff; background: var(--accent); }
 
 /* ===== Listen-Picker (Modal) ===== */
-.pick-overlay, .lt-overlay { position: fixed; inset: 0; z-index: 100; background: rgba(32,36,43,.55); backdrop-filter: blur(3px); display: flex; align-items: center; justify-content: center; padding: 1rem; }
-.pick-overlay[hidden], .lt-overlay[hidden] { display: none; }
+.pick-overlay, .lt-overlay, .vf-overlay { position: fixed; inset: 0; z-index: 100; background: rgba(32,36,43,.55); backdrop-filter: blur(3px); display: flex; align-items: center; justify-content: center; padding: 1rem; }
+.pick-overlay[hidden], .lt-overlay[hidden], .vf-overlay[hidden] { display: none; }
 .pick-modal { background: var(--surface); border-radius: 16px; box-shadow: 0 12px 48px rgba(20,15,5,.3); width: 100%; max-width: 440px; padding: 1.1rem 1.3rem 1.3rem; }
 .pick-head { display: flex; align-items: center; gap: .6rem; margin-bottom: .8rem; }
 .pick-title { font-weight: 800; flex: 1; }
@@ -1018,6 +1032,16 @@ a.lp-part:hover { border-color: var(--accent); }
 .pick-new { display: flex; gap: .5rem; margin-top: .8rem; }
 .pick-name { flex: 1; padding: .55rem .7rem; border: 1px solid var(--border); border-radius: 9px; font-size: .92rem; background: var(--surface); color: var(--ink); }
 .pick-msg { color: var(--good); font-size: .85rem; font-weight: 700; margin-top: .7rem; min-height: 1.1rem; }
+/* Formen-Popup: nutzt das Modal des Pickers, die Tabelle ist dieselbe wie auf der Verben-Seite. */
+.vf-modal { max-width: 460px; max-height: 88vh; overflow-y: auto; }
+.vf-title .ja { font-family: var(--font-ja-sans); font-size: 1.6rem; font-weight: 600; }
+.vf-sub { color: var(--muted); font-size: .9rem; font-weight: 600; margin: -.4rem 0 .5rem; }
+.vf-group { display: inline-block; font-size: .7rem; font-weight: 800; color: #fff; background: var(--chip-on);
+  border-radius: 999px; padding: .1rem .5rem; margin-right: .4rem; vertical-align: middle; }
+.vf-note { font-size: .82rem; color: var(--indigo); background: var(--surface-2); border-left: 3px solid var(--indigo);
+  border-radius: 0 6px 6px 0; padding: .4rem .6rem; margin-bottom: .6rem; }
+.vf-note[hidden] { display: none; }
+.vf-train { margin-top: .9rem; width: 100%; justify-content: center; }
 
 /* ===== Listen-Trainer (Modal) ===== */
 .lt-modal { background: var(--surface); border-radius: 16px; box-shadow: 0 12px 48px rgba(20,15,5,.3); width: 100%; max-width: 560px; max-height: 92vh; overflow-y: auto; padding: 1.1rem 1.3rem 1.4rem; }

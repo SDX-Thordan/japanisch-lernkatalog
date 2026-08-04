@@ -94,10 +94,13 @@ describe('Vokabular — erweiterte Bedeutung aufklappen', () => {
   it('nimmt den Beispieltext in den Suchindex der Zeile auf', () => {
     // Eine Zeile finden, deren Beispieltext ein reines ASCII-Wort (≥5) enthält,
     // das norm() unverändert lässt → robuste Teilstring-Prüfung im Suchindex.
+    // Gesucht wird gezielt im Beispiel-Block: der übrige .v-ext trägt bei Verben deutsche
+    // Beschriftungen („Gruppe“, „Alle Formen“), die absichtlich NICHT im Suchindex stehen.
     const rows = [...win.document.querySelectorAll('.item[data-ext]')];
     let found = null;
     for (const r of rows) {
-      const w = (r.querySelector('.v-ext').textContent.toLowerCase().match(/[a-z]{5,}/g) || [])[0];
+      const bsp = r.querySelector('.v-bsp-inline'); if (!bsp) continue;
+      const w = (bsp.textContent.toLowerCase().match(/[a-z]{5,}/g) || [])[0];
       if (w) { found = { r, w }; break; }
     }
     expect(found).toBeTruthy();

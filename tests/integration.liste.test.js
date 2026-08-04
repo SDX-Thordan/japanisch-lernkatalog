@@ -127,3 +127,99 @@ describe('liste.html — Üben', () => {
     expect(ov.querySelector('.lt-ex')).toBeTruthy();
   });
 });
+
+// Beim Aufklappen eines Verbs: Verbgruppe, Ausnahme-Hinweis und ein Popup mit allen Formen.
+// Verben werden gezielt gesucht — VOKABULAR[0] ist keines.
+function verbList(win, kana) {
+  // Ohne win.Katalog — app.js wird erst NACH diesem Callback ausgewertet.
+  const v = kana
+    ? win.VOKABULAR.find((x) => x.kana === kana)
+    : win.VOKABULAR.find((x) => /^V\./.test(x.pos));
+  const l = win.SRS.createList('Verben');
+  win.SRS.addToList(l.id, [win.SRS.srsId('vocab', v), win.SRS.srsId('vocab', win.VOKABULAR[0])]);
+  return { l, v };
+}
+const verbRow = (win, v) => [...win.document.querySelectorAll('#content .v-row.item')]
+  .find((r) => r.querySelector('.v-add').dataset.vid === 'v:' + v.kana + '|' + v.lesson);
+
+describe('liste.html — Verbgruppe beim Aufklappen', () => {
+  it('zeigt die Gruppe als Chip; ein Nicht-Verb bekommt keinen', () => {
+    let made;
+    const { win } = openListe('l1', (w) => { made = verbList(w); return made.l; });
+    const row = verbRow(win, made.v);
+    const chip = row.querySelector('.v-ext .v-vgrp-lbl');
+    expect(chip).toBeTruthy();
+    expect(chip.textContent).toBe('Gruppe ' + ['', 'I', 'II', 'III'][win.Katalog.verbGroup(made.v.pos)]);
+    // die ます-Form bleibt daneben stehen
+    expect(row.querySelector('.v-ext .v-masu-inline')).toBeTruthy();
+    // Nicht-Verb: kein Chip
+    const other = [...win.document.querySelectorAll('#content .v-row.item')].find((r) => r !== row);
+    expect(other.querySelector('.v-vgrp-lbl')).toBe(null);
+  });
+
+  it('„Alle Formen" öffnet das Popup und klappt die Zeile NICHT zu', () => {
+    let made;
+    const { win } = openListe('l1', (w) => { made = verbList(w); return made.l; });
+    const row = verbRow(win, made.v);
+    expect(row.classList.contains('expanded')).toBe(false);
+    click(win, row.querySelector('.v-forms'));
+    expect(row.classList.contains('expanded')).toBe(false); // Klick klappt nicht um
+    const ov = win.document.getElementById('verbforms-overlay');
+    expect(ov.hidden).toBe(false);
+    // alle acht Formen mit den Werten aus allForms
+    const g = win.Katalog.verbGroup(made.v.pos);
+    const f = win.Katalog.allForms(made.v.kana, g);
+    const cells = [...ov.querySelectorAll('.vf-table .vf-row td')].map((td) => td.textContent);
+    expect(cells).toHaveLength(8);
+    ['dict', 'masu', 'masen', 'ta', 'te', 'nai', 'tai', 'mashou'].forEach((k) => {
+      expect(cells.some((c) => c.indexOf(f[k]) !== -1), k).toBe(true);
+    });
+    expect(ov.querySelector('.vf-sub').textContent).toContain('Gruppe');
+  });
+
+  it('das Popup schließt per ✕, Hintergrund-Klick und Escape', () => {
+    let made;
+    const { win } = openListe('l1', (w) => { made = verbList(w); return made.l; });
+    const open = () => click(win, verbRow(win, made.v).querySelector('.v-forms'));
+    const ov = () => win.document.getElementById('verbforms-overlay');
+    open(); click(win, ov().querySelector('.vf-close'));
+    expect(ov().hidden).toBe(true);
+    open(); click(win, ov()); // Hintergrund
+    expect(ov().hidden).toBe(true);
+    open(); win.document.dispatchEvent(new win.KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
+    expect(ov().hidden).toBe(true);
+  });
+
+  it('eine Formzeile im Popup zeigt die Bildungsregel', () => {
+    let made;
+    const { win } = openListe('l1', (w) => { made = verbList(w); return made.l; });
+    click(win, verbRow(win, made.v).querySelector('.v-forms'));
+    const first = win.document.querySelector('#verbforms-overlay .vf-row');
+    expect(first.classList.contains('open')).toBe(false);
+    click(win, first);
+    expect(first.classList.contains('open')).toBe(true);
+    expect(first.querySelector('.vf-rule').textContent).toContain('Bildung');
+  });
+});
+
+describe('liste.html — Ausnahme-Hinweise', () => {
+  const noteOf = (win, v) => {
+    const n = verbRow(win, v).querySelector('.v-ext .v-vnote');
+    return n ? n.textContent : '';
+  };
+  it('行きます nennt die て-/た-Form, あります die Verneinung', () => {
+    let made;
+    let { win } = openListe('l1', (w) => { made = verbList(w, 'いきます'); return made.l; });
+    expect(noteOf(win, made.v)).toContain('行って');
+    ({ win } = openListe('l1', (w) => { made = verbList(w, 'あります'); return made.l; }));
+    expect(noteOf(win, made.v)).toContain('ない');
+  });
+
+  it('帰ります wird als falsches Gruppe-II-Verb markiert, たべます gar nicht', () => {
+    let made;
+    let { win } = openListe('l1', (w) => { made = verbList(w, 'かえります'); return made.l; });
+    expect(noteOf(win, made.v)).toContain('Gruppe II');
+    ({ win } = openListe('l1', (w) => { made = verbList(w, 'たべます'); return made.l; }));
+    expect(noteOf(win, made.v)).toBe('');
+  });
+});
