@@ -240,7 +240,10 @@
     const dict = base + u;
     let teEnd = TE[u], taEnd = TA[u];
     if(/いく$/.test(dict) || /行く$/.test(dict)){ teEnd='って'; taEnd='った'; } // Ausnahme 行く
-    return { dict, te:base+teEnd, ta:base+taEnd, nai:base+U2A[u]+'ない' };
+    // Ausnahme ある: die Verneinung ist ない, nicht das regelmäßige „あらない“ (s. GRAMMATIK L9).
+    // Exakter Vergleich, damit Komposita auf ～ある nicht mitgefangen werden.
+    const nai = (dict==='ある') ? 'ない' : (base+U2A[u]+'ない');
+    return { dict, te:base+teEnd, ta:base+taEnd, nai:nai };
   }
 
   // Anzeige-Form eines Verbs: die WÖRTERBUCHFORM ist das Stichwort (wichtiger als ます);
@@ -251,6 +254,28 @@
     const kana=conjugate(v.kana,g); if(!kana)return null;
     const written=(v.kanji&&v.kanji.length&&v.kanji!==v.kana)?conjugate(v.kanji,g):null;
     return { kana:kana.dict, written:(written&&written.dict)||kana.dict };
+  }
+
+  /* ---------- Verbgruppe benennen und Stolpersteine am einzelnen Verb vermerken ----------
+     Es bleibt beim Drei-Gruppen-System des Lehrbuchs (する UND くる stecken in III). Verben, die
+     man sich trotzdem merken muss, bekommen keinen eigenen Gruppen-Namen, sondern einen Hinweis. */
+  const VERB_GROUP_NAMES={1:'Gruppe I （五段）',2:'Gruppe II （一段）',3:'Gruppe III （unregelmäßig）'};
+  const VERB_GROUP_SHORT={1:'Gruppe I',2:'Gruppe II',3:'Gruppe III'};
+  // Verben, deren gebildete Formen von der Regel ihrer Gruppe abweichen (Schlüssel = ます-Form).
+  const VERB_NOTES={
+    'いきます':'Ausnahme: て-/た-Form ist 行って／行った (nicht 行いて).',
+    'あります':'Ausnahme: die Verneinung ist ない (nicht あらない).'
+  };
+  // え-/い-Reihe: endet die Wörterbuchform auf eines dieser Kana + る, sieht sie nach Gruppe II aus.
+  const EI_ROW=/[えけげせぜてでねへべめれいきぎしじちぢにひびみり]る$/;
+  /* Kurzer Hinweistext zu einem Verb — oder '' . Die „falschen Ichidan“ (帰る・入る・知る・切る・
+     要る) werden per Regel erkannt statt aufgelistet, damit später ergänzte Verben mitgreifen. */
+  function verbIrregularNote(v,g,dictKana){
+    const key=cleanVerb(v&&v.kana);
+    if(VERB_NOTES[key])return VERB_NOTES[key];
+    if(g===1&&EI_ROW.test(dictKana||''))
+      return 'Sieht wie Gruppe II aus (Wörterbuchform auf ～る), gehört aber zu Gruppe I.';
+    return '';
   }
 
   /* ---------- Generierte Verb-Form-Übungen (て/た/ない/辞書形) aus echten Verben ---------- */
@@ -419,6 +444,8 @@
         const a=e.target.closest('.v-add'); if(a){ e.stopPropagation(); openListPicker([a.dataset.vid],a.dataset.word); return; }
         const al=e.target.closest('.v-add-lesson'); if(al){ const L=+al.dataset.lesson; const ids=(window.VOKABULAR||[]).filter(v=>v.lesson===L).map(v=>'v:'+v.kana+'|'+v.lesson); openListPicker(ids,'Lektion '+L); return; }
       }
+      // „Alle Formen“ öffnet das Popup — vor dem Toggle, sonst klappt die Zeile dabei zu.
+      const vf=e.target.closest('.v-forms'); if(vf){ e.stopPropagation(); openVerbForms(vocabById(vf.dataset.vid)); return; }
       // Klick auf die Karte klappt die erweiterte Bedeutung (Beispiel) auf/zu.
       const row=e.target.closest('.v-row.item'); if(row&&row.dataset.ext)row.classList.toggle('expanded');
     });
@@ -492,6 +519,21 @@
     const kana=keys.map(k=>f[k]).filter(Boolean);
     return kana.concat(kana.map(kanaToRomaji)).concat(keys.map(k=>disp[k]).filter(Boolean)).join(' ');
   }
+  function vocabById(id){
+    const m=/^v:(.*)\|(\d+)$/.exec(String(id||'')); if(!m)return null;
+    return (window.VOKABULAR||[]).filter(v=>v.kana===m[1]&&String(v.lesson)===m[2])[0]||null;
+  }
+  /* Verb-Block für den aufgeklappten Bereich: Gruppe + „Alle Formen“ + ggf. Ausnahme-Hinweis.
+     Geteilt von der Katalogzeile (vokabular.html/liste.html) und der Listen-Übersicht. */
+  function verbExtraHtml(w){
+    const g=verbGroup(w.pos||''); if(g<=0)return '';
+    const f=allForms(w.kana,g); if(!f)return '';
+    const note=verbIrregularNote(w,g,f.dict);
+    return '<div class="v-vgrp"><span class="v-masu-lbl v-vgrp-lbl">'+esc(VERB_GROUP_SHORT[g])+'</span>'+
+      '<button class="v-forms" type="button" data-vid="v:'+esc(w.kana)+'|'+w.lesson+'">'+
+        '<span class="msi" aria-hidden="true">table_rows</span> Alle Formen</button></div>'+
+      (note?'<div class="v-vnote">'+esc(note)+'</div>':'');
+  }
   function vocabRow(w,listsOn){
     // Verben: Stichwort = Wörterbuchform; die ます-Form erscheint erst beim Aufklappen.
     const dd=verbDictDisplay(w);
@@ -507,7 +549,7 @@
     const masuLine=dd?'<div class="v-masu-inline"><span class="v-masu-lbl">ます-Form</span> <span class="ja">'+esc(masuPrompt(w))+'</span></div>':'';
     const bspLine=bsp?'<div class="v-bsp-inline"><span class="ja">'+furiToRuby(bsp.jp)+'</span> — '+esc(bsp.de)+(bsp.note?'<span class="v-note"> · '+esc(bsp.note)+'</span>':'')+'</div>':'';
     const ext=(bsp||dd)?'<span class="v-more" aria-hidden="true" title="Mehr anzeigen">›</span>'+
-      '<div class="v-ext">'+masuLine+bspLine+'</div>':'';
+      '<div class="v-ext">'+(dd?verbExtraHtml(w):'')+masuLine+bspLine+'</div>':'';
     row.innerHTML='<span class="v-score">'+scoreBadgeHtml('v:'+w.kana+'|'+w.lesson)+'</span>'+
       '<div class="v-main">'+(showKana?'<div class="v-read ja">'+esc(readKana)+'</div>':'')+'<div class="v-word ja">'+esc(written)+'</div></div>'+
       '<div class="v-mean de hideable">'+esc(w.de)+ext+'</div>'+
@@ -799,15 +841,14 @@
       const disp=allForms(dispSrc,g)||kana;
       list.push({v,g,kana,disp});
     });
-    const names={1:'Gruppe I （五段）',2:'Gruppe II （一段）',3:'Gruppe III （unregelmäßig）'};
     [1,2,3].forEach(g=>{
       const arr=list.filter(o=>o.g===g); if(!arr.length)return;
       const group=el('section','group'); group.dataset.group=String(g);
-      group.appendChild(groupHead(names[g],'aus der Wörterbuchform gebildet',arr.length));
+      group.appendChild(groupHead(VERB_GROUP_NAMES[g],'aus der Wörterbuchform gebildet',arr.length));
       const grid=el('div','verb-grid'); arr.forEach(o=>grid.appendChild(verbCard(o)));
       group.appendChild(grid); content.appendChild(group);
     });
-    buildChips([1,2,3], g=>({1:'Gruppe I',2:'Gruppe II',3:'Gruppe III'}[g]));
+    buildChips([1,2,3], g=>VERB_GROUP_SHORT[g]);
     // Klick auf den Karten-Kopf klappt die Verbkarte auf/zu; Klick/Enter auf eine Form-Zeile zeigt die Bildungsregel.
     const toggleRow=row=>{ const open=row.classList.toggle('open'); row.setAttribute('aria-expanded',open?'true':'false'); };
     content.addEventListener('click',e=>{ const h=e.target.closest('.card-toggle');
@@ -832,15 +873,20 @@
     };
     const m=R[key]||{}; return m[g]||m[0]||'';
   }
-  function verbCard(o){
-    const {v,g,kana,disp}=o;
-    const body=VERB_ROWS.map(([lbl,key])=>{
+  /* Die Formen-Tabelle als reiner String — geteilt von der Verbkarte (verben.html) und dem
+     Formen-Popup, damit VERB_ROWS und verbRule die einzige Quelle bleiben. */
+  function verbFormsTableHtml(g,kana,disp){
+    return VERB_ROWS.map(([lbl,key])=>{
       const rule=verbRule(key,g);
       return '<tr class="vf-row" tabindex="0" role="button" aria-expanded="false"><th>'+lbl+
         (rule?'<div class="vf-rule"><b>Bildung:</b> '+rule+'</div>':'')+
         '</th><td class="ja">'+rubyPair(disp[key],kana[key])+'</td></tr>';
     }).join('');
-    const gname={1:'Gruppe I',2:'Gruppe II',3:'Gruppe III'}[g];
+  }
+  function verbCard(o){
+    const {v,g,kana,disp}=o;
+    const body=verbFormsTableHtml(g,kana,disp);
+    const gname=VERB_GROUP_SHORT[g];
     const card=el('article','verb-card item collapsible collapsed'); card.dataset.filter=String(g);
     card.dataset.search=norm([v.kana,v.kanji,v.romaji,v.de,Object.keys(kana).map(k=>kana[k]+' '+kanaToRomaji(kana[k])).join(' ')].join(' '));
     card.innerHTML=
@@ -1563,6 +1609,49 @@
     document.querySelectorAll('.gp-add').forEach(b=>{ const id='g:'+b.dataset.pattern; if(!set.has(id))return;
       b.textContent=addBtnLabel(id); b.title=addBtnTitle(id,'Zur Lernliste hinzufügen'); b.classList.toggle('in-list',inListCount(id)>0); });
   }
+  /* ---------- Formen-Popup: alle Verbformen auf einen Blick ----------
+     Reines Anzeige-Popup (keine Übung) — daher nach dem Vorbild des Listen-Pickers: Schließen per
+     Hintergrund-Klick, ✕ und Escape, und KEIN body.drill-open (das gehört den Übungs-Overlays). */
+  let vfp=null;
+  function ensureVerbFormsPopup(){
+    if(vfp)return vfp;
+    const ov=el('div','vf-overlay'); ov.id='verbforms-overlay'; ov.hidden=true;
+    ov.innerHTML='<div class="pick-modal vf-modal" role="dialog" aria-modal="true" aria-label="Verbformen">'+
+      '<div class="pick-head"><span class="pick-title vf-title"></span>'+
+        '<button class="drill-close vf-close" type="button" aria-label="Schließen"><span class="msi" aria-hidden="true">close</span></button></div>'+
+      '<div class="vf-sub"></div><div class="vf-note"></div>'+
+      '<table class="vforms vf-table"></table>'+
+      '<a class="btn vf-train" href="verbtrainer.html"><span class="msi" aria-hidden="true">play_arrow</span> Formen üben</a></div>';
+    document.body.appendChild(ov);
+    const close=()=>{ ov.hidden=true; };
+    ov.addEventListener('click',e=>{ if(e.target===ov)close(); });
+    ov.querySelector('.vf-close').addEventListener('click',close);
+    document.addEventListener('keydown',e=>{ if(!ov.hidden&&e.key==='Escape')close(); });
+    // Klick/Enter auf eine Formzeile zeigt die Bildungsregel — wie auf der Verben-Seite.
+    const toggleRow=row=>{ const open=row.classList.toggle('open'); row.setAttribute('aria-expanded',open?'true':'false'); };
+    ov.addEventListener('click',e=>{ const row=e.target.closest('.vf-row'); if(row)toggleRow(row); });
+    ov.addEventListener('keydown',e=>{ if(e.key!=='Enter'&&e.code!=='Space')return;
+      const row=e.target.closest('.vf-row'); if(row){ e.preventDefault(); toggleRow(row); } });
+    vfp={ ov, title:ov.querySelector('.vf-title'), sub:ov.querySelector('.vf-sub'),
+      note:ov.querySelector('.vf-note'), table:ov.querySelector('.vf-table') };
+    return vfp;
+  }
+  // Öffnet das Popup für eine Vokabel; tut nichts, wenn es kein konjugierbares Verb ist.
+  function openVerbForms(v){
+    if(!v)return false;
+    const g=verbGroup(v.pos||''); if(g<=0)return false;
+    const kana=allForms(v.kana,g); if(!kana)return false;
+    const disp=allForms(writtenForm(v),g)||kana;
+    const p=ensureVerbFormsPopup();
+    p.title.innerHTML='<span class="ja">'+rubyPair(disp.dict,kana.dict)+'</span>';
+    p.sub.innerHTML='<span class="vf-group">'+esc(VERB_GROUP_NAMES[g])+'</span> '+esc(v.de||'');
+    const note=verbIrregularNote(v,g,kana.dict);
+    p.note.innerHTML=note?esc(note):''; p.note.hidden=!note;
+    p.table.innerHTML=verbFormsTableHtml(g,kana,disp);
+    p.ov.hidden=false;
+    return true;
+  }
+
   let picker=null;
   function ensurePicker(){
     if(picker)return picker;
@@ -2041,12 +2130,17 @@
       box.innerHTML='';
       items.forEach(o=>{ const row=el('div','lst-item');
         const bsp=o.type==='vocab'?(window.VOKABULAR_BEISPIELE||{})[o.data.kana+'|'+o.data.lesson]:null;
-        // Erweiterte Bedeutung (Beispiel + Notiz) klappt per Klick auf die Zeile auf (nur Vokabeln).
-        const ext=bsp?'<span class="v-more" aria-hidden="true" title="Beispiel anzeigen">›</span>'+
-          '<div class="v-ext"><div class="v-bsp-inline"><span class="ja">'+furiToRuby(bsp.jp)+'</span> — '+esc(bsp.de)+(bsp.note?'<span class="v-note"> · '+esc(bsp.note)+'</span>':'')+'</div></div>':'';
+        // Verben klappen auch OHNE Beispielsatz auf — dort stehen Gruppe und „Alle Formen“.
+        const vex=o.type==='vocab'?verbExtraHtml(o.data):'';
+        // Erweiterte Bedeutung (Verbblock, Beispiel + Notiz) klappt per Klick auf die Zeile auf.
+        const ext=(bsp||vex)?'<span class="v-more" aria-hidden="true" title="Mehr anzeigen">›</span>'+
+          '<div class="v-ext">'+vex+(bsp?'<div class="v-bsp-inline"><span class="ja">'+furiToRuby(bsp.jp)+'</span> — '+esc(bsp.de)+(bsp.note?'<span class="v-note"> · '+esc(bsp.note)+'</span>':'')+'</div>':'')+'</div>':'';
         const tag=o.type!=='vocab'?'<span class="lst-tag">'+(o.type==='kanji'?'漢字':'文法')+'</span>':'';
         row.innerHTML='<span class="lst-jp ja">'+itemFrontHtml(o)+'</span><span class="lst-de">'+tag+esc(itemMeaning(o))+ext+'</span>';
-        if(bsp){ row.dataset.ext='1'; row.addEventListener('click',e=>{ if(e.target.closest('.lst-rm'))return; row.classList.toggle('expanded'); }); }
+        if(bsp||vex){ row.dataset.ext='1'; row.addEventListener('click',e=>{
+          if(e.target.closest('.lst-rm'))return;
+          const vf=e.target.closest('.v-forms'); if(vf){ e.stopPropagation(); openVerbForms(vocabById(vf.dataset.vid)); return; }
+          row.classList.toggle('expanded'); }); }
         const rm=el('button','lst-rm','<span class="msi" aria-hidden="true">close</span>'); rm.type='button'; rm.title='Aus Liste entfernen';
         // Nur die Zeile entfernen und Zähler/Buttons aktualisieren — NICHT die ganze Seite neu
         // zeichnen, sonst klappt die geöffnete Einträge-Ansicht zu.

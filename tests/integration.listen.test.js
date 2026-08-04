@@ -166,6 +166,28 @@ describe('Listen-Seite', () => {
     // Klick auf den Entfernen-Button klappt NICHT auf (sondern entfernt).
   });
 
+  it('Verben zeigen Gruppe und „Alle Formen"; der Knopf klappt die Zeile nicht zu', () => {
+    const verb = win.VOKABULAR.find((v) => /^V\./.test(v.pos));
+    const l = win.SRS.createList('Verb-Liste');
+    win.SRS.addToList(l.id, [win.SRS.srsId('vocab', verb), win.SRS.srsId('vocab', win.VOKABULAR[0])]);
+    win.document.getElementById('lst-create-name').value = 'x';
+    click(win.document.getElementById('lst-create'));
+    click(win.document.querySelector('.lst-show'));
+    const rows = [...win.document.querySelectorAll('.lst-item')];
+    const row = rows.find((r) => r.querySelector('.v-vgrp-lbl'));
+    expect(row).toBeTruthy();
+    expect(row.querySelector('.v-vgrp-lbl').textContent).toMatch(/^Gruppe (I|II|III)$/);
+    // das Nicht-Verb bleibt ohne Chip
+    expect(rows.filter((r) => r.querySelector('.v-vgrp-lbl'))).toHaveLength(1);
+    // Popup öffnen, ohne die Zeile umzuklappen
+    expect(row.classList.contains('expanded')).toBe(false);
+    click(row.querySelector('.v-forms'));
+    expect(row.classList.contains('expanded')).toBe(false);
+    const ov = win.document.getElementById('verbforms-overlay');
+    expect(ov.hidden).toBe(false);
+    expect(ov.querySelectorAll('.vf-table .vf-row')).toHaveLength(8);
+  });
+
   it('Eintrag entfernen lässt die Einträge-Ansicht offen und aktualisiert den Zähler', () => {
     const l = win.SRS.createList('Entfern-Test');
     win.SRS.addToList(l.id, win.VOKABULAR.slice(0, 3).map((v) => win.SRS.srsId('vocab', v)));
