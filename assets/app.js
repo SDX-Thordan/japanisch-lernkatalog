@@ -543,7 +543,9 @@
     const row=el('div','v-row item'); row.dataset.filter=String(w.lesson);
     row.dataset.type=vocabType(w.pos);
     const bsp=(window.VOKABULAR_BEISPIELE||{})[w.kana+'|'+w.lesson];
-    row.dataset.search=norm([w.kanji,w.kana,w.romaji,w.de,w.pos,verbSearchIndex(w),(bsp?bsp.jp+' '+bsp.de+' '+(bsp.note||''):'')].join(' '));
+    // Nur Kerndaten des Eintrags — der Beispielsatz wird zwar angezeigt, aber NICHT durchsucht:
+    // sonst trifft jedes deutsche Wort aus einer Beispielübersetzung fremde Vokabeln.
+    row.dataset.search=norm([w.kanji,w.kana,w.romaji,w.de,w.pos,verbSearchIndex(w)].join(' '));
     // Erweiterte Infos (ます-Form bei Verben, Beispielsatz + Notiz) klappen per Klick auf.
     if(bsp||dd)row.dataset.ext='1';
     const masuLine=dd?'<div class="v-masu-inline"><span class="v-masu-lbl">ます-Form</span> <span class="ja">'+esc(masuPrompt(w))+'</span></div>':'';
@@ -602,7 +604,10 @@
       (b.de?'<span class="ex-trans hideable">'+esc(b.de)+'</span>':'')+'</li>').join('');
     const drillable=all.filter(b=>b.jp&&b.de);
     const card=el('article','gp item collapsible collapsed'); card.dataset.filter=String(L);
-    const gSearch=norm([g.pattern,g.title,g.bildung,g.erklaerung,all.map(b=>b.jp+' '+(b.r||'')+' '+b.de).join(' ')].join(' '));
+    // Muster und Titel — weder Beispielsätze noch die Erklärtexte. Die Rōmaji stünden sonst nur in
+    // den Beispielen (das Muster selbst ist rein japanisch), darum wird die Umschrift aus dem
+    // MUSTER erzeugt: „のほうが“ → „nohouga“, damit „houga“ weiterhin trifft.
+    const gSearch=norm([g.pattern,g.title,kanaToRomaji(g.pattern)].join(' '));
     card.dataset.search=gSearch+' '+gSearch.replace(/\s+/g,'');
     card.innerHTML=
       '<div class="gp-head card-toggle">'+scoreBadgeHtml('g:'+g.pattern)+'<span class="gp-pattern">'+esc(g.pattern)+'</span>'+
@@ -996,8 +1001,13 @@
   }
   function applyFilter(){
     const q=norm(query.trim()); let shown=0;
+    // Zusätzlich ohne Leerzeichen vergleichen: „hou ga“ soll die zusammenhängende Umschrift
+    // „nohouga“ treffen. Die Indizes führen dafür eine leerzeichenfreie Zweitfassung.
+    const qs=q.replace(/\s+/g,'');
     document.body.classList.toggle('searching',q.length>0);
-    items.forEach(it=>{ const okF=activeFilter==='all'||it.dataset.filter===activeFilter; const okQ=!q||(it.dataset.search||'').indexOf(q)!==-1;
+    items.forEach(it=>{ const idx=it.dataset.search||'';
+      const okF=activeFilter==='all'||it.dataset.filter===activeFilter;
+      const okQ=!q||idx.indexOf(q)!==-1||(!!qs&&idx.indexOf(qs)!==-1);
       const okT=activeType==='all'||it.dataset.type===activeType;
       const vis=okF&&okQ&&okT; it.classList.toggle('hidden',!vis); if(vis)shown++; });
     groups.forEach(g=>{ const n=g.querySelectorAll('.item:not(.hidden)').length; g.classList.toggle('hidden',n===0);
@@ -1031,7 +1041,12 @@
     if(fltBtn)fltBtn.addEventListener('click',()=>{ const open=!body.classList.toggle('filters-collapsed'); setPressed(fltBtn,open); lsSet('katalog_filters',open?'open':'collapsed'); });
     applyFilter();
   }
-  function initSearch(){ const input=document.getElementById('search-input'); if(!input)return; input.addEventListener('input',()=>{ query=input.value; applyFilter(); }); }
+  function initSearch(){ const input=document.getElementById('search-input'); if(!input)return;
+    input.addEventListener('input',()=>{ query=input.value; applyFilter(); });
+    // Gefiltert wird live beim Tippen — die „Suchen“-Taste hat also nichts mehr zu tun und soll
+    // nur noch die Bildschirmtastatur schließen, die sonst die Trefferliste verdeckt.
+    input.addEventListener('keydown',e=>{ if(e.key==='Enter'){ e.preventDefault(); input.blur(); } });
+  }
 
   /* ============================================================  Karteikarten-Helfer (Heute)  */
   function shuffle(a){ for(let i=a.length-1;i>0;i--){ const j=Math.floor(Math.random()*(i+1)); const t=a[i]; a[i]=a[j]; a[j]=t; } return a; }

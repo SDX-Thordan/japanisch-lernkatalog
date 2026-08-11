@@ -104,3 +104,120 @@ describe('Kanji-Suche: Kun-Lesung ohne Trennstrich', () => {
     expect(cards.some((c) => c.querySelector('.kanji-char').textContent === '見')).toBe(true);
   });
 });
+
+describe('Suche greift NICHT in Beispieltexte', () => {
+  let win, verb, word;
+  beforeEach(() => {
+    win = page(VOCAB_BODY, ['assets/data/vokabular.js', 'assets/data/vokabular_beispiele.js', 'assets/srs.js', 'assets/app.js']);
+    // Eine Vokabel suchen, deren Beispielübersetzung ein markantes Wort enthält,
+    // das in ihren eigenen Kerndaten nicht vorkommt.
+    const K = win.Katalog;
+    for (const v of win.VOKABULAR) {
+      const b = win.VOKABULAR_BEISPIELE[v.kana + '|' + v.lesson]; if (!b) continue;
+      const core = K.norm([v.kanji, v.kana, v.romaji, v.de, v.pos].join(' '));
+      const w = (b.de.toLowerCase().match(/[a-zäöüß]{6,}/g) || []).find((x) => core.indexOf(K.norm(x)) === -1);
+      if (w) { verb = v; word = w; break; }
+    }
+  });
+
+  it('ein Wort, das nur im Beispielsatz steht, liefert keine Treffer', () => {
+    expect(word).toBeTruthy();
+    search(win, word);
+    const hit = visibleRows(win, '.v-row.item')
+      .some((r) => r.querySelector('.v-add').dataset.vid === 'v:' + verb.kana + '|' + verb.lesson);
+    expect(hit).toBe(false);
+  });
+
+  it('dieselbe Vokabel bleibt über ihre Kerndaten auffindbar', () => {
+    const findsIt = (q) => {
+      search(win, q);
+      return visibleRows(win, '.v-row.item')
+        .some((r) => r.querySelector('.v-add').dataset.vid === 'v:' + verb.kana + '|' + verb.lesson);
+    };
+    expect(findsIt(verb.kana)).toBe(true);
+    expect(findsIt(verb.de)).toBe(true);
+  });
+
+  it('der Beispielsatz wird weiterhin angezeigt — nur nicht durchsucht', () => {
+    expect(win.document.querySelectorAll('.v-bsp-inline').length).toBeGreaterThan(20);
+  });
+});
+
+describe('Kanji-Beispielwörter bleiben durchsuchbar', () => {
+  it('ein Beispielwort findet sein Kanji (bewusste Ausnahme)', () => {
+    const win = page(KANJI_BODY, ['assets/data/kanji.js', 'assets/srs.js', 'assets/app.js']);
+    const k = win.KANJI.find((x) => (x.examples || []).length);
+    const ex = k.examples[0];
+    search(win, ex.w);
+    const cards = visibleRows(win, '.kanji-card.item');
+    expect(cards.some((c) => c.querySelector('.kanji-char').textContent === k.k)).toBe(true);
+  });
+});
+
+describe('Grammatik: Rōmaji ohne Beispieltext', () => {
+  const GRAMMAR_BODY = `<!DOCTYPE html><html><body data-page="grammatik">
+    <input id="search-input" type="search"><div id="filters"></div><p id="count"></p>
+    <div id="content"></div><div id="empty" class="hidden"></div>
+  </body></html>`;
+  let win, card;
+  beforeEach(() => {
+    win = page(GRAMMAR_BODY, ['assets/data/grammatik.js', 'assets/data/grammatik_extra.js',
+      'assets/data/grammatik_furigana.js', 'assets/data/grammatik_plus.js', 'assets/srs.js', 'assets/app.js']);
+    card = [...win.document.querySelectorAll('.gp.item')]
+      .find((c) => c.querySelector('.gp-pattern').textContent.indexOf('のほうが') !== -1);
+  });
+
+  it('die Umschrift stammt aus dem Muster — alle Schreibweisen treffen', () => {
+    expect(card).toBeTruthy();
+    ['ほうが', 'houga', 'hou ga', 'hō ga', 'yori'].forEach((q) => {
+      search(win, q);
+      expect(visibleRows(win, '.gp.item').includes(card), q).toBe(true);
+    });
+  });
+
+  it('ein Wort aus einem Beispielsatz findet das Muster nicht mehr', () => {
+    const g = win.GRAMMATIK.find((x) => x.pattern.indexOf('のほうが') !== -1);
+    // „Sommer“ steht nur in der Übersetzung eines Beispielsatzes, nicht im Muster/Titel
+    const w = g.beispiele.map((b) => b.de).join(' ').match(/Sommer/);
+    expect(w).toBeTruthy();
+    search(win, 'Sommer');
+    expect(visibleRows(win, '.gp.item').includes(card)).toBe(false);
+  });
+});
+
+describe('Suchen-Taste schließt die Tastatur', () => {
+  let win, input;
+  beforeEach(() => {
+    win = page(VOCAB_BODY, ['assets/data/vokabular.js', 'assets/srs.js', 'assets/app.js']);
+    input = win.document.getElementById('search-input');
+  });
+  const enter = () => input.dispatchEvent(new win.KeyboardEvent('keydown', { key: 'Enter', bubbles: true, cancelable: true }));
+
+  it('Enter nimmt den Fokus vom Suchfeld (die Bildschirmtastatur geht zu)', () => {
+    input.focus();
+    expect(win.document.activeElement).toBe(input);
+    enter();
+    expect(win.document.activeElement).not.toBe(input);
+  });
+
+  it('der Suchbegriff und die Trefferliste bleiben erhalten', () => {
+    search(win, win.VOKABULAR[0].kana);
+    const before = visibleRows(win, '.v-row.item').length;
+    expect(before).toBeGreaterThan(0);
+    input.focus(); enter();
+    expect(input.value).toBe(win.VOKABULAR[0].kana);
+    expect(visibleRows(win, '.v-row.item').length).toBe(before);
+  });
+
+  it('Enter löst kein Standardverhalten aus (kein Formular-Absenden)', () => {
+    const ev = new win.KeyboardEvent('keydown', { key: 'Enter', bubbles: true, cancelable: true });
+    input.dispatchEvent(ev);
+    expect(ev.defaultPrevented).toBe(true);
+  });
+
+  it('andere Tasten lassen den Fokus in Ruhe', () => {
+    input.focus();
+    input.dispatchEvent(new win.KeyboardEvent('keydown', { key: 'a', bubbles: true, cancelable: true }));
+    expect(win.document.activeElement).toBe(input);
+  });
+});
