@@ -79,11 +79,16 @@ describe('Grammatik-Seite', () => {
     hou.beispiele.forEach((b) => expect(win.GRAMMATIK_FURIGANA[b.jp]).toBeTruthy());
     // „Mehr erklären“ samt Übungen vorhanden
     expect(win.GRAMMATIK_PLUS[hou.pattern].uebungen.length).toBeGreaterThan(0);
-    // Suchindex trifft Kana UND die gängigen Rōmaji-Schreibweisen
+    // Die Suche findet die Karte über Kana UND die gängigen Rōmaji-Schreibweisen.
+    // Geprüft wird der ECHTE Filterlauf: die Umschrift stammt aus dem Muster, und „hou ga“
+    // trifft die zusammenhängende Form „nohouga“ über den leerzeichen-unempfindlichen Vergleich.
     const card = [...win.document.querySelectorAll('.gp.item')]
       .find((c) => c.querySelector('.gp-pattern').textContent.indexOf('のほうが') !== -1);
+    const input = win.document.getElementById('search-input');
     ['ほうが', 'houga', 'hou ga', 'hō ga'].forEach((q) => {
-      expect(card.dataset.search.indexOf(win.Katalog.norm(q))).toBeGreaterThan(-1);
+      input.value = q;
+      input.dispatchEvent(new win.Event('input', { bubbles: true }));
+      expect(card.classList.contains('hidden'), q).toBe(false);
     });
   });
 });

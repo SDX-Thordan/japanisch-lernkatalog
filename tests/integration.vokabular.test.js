@@ -91,19 +91,22 @@ describe('Vokabular — erweiterte Bedeutung aufklappen', () => {
     expect(row.dataset.search).toContain(win.Katalog.norm(c.dict));
   });
 
-  it('nimmt den Beispieltext in den Suchindex der Zeile auf', () => {
-    // Eine Zeile finden, deren Beispieltext ein reines ASCII-Wort (≥5) enthält,
-    // das norm() unverändert lässt → robuste Teilstring-Prüfung im Suchindex.
-    // Gesucht wird gezielt im Beispiel-Block: der übrige .v-ext trägt bei Verben deutsche
-    // Beschriftungen („Gruppe“, „Alle Formen“), die absichtlich NICHT im Suchindex stehen.
+  it('nimmt den Beispieltext NICHT in den Suchindex auf', () => {
+    // Der Beispielsatz wird weiterhin angezeigt, ist aber nicht durchsuchbar: sonst trifft jedes
+    // deutsche Wort aus einer Beispielübersetzung fremde Vokabeln.
     const rows = [...win.document.querySelectorAll('.item[data-ext]')];
     let found = null;
     for (const r of rows) {
       const bsp = r.querySelector('.v-bsp-inline'); if (!bsp) continue;
-      const w = (bsp.textContent.toLowerCase().match(/[a-z]{5,}/g) || [])[0];
+      // ein ASCII-Wort (≥5) aus dem Beispiel, das NICHT schon in der Bedeutung der Zeile steht
+      const mean = win.Katalog.norm(r.querySelector('.v-mean').textContent);
+      const w = (bsp.textContent.toLowerCase().match(/[a-z]{5,}/g) || []).find((x) => mean.indexOf(x) === -1);
       if (w) { found = { r, w }; break; }
     }
     expect(found).toBeTruthy();
-    expect((found.r.dataset.search || '').includes(found.w)).toBe(true);
+    expect((found.r.dataset.search || '').includes(found.w)).toBe(false);
+    // die Zeile bleibt über ihre Kerndaten auffindbar
+    const v = win.VOKABULAR.find((x) => found.r.dataset.search.includes(win.Katalog.norm(x.kana)));
+    expect(v).toBeTruthy();
   });
 });
