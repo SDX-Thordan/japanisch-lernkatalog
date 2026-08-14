@@ -208,3 +208,99 @@ describe('Listen-Seite', () => {
     expect(win.SRS.listItems(l.id).length).toBe(2);
   });
 });
+
+// Portionen: eine lange Liste wird in Häppchen von 10 geübt, dazwischen „Mehr" / „Aufhören".
+describe('Listen-Trainer: Portionen von 10', () => {
+  const PORTION = 10;
+  const ov = () => win.document.querySelector('#trainer-overlay');
+  const prog = () => ov().querySelector('.lt-prog').textContent;
+  const doneBox = () => ov().querySelector('.lt-done');
+  // Eine Aufgabe beantworten und weiterrücken.
+  function step() {
+    const opt = ov().querySelector('.ex-opt');
+    if (opt) click(opt);
+    else { const i = ov().querySelector('.ex-input'); if (i) { i.value = 'x'; click(ov().querySelector('.ex-check')); } }
+    const nx = ov().querySelector('.lt-next'); if (nx) click(nx);
+  }
+  const runPortion = (n) => { for (let i = 0; i < n; i++) step(); };
+  // IDs der aktuellen Portion aus der Sitzung lesen (vor der ersten Antwort vollständig).
+  const portionIds = (l) => (win.Katalog.sessGet('trainer:' + l.id) || {}).ids || [];
+
+  function bigList(n) {
+    const l = win.SRS.createList('Große Liste');
+    win.SRS.addToList(l.id, win.VOKABULAR.slice(0, n).map((v) => win.SRS.srsId('vocab', v)));
+    win.document.getElementById('lst-create-name').value = 'x';
+    click(win.document.getElementById('lst-create'));
+    click(win.document.querySelector('.lst-train'));
+    return l;
+  }
+
+  it('startet mit 10 Aufgaben statt der ganzen Liste', () => {
+    bigList(25);
+    expect(prog()).toContain('Aufgabe 1 / ' + PORTION);
+  });
+
+  it('nach der Portion kommt die Zwischenseite mit „Mehr" und „Aufhören"', () => {
+    bigList(25);
+    runPortion(PORTION);
+    expect(doneBox().classList.contains('hidden')).toBe(false);
+    expect(doneBox().querySelector('.lt-more')).toBeTruthy();
+    expect(doneBox().querySelector('.lt-stop')).toBeTruthy();
+    expect(doneBox().querySelector('.lt-restart')).toBe(null);   // noch nicht fertig
+    expect(doneBox().textContent).toContain('10 von 25');
+  });
+
+  it('„Mehr" bringt eine neue Portion mit anderen Einträgen', () => {
+    const l = bigList(25);
+    const first = portionIds(l);
+    expect(first).toHaveLength(PORTION);
+    runPortion(PORTION);
+    click(doneBox().querySelector('.lt-more'));
+    expect(prog()).toContain('Aufgabe 1 / ' + PORTION);
+    const second = portionIds(l);
+    expect(second).toHaveLength(PORTION);
+    expect(second.filter((id) => first.includes(id))).toHaveLength(0);
+  });
+
+  it('„Aufhören" schließt den Trainer', () => {
+    bigList(25);
+    runPortion(PORTION);
+    click(doneBox().querySelector('.lt-stop'));
+    expect(ov().hidden).toBe(true);
+  });
+
+  it('eine kurze Liste verhält sich unverändert: eine Runde, dann der Fertig-Screen', () => {
+    bigList(3);
+    expect(prog()).toContain('Aufgabe 1 / 3');
+    runPortion(3);
+    expect(doneBox().textContent).toContain('Geschafft');
+    expect(doneBox().querySelector('.lt-restart')).toBeTruthy();
+    expect(doneBox().querySelector('.lt-more')).toBe(null);
+  });
+
+  it('die schwächer beherrschten Einträge kommen zuerst', () => {
+    const l = win.SRS.createList('Gemischt');
+    const ids = win.VOKABULAR.slice(0, 15).map((v) => win.SRS.srsId('vocab', v));
+    win.SRS.addToList(l.id, ids);
+    // Die letzten fünf gezielt hochziehen → sie dürfen NICHT in der ersten Portion landen.
+    const strong = ids.slice(10);
+    strong.forEach((id) => { for (let i = 0; i < 5; i++) win.SRS.grade(id, 1); });
+    strong.forEach((id) => expect(win.SRS.scoreOf(id)).toBe(100));
+    win.document.getElementById('lst-create-name').value = 'x';
+    click(win.document.getElementById('lst-create'));
+    click(win.document.querySelector('.lst-train'));
+    const first = portionIds(l);
+    expect(first).toHaveLength(PORTION);
+    expect(first.filter((id) => strong.includes(id))).toHaveLength(0);
+  });
+
+  it('der Lernstand steigt über mehrere Runden hinweg weiter', () => {
+    const l = win.SRS.createList('Wachstum');
+    const id = win.SRS.srsId('vocab', win.VOKABULAR[0]);
+    win.SRS.addToList(l.id, [id]);
+    const seen = [];
+    for (let i = 0; i < 5; i++) { win.SRS.grade(id, 1); seen.push(win.SRS.scoreOf(id)); }
+    // früher bei 40 gedeckelt — jetzt wächst es weiter
+    expect(seen).toEqual([20, 40, 60, 80, 100]);
+  });
+});

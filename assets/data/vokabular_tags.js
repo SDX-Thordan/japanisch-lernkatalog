@@ -100,4 +100,10 @@ window.VOKABULAR_TAGS = {
   "v:しずか|8": ["na_place"],
   "v:にぎやか|8": ["na_place"],
   "v:べんり|8": ["na_place"],
+
+  /* ---- Alltagswortschatz-Ergänzungen ---- */
+  "v:むすこ|11": ["person", "family", "subj3"],
+  "v:むすめ|11": ["person", "family", "subj3"],
+  "v:おきゃくさん|6": ["person", "subj3"],
+  "v:バスてい|5": ["place"],
 };

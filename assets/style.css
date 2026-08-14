@@ -1058,6 +1058,8 @@ a.lp-part:hover { border-color: var(--accent); }
 .lt-back .lt-jp, .lt-back .lt-de { color: var(--good); }
 .lt-controls { display: flex; gap: .6rem; justify-content: center; margin-top: auto; padding-top: 1.4rem; }
 .lt-done { text-align: center; padding: 2rem 1rem; }
+/* Zwischenseite nach einer Portion: „Mehr" und „Aufhören" nebeneinander, auf schmalen Displays untereinander. */
+.lt-more-wrap { display: flex; gap: .6rem; justify-content: center; flex-wrap: wrap; margin-top: .4rem; }
 
 /* ---------- Listen-Detailseite (liste.html) ---------- */
 .li-actions { display: flex; flex-wrap: wrap; gap: .5rem; margin-top: .8rem; }

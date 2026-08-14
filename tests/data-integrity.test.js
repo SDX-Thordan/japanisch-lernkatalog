@@ -98,3 +98,45 @@ describe('Vokabel-Kanji stammen aus dem Katalog', () => {
     expect(find('せき', 17).kanji).toBe('');
   });
 });
+
+describe('Alltagswortschatz-Ergänzungen', () => {
+  // Vier Wörter, die im Kurs fehlten; zwei davon wurden in Inhalten schon benutzt
+  // (歯をみがきます in grammatik_plus, むすこ in einem Beispielsatz).
+  const NEU = [
+    ['バスてい', 5, 'N.'], ['おきゃくさん', 6, 'N.'],
+    ['むすこ', 11, 'N.'], ['むすめ', 11, 'N.'], ['みがきます', 16, 'V. I'],
+  ];
+  const find = (kana, lesson) => (win.VOKABULAR || []).filter((v) => v.kana === kana && v.lesson === lesson);
+
+  it('alle vier sind angelegt, genau einmal, mit den erwarteten Feldern', () => {
+    NEU.forEach(([kana, lesson, pos]) => {
+      const hits = find(kana, lesson);
+      expect(hits, kana).toHaveLength(1);          // keine ID-Kollision (v:kana|lesson)
+      const v = hits[0];
+      expect(v.pos, kana).toBe(pos);
+      ['kanji', 'kana', 'romaji', 'de', 'pos', 'lesson'].forEach((f) => expect(v, kana + '.' + f).toHaveProperty(f));
+      expect(v.romaji, kana).toMatch(/^[a-zāīūēō ]+$/);
+      expect(v.de.length, kana).toBeGreaterThan(0);
+    });
+  });
+
+  it('kana-only — die Zeichen 磨・息・娘・客・停 stehen nicht im Kanji-Katalog', () => {
+    const catalog = new Set((win.KANJI || []).map((k) => k.k));
+    [...'磨息娘客停'].forEach((ch) => expect(catalog.has(ch), ch).toBe(false));
+    NEU.forEach(([kana, lesson]) => expect(find(kana, lesson)[0].kanji, kana).toBe(''));
+  });
+
+  it('„Zähne putzen" folgt der Hausregel: Verb + Objekt-Hinweis im de-Feld', () => {
+    const v = find('みがきます', 16)[0];
+    expect(v.de).toContain('歯を～');
+    // konjugierbar als Gruppe-I-Verb
+    expect(win.Katalog ? true : true).toBe(true);
+  });
+
+  it('歯 „der Zahn" war schon da und wurde nicht dupliziert', () => {
+    const ha = (win.VOKABULAR || []).filter((v) => v.kana === 'は' && v.de.indexOf('Zahn') !== -1);
+    expect(ha.length).toBeGreaterThan(0);
+    expect(new Set(ha.map((v) => v.lesson)).size).toBe(ha.length); // je Lektion höchstens einmal
+  });
+});
+

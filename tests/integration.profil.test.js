@@ -63,7 +63,7 @@ describe('Fortschritt-Seite', () => {
 
   it('hebt aktive Tage farblich hervor und füllt den heutigen Balken (nach Redraw)', async () => {
     const today = win.SRS.__test.todayISO();
-    for (let i = 0; i < 3; i++) win.SRS.grade('k:学', 1, today); // bis ITEM_DAILY_CAP=40 → Stufe 2
+    for (let i = 0; i < 3; i++) win.SRS.grade('k:学', 1, today); // 3 × GAIN = 60 Punkte am selben Tag
     // Redraw über den realen Import-Pfad (FileReader → draw()).
     const json = win.SRS.exportJSON();
     const file = win.document.getElementById('f-file');

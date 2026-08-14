@@ -122,7 +122,10 @@ describe('Listen-Trainer: Runde fortsetzen', () => {
     answer(win, ov);
     click(win, ov.querySelector('.lt-next'));
     click(win, ov.querySelector('.lt-close'));
-    win.SRS.removeFromList(l.id, [win.SRS.srsId('vocab', win.VOKABULAR[2])]);
+    // Gezielt einen NOCH OFFENEN Eintrag entfernen — welcher das ist, hängt an der Mischung,
+    // deshalb aus dem Restdeck der Sitzung nehmen statt einen festen Index zu raten.
+    const rest = win.Katalog.sessGet('trainer:' + l.id).ids;
+    win.SRS.removeFromList(l.id, [rest[rest.length - 1]]);
     click(win, win.document.querySelector('.lst-train'));
     expect(ov.hidden).toBe(false);
     expect(ov.querySelector('.lt-prog').textContent).toMatch(/Aufgabe \d+ \/ 2/);

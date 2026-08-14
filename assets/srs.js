@@ -30,8 +30,12 @@
   var MASTER_AT = 80;        // ab hier „beherrscht" (= 4 Blütenblätter)
   var GRACE_DAYS = 3;        // so viele Tage kein Zerfall nach der letzten Übung
   var DECAY_PER_DAY = 2;     // danach Punkte/Tag Zerfall (sanft)
-  var ITEM_DAILY_CAP = 40;   // max. Punktgewinn pro Wort und Tag
-  var DAILY_CAP = 2400;      // max. Punktgewinn über alle Wörter pro Tag (global = „Lernlimit")
+  // Bewusst hoch angesetzt: der Lernstand soll nach JEDER geübten Runde weiter steigen. Mit den
+  // früheren Werten (40 / 2400) stand ein Wort schon nach zwei richtigen Antworten still, und
+  // global war nach rund sechs intensiv geübten Wörtern Schluss — beim portionierten Listen-Üben
+  // hätten dann dieselben Wörter immer wieder ganz vorn gestanden.
+  var ITEM_DAILY_CAP = 400;  // max. Punktgewinn pro Wort und Tag
+  var DAILY_CAP = 24000;     // max. Punktgewinn über alle Wörter pro Tag (global = „Lernlimit")
   var LEARNED_SCORE = 60;    // „ganze Lektion als gelernt" setzt Items hierher (unter MASTER_AT → sofort fällig)
   var SCORE_THRESHOLDS = [20, 40, 60, 80, 100]; // Blütenblatt je 20 %
   var LEECH_LAPSES = 4;      // ab so vielen Fehlversuchen gilt ein noch-nicht-beherrschtes Item als „schwierig"

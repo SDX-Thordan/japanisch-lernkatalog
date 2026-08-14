@@ -1025,5 +1025,11 @@ window.VOKABULAR_BEISPIELE = {
   "もどります|25": {"jp":"忘れ物をしたら、すぐ戻ります。","r":"Wasuremono o shitara, sugu modorimasu.","de":"Wenn ich etwas vergessen habe, komme ich gleich zurück.","note":"戻ります: zurückkehren, umkehren."},
   "すぎます|25": {"jp":"10時を過ぎても、彼は来ませんでした。","r":"Jūji o sugite mo, kare wa kimasen deshita.","de":"Auch als es zehn Uhr vorbei war, kam er nicht.","note":"～ても: auch wenn (Konzessiv)."},
   "べつべつに|25": {"jp":"すみません、別々に払いたいです。","r":"Sumimasen, betsubetsu ni haraitai desu.","de":"Entschuldigung, wir möchten getrennt zahlen.","note":"別々に: getrennt (z. B. bezahlen)."},
-  "ずっと|25": {"jp":"彼女は朝からずっと部屋で勉強しています。","r":"Kanojo wa asa kara zutto heya de benkyō shite imasu.","de":"Sie lernt seit dem Morgen die ganze Zeit im Zimmer.","note":"ずっと: durchgehend, die ganze Zeit."}
+  "ずっと|25": {"jp":"彼女は朝からずっと部屋で勉強しています。","r":"Kanojo wa asa kara zutto heya de benkyō shite imasu.","de":"Sie lernt seit dem Morgen die ganze Zeit im Zimmer.","note":"ずっと: durchgehend, die ganze Zeit."},
+
+  "バスてい|5": {"jp":"駅の前にバスていがあります。","r":"Eki no mae ni basutei ga arimasu.","de":"Vor dem Bahnhof ist eine Bushaltestelle.","note":"バス + てい (停): Haltestelle. Ort + に + あります."},
+  "おきゃくさん|6": {"jp":"レストランにおきゃくさんがたくさんいます。","r":"Resutoran ni okyakusan ga takusan imasu.","de":"Im Restaurant sind viele Gäste.","note":"おきゃくさん: Kunde im Laden UND Gast zu Hause; das お gehört fest dazu."},
+  "むすこ|11": {"jp":"むすこは毎朝七時に起きます。","r":"Musuko wa maiasa shichi-ji ni okimasu.","de":"Mein Sohn steht jeden Morgen um sieben auf.","note":"むすこ = der eigene Sohn; von fremden Söhnen spricht man als むすこさん."},
+  "むすめ|11": {"jp":"むすめは日本語が上手です。","r":"Musume wa nihongo ga jōzu desu.","de":"Meine Tochter kann gut Japanisch.","note":"むすめ = die eigene Tochter; fremde Töchter sind むすめさん."},
+  "みがきます|16": {"jp":"寝る前に歯をみがきます。","r":"Neru mae ni ha o migakimasu.","de":"Vor dem Schlafengehen putze ich mir die Zähne.","note":"Feste Wendung 歯をみがきます; みがきます allein heißt „polieren“."}
 };
