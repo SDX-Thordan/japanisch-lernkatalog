@@ -1940,6 +1940,16 @@
       if(e.code==='Space'){ const nx=tov.querySelector('.lt-next'); if(nx){ e.preventDefault(); nx.click(); } } });
     return tov;
   }
+  /* Portionsgröße: eine Runde bleibt überschaubar, danach entscheidet man „Mehr“ oder „Aufhören“. */
+  const TRAINER_PORTION=10;
+  /* Dringlichkeit eines Listeneintrags — kleiner = wichtiger. Dieselbe Formel wie in
+     SRS.buildQueue: schwacher Lernstand zuerst, häufige Fehler ziehen zusätzlich nach vorn.
+     Dadurch bringt jede neue Portion die schlechter beherrschten Wörter, statt derselben zehn. */
+  function trainerPrio(o){
+    const sc=(window.SRS&&window.SRS.scoreOf)?window.SRS.scoreOf(o.id):0;
+    const it=(window.SRS&&window.SRS.get)?window.SRS.get(o.id):null;
+    return sc-8*((it&&it.lapses)||0);
+  }
   function openTrainer(l){
     const ov=ensureTrainer();
     const q=s=>ov.querySelector(s);
@@ -1947,13 +1957,30 @@
       exMount=q('.lt-ex'), nextWrap=q('.lt-next-wrap'), done=q('.lt-done');
     title.textContent=l.name;
     const sKey='trainer:'+l.id;
-    let deck=[], total=0, resumed=false;
-    function save(answered){ ov.dataset.done=String(total-deck.length); sessSet(sKey,{ids:deck.map(o=>o.id),done:total-deck.length,answered:!!answered}); }
-    function start(){ sessClear(sKey); deck=shuffle(window.SRS.listItems(l.id).slice()); total=deck.length; resumed=false;
+    let deck=[], total=0, resumed=false, seen=[];
+    function save(answered){ ov.dataset.done=String(total-deck.length);
+      sessSet(sKey,{ids:deck.map(o=>o.id),done:total-deck.length,answered:!!answered,seen:seen.slice()}); }
+    /* Nächste Portion zusammenstellen: bevorzugt Einträge, die diese Sitzung noch nicht dran hatte
+       (sonst käme bei gleichem Lernstand immer dieselbe Auswahl), darin die dringendsten zuerst.
+       Sind alle einmal durch, beginnt die Rotation von vorn. */
+    function nextPortion(){
+      const all=window.SRS.listItems(l.id);
+      if(!all.length)return [];
+      const had={}; seen.forEach(id=>{ had[id]=1; });
+      let pool=all.filter(o=>!had[o.id]);
+      if(!pool.length){ seen=[]; pool=all.slice(); }        // alle einmal durch → von vorn
+      // Mischen VOR dem Sortieren, damit gleich dringende Einträge rotieren.
+      pool=shuffle(pool.slice()).sort((a,b)=>trainerPrio(a)-trainerPrio(b)).slice(0,TRAINER_PORTION);
+      pool.forEach(o=>seen.push(o.id));
+      return shuffle(pool);                                  // Reihenfolge innerhalb der Portion
+    }
+    function begin(){ deck=nextPortion(); total=deck.length; resumed=false;
       ov.dataset.done='0'; done.classList.add('hidden'); card.classList.remove('hidden'); render(); }
+    function start(){ sessClear(sKey); seen=[]; begin(); }
     // Angefangene Runde wiederherstellen; inzwischen entfernte Einträge fallen still weg.
     function resume(s){
       const idx={}; window.SRS.listItems(l.id).forEach(o=>{ idx[o.id]=o; });
+      seen=(s.seen||[]).slice();
       let rest=(s.ids||[]).map(x=>idx[x]).filter(Boolean), doneN=s.done|0;
       if(s.answered&&rest.length){ rest.shift(); doneN++; }
       if(!rest.length)return false;
@@ -1962,10 +1989,27 @@
       return true;
     }
     function addNext(){ if(nextWrap.querySelector('.lt-next'))return; const nx=makeNextButton(()=>{ deck.shift(); render(); },'lt-next'); nextWrap.appendChild(nx); nx.focus(); }
+    /* Portion zu Ende. Sind noch ungeübte Einträge da, wird nicht abgeschlossen, sondern gefragt —
+       so bleibt eine lange Liste in Häppchen lernbar, statt am Stück durchgezogen zu werden. */
+    function finish(){
+      const n=window.SRS.listItems(l.id).length;
+      sessClear(sKey);
+      card.classList.add('hidden'); done.classList.remove('hidden');
+      if(!total){ done.innerHTML='<div class="tr-done-in">Diese Liste ist leer.</div>'; return; }
+      if(seen.length<n){
+        done.innerHTML='<div class="tr-done-in">'+total+' geübt — '+seen.length+' von '+n+' Einträgen dieser Liste.<br>Weitermachen oder Schluss für heute?</div>'+
+          '<div class="lt-more-wrap"><button class="btn-primary lt-more" type="button"><span class="msi" aria-hidden="true">play_arrow</span> Mehr</button>'+
+          '<button class="btn lt-stop" type="button"><span class="msi" aria-hidden="true">check</span> Aufhören</button></div>';
+        done.querySelector('.lt-more').addEventListener('click',begin);
+        done.querySelector('.lt-stop').addEventListener('click',closeTrainer);
+        return;
+      }
+      done.innerHTML='<div class="tr-done-in">Geschafft!<br>Alle '+n+' Einträge durch.</div>'+
+        '<button class="btn-primary lt-restart" type="button"><span class="msi" aria-hidden="true">refresh</span> Nochmal</button>';
+      done.querySelector('.lt-restart').addEventListener('click',start);
+    }
     function render(){
-      if(!deck.length){ sessClear(sKey); card.classList.add('hidden'); done.classList.remove('hidden');
-        done.innerHTML=total?'<div class="tr-done-in">Geschafft!<br>Alle '+total+' Einträge durch.</div><button class="btn-primary lt-restart" type="button"><span class="msi" aria-hidden="true">refresh</span> Nochmal</button>':'<div class="tr-done-in">Diese Liste ist leer.</div>';
-        const rs=done.querySelector('.lt-restart'); if(rs)rs.addEventListener('click',start); return; }
+      if(!deck.length){ finish(); return; }
       const learned=total-deck.length; prog.innerHTML='Aufgabe '+(learned+1)+' / '+total+resumedTag(resumed);
       resumed=false; save(false);
       exMount.innerHTML=''; nextWrap.innerHTML='';

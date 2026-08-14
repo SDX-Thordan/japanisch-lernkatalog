@@ -982,5 +982,14 @@ window.VOKABULAR = [
   {"kanji":"戻ります","kana":"もどります","romaji":"modorimasu","de":"zurückkehren, zurückkommen","pos":"V. I","lesson":25},
   {"kanji":"過ぎます","kana":"すぎます","romaji":"sugimasu","de":"vergehen, vorbeigehen","pos":"V. II","lesson":25},
   {"kanji":"","kana":"べつべつに","romaji":"betsubetsu ni","de":"getrennt (z. B. bezahlen)","pos":"Adv.","lesson":25},
-  {"kanji":"","kana":"ずっと","romaji":"zutto","de":"die ganze Zeit; bei Weitem","pos":"Adv.","lesson":25}
+  {"kanji":"","kana":"ずっと","romaji":"zutto","de":"die ganze Zeit; bei Weitem","pos":"Adv.","lesson":25},
+
+  /* ===== Alltagswortschatz über MNN I hinaus (nicht Teil der offiziellen Lektionsliste) =====
+     Thematisch dort einsortiert, wo die verwandten Wörter stehen. Kana-only: 磨・息・娘・客・停
+     sind nicht im Kanji-Katalog, und neu ergänzte Schreibungen nutzen nur Katalog-Kanji. */
+  {"kanji":"","kana":"バスてい","romaji":"basutei","de":"die Bushaltestelle","pos":"N.","lesson":5},
+  {"kanji":"","kana":"おきゃくさん","romaji":"okyakusan","de":"der Kunde; der Gast","pos":"N.","lesson":6},
+  {"kanji":"","kana":"むすこ","romaji":"musuko","de":"(mein) Sohn","pos":"N.","lesson":11},
+  {"kanji":"","kana":"むすめ","romaji":"musume","de":"(meine) Tochter","pos":"N.","lesson":11},
+  {"kanji":"","kana":"みがきます","romaji":"migakimasu","de":"putzen (歯を～)","pos":"V. I","lesson":16}
 ];

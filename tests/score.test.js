@@ -38,19 +38,23 @@ describe('Lernpunktzahl', () => {
     expect(SRS.get('v:b|1').score).toBe(25);
   });
 
-  it('Pro-Wort-Cap: ein Wort steigt am selben Tag nur bis 40', () => {
-    SRS.grade('v:c|1', 1, '2026-06-10');
-    SRS.grade('v:c|1', 1, '2026-06-10');
-    SRS.grade('v:c|1', 1, '2026-06-10'); // dritter Gewinn am selben Tag wird gedeckelt
-    expect(SRS.get('v:c|1').score).toBe(40);
+  it('Pro-Wort-Cap greift erst weit oben: ein Wort erreicht am selben Tag 100', () => {
+    // Der Deckel liegt bei 400 Punkten/Wort/Tag — der Lernstand soll nach JEDER Runde steigen,
+    // nicht schon nach der zweiten stehenbleiben.
+    for (let i = 0; i < 3; i++) SRS.grade('v:c|1', 1, '2026-06-10');
+    expect(SRS.get('v:c|1').score).toBe(60);      // früher hier gedeckelt
+    for (let i = 0; i < 3; i++) SRS.grade('v:c|1', 1, '2026-06-10');
+    expect(SRS.get('v:c|1').score).toBe(100);     // 0–100 bleibt die harte Grenze
   });
 
-  it('globaler Tagescap: insgesamt max. 2400 Punkte/Tag', () => {
-    // 60 Wörter × 40 = 2400 → globaler Cap (2400) greift, bevor das nächste Wort Punkte bekommt
-    for (let i = 0; i < 60; i++) { SRS.grade('v:g' + i + '|1', 1, '2026-06-10'); SRS.grade('v:g' + i + '|1', 1, '2026-06-10'); }
+  it('globaler Tagescap: insgesamt max. 24000 Punkte/Tag', () => {
+    // 240 Wörter × 100 = 24000 → globaler Cap greift, bevor das nächste Wort Punkte bekommt
+    for (let i = 0; i < 240; i++) {
+      for (let g = 0; g < 5; g++) SRS.grade('v:g' + i + '|1', 1, '2026-06-10');
+    }
     SRS.grade('v:extra|1', 1, '2026-06-10'); // global gedeckelt → kein Gain
     expect(SRS.get('v:extra|1').score).toBe(0);
-    expect(SRS.stats('2026-06-10').dailyGain).toBe(2400);
+    expect(SRS.stats('2026-06-10').dailyGain).toBe(24000);
   });
 
   it('Zerfall: nach der Schonfrist sinkt der effektive Lernstand sanft', () => {
