@@ -185,6 +185,53 @@ describe('Grammatik: Rōmaji ohne Beispieltext', () => {
   });
 });
 
+describe('Suchindex: reine Funktionen == gerenderter dataset.search', () => {
+  // Die drei Index-Ausdrücke wurden aus vocabRow/kanjiCard/grammarCard herausgelöst, damit das
+  // Hinzufügen-Overlay ohne gerenderten Katalog suchen kann. Dieser Test hält beide Seiten synchron:
+  // weicht die reine Funktion vom gerenderten Index ab, findet das Overlay andere Treffer als die Seite.
+  const GRAMMAR_BODY = `<!DOCTYPE html><html><body data-page="grammatik">
+    <input id="search-input" type="search"><div id="filters"></div><p id="count"></p>
+    <div id="content"></div><div id="empty" class="hidden"></div>
+  </body></html>`;
+
+  it('Vokabeln: jede gerenderte Zeile trägt genau vocabSearchIndex(w)', () => {
+    const win = page(VOCAB_BODY, ['assets/data/vokabular.js', 'assets/srs.js', 'assets/app.js']);
+    const rows = [...win.document.querySelectorAll('.v-row.item')];
+    expect(rows.length).toBe(win.VOKABULAR.length);
+    // Reihenfolge der Zeilen kann von der Datenreihenfolge abweichen → über den Index-Wert vergleichen.
+    const rendered = rows.map((r) => r.dataset.search).sort();
+    const pure = win.VOKABULAR.map((w) => win.Katalog.vocabSearchIndex(w)).sort();
+    expect(rendered).toEqual(pure);
+  });
+
+  it('Kanji: jede gerenderte Karte trägt genau kanjiSearchIndex(k)', () => {
+    const win = page(KANJI_BODY, ['assets/data/kanji.js', 'assets/srs.js', 'assets/app.js']);
+    const cards = [...win.document.querySelectorAll('.kanji-card.item')];
+    expect(cards.length).toBe(win.KANJI.length);
+    expect(cards.map((c) => c.dataset.search).sort())
+      .toEqual(win.KANJI.map((k) => win.Katalog.kanjiSearchIndex(k)).sort());
+  });
+
+  it('Grammatik: jede gerenderte Karte trägt genau grammarSearchIndex(g)', () => {
+    const win = page(GRAMMAR_BODY, ['assets/data/grammatik.js', 'assets/data/grammatik_extra.js',
+      'assets/data/grammatik_furigana.js', 'assets/data/grammatik_plus.js', 'assets/srs.js', 'assets/app.js']);
+    const cards = [...win.document.querySelectorAll('.gp.item')];
+    expect(cards.length).toBe(win.GRAMMATIK.length);
+    expect(cards.map((c) => c.dataset.search).sort())
+      .toEqual(win.GRAMMATIK.map((g) => win.Katalog.grammarSearchIndex(g)).sort());
+  });
+
+  it('searchHit: Substring, leerzeichenfreie Zweitfassung, leerer Begriff trifft alles', () => {
+    const win = page(VOCAB_BODY, ['assets/data/vokabular.js', 'assets/srs.js', 'assets/app.js']);
+    const hit = win.Katalog.searchHit;
+    expect(hit('mizu wasser', 'wasser', 'wasser')).toBe(true);
+    expect(hit('mizu wasser', 'feuer', 'feuer')).toBe(false);
+    expect(hit('n1 nohouga n2', 'hou ga', 'houga')).toBe(true); // nur über die 2. Fassung
+    expect(hit('irgendwas', '', '')).toBe(true);
+    expect(hit(undefined, 'x', 'x')).toBe(false); // kein Index → kein Treffer, kein Absturz
+  });
+});
+
 describe('Suchen-Taste schließt die Tastatur', () => {
   let win, input;
   beforeEach(() => {
