@@ -127,6 +127,34 @@ describe('Kanji 強 „stark"', () => {
   });
 });
 
+describe('Kanji 力 „Kraft, Stärke"', () => {
+  let K;
+  beforeAll(() => { K = (loadWithData(['assets/data/kanji.js']).KANJI) || []; });
+
+  it('steht genau einmal im Katalog, mit zwei Strichen', () => {
+    const hits = K.filter((k) => k.k === '力');
+    expect(hits).toHaveLength(1);
+    expect(hits[0].strokes).toBe(2);
+    expect(hits[0].meaning).toContain('Kraft');
+  });
+
+  it('ist von 九 unterscheidbar: eigenes Zeichen, eigene Lesungen, eigene Bedeutung', () => {
+    // Die beiden sehen sich zum Verwechseln ähnlich — sie dürfen sich in der Übung nicht
+    // gegenseitig als Lösung durchgehen: keine gemeinsame Lesung, keine gemeinsame Bedeutung.
+    const chikara = K.find((k) => k.k === '力'), kyuu = K.find((k) => k.k === '九');
+    expect(kyuu).toBeTruthy();
+    const shared = [].concat(chikara.on, chikara.kun).filter((r) => [].concat(kyuu.on, kyuu.kun).indexOf(r) !== -1);
+    expect(shared).toEqual([]);
+    expect(chikara.meaning).not.toBe(kyuu.meaning);
+  });
+
+  it('seine Beispielwörter haben w/r/m und binden 強 mit ein', () => {
+    const k = K.find((x) => x.k === '力');
+    k.examples.forEach((e, i) => ['w', 'r', 'm'].forEach((f) => expect(e[f], 'examples[' + i + '].' + f).toBeTruthy()));
+    expect(k.examples.some((e) => e.w.indexOf('強') !== -1)).toBe(true);
+  });
+});
+
 describe('Alltagswortschatz-Ergänzungen', () => {
   // Vier Wörter, die im Kurs fehlten; zwei davon wurden in Inhalten schon benutzt
   // (歯をみがきます in grammatik_plus, むすこ in einem Beispielsatz).

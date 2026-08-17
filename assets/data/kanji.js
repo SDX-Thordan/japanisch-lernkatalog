@@ -130,5 +130,9 @@ window.KANJI = [
   {"k":"石","on":["セキ","シャク","コク"],"kun":["いし"],"meaning":"Stein","strokes":5,"level":"A1.7","cls":"Class 7","examples":[{"w":"石","r":"いし","m":"der Stein"},{"w":"石油","r":"せきゆ","m":"das Erdöl"},{"w":"宝石","r":"ほうせき","m":"der Edelstein"}]},
   {"k":"花","on":["カ"],"kun":["はな"],"meaning":"Blume","strokes":7,"level":"A1.7","cls":"Class 7","examples":[{"w":"花","r":"はな","m":"die Blume"},{"w":"花見","r":"はなみ","m":"die Kirschblütenschau"},{"w":"花火","r":"はなび","m":"das Feuerwerk"}]},
   {"k":"末","on":["マツ","バツ"],"kun":["すえ"],"meaning":"Ende","strokes":5,"level":"A1.7","cls":"Class 8","examples":[{"w":"週末","r":"しゅうまつ","m":"das Wochenende"},{"w":"末","r":"すえ","m":"das Ende"},{"w":"年末","r":"ねんまつ","m":"das Jahresende"}]},
-  {"k":"強","on":["キョウ","ゴウ"],"kun":["つよ-い","つよ-まる"],"meaning":"stark","strokes":11,"level":"A1.7","cls":"Class 8","examples":[{"w":"強い","r":"つよい","m":"stark"},{"w":"勉強","r":"べんきょう","m":"das Lernen"},{"w":"強風","r":"きょうふう","m":"starker Wind"}]}
+  {"k":"強","on":["キョウ","ゴウ"],"kun":["つよ-い","つよ-まる"],"meaning":"stark","strokes":11,"level":"A1.7","cls":"Class 8","examples":[{"w":"強い","r":"つよい","m":"stark"},{"w":"勉強","r":"べんきょう","m":"das Lernen"},{"w":"強風","r":"きょうふう","m":"starker Wind"}]},
+  /* 力 hat im Kurs keine eigene Vokabel — es steht hier, weil es als Baustein überall auftaucht
+     (強力・電力) und weil es sich mit 九 leicht verwechselt: 力 endet unten links im Haken,
+     九 hat den zweiten Strich als weit ausholende Kurve nach rechts. */
+  {"k":"力","on":["リョク","リキ"],"kun":["ちから"],"meaning":"Kraft, Stärke","strokes":2,"level":"A1.7","cls":"Class 8","examples":[{"w":"力","r":"ちから","m":"die Kraft"},{"w":"強力","r":"きょうりょく","m":"kraftvoll, stark"},{"w":"電力","r":"でんりょく","m":"die elektrische Leistung"}]}
 ];
