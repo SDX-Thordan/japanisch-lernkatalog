@@ -99,6 +99,34 @@ describe('Vokabel-Kanji stammen aus dem Katalog', () => {
   });
 });
 
+describe('Kanji 強 „stark"', () => {
+  let kw, K;
+  beforeAll(() => { kw = loadWithData(['assets/data/kanji.js', 'assets/data/vokabular.js']); K = kw.KANJI || []; });
+
+  it('steht genau einmal im Katalog, auf der Stufe seiner Vokabel', () => {
+    const hits = K.filter((k) => k.k === '強');
+    expect(hits).toHaveLength(1);
+    // 強い ist eine L19-Vokabel; A1.7 deckt L17–20 ab (KANJI_LEVEL_LESSON in srs.js).
+    expect(hits[0].level).toBe('A1.7');
+    expect(kw.VOKABULAR.some((v) => v.kanji === '強い' && v.lesson === 19)).toBe(true);
+  });
+
+  it('hat die Felder, die Karte und Lesungsübung brauchen', () => {
+    const k = K.find((x) => x.k === '強');
+    ['on', 'kun'].forEach((f) => { expect(Array.isArray(k[f]), f).toBe(true); expect(k[f].length, f).toBeGreaterThan(0); });
+    expect(k.meaning).toContain('stark');
+    expect(k.strokes).toBe(11);
+    expect(k.examples.length).toBeGreaterThanOrEqual(3);
+    // Okurigana-Striche wie im übrigen Katalog — die Suche entfernt sie beim Normalisieren.
+    expect(k.kun).toContain('つよ-い');
+  });
+
+  it('seine Beispielwörter stehen in derselben Form wie überall (w/r/m)', () => {
+    const k = K.find((x) => x.k === '強');
+    k.examples.forEach((e, i) => ['w', 'r', 'm'].forEach((f) => expect(e[f], 'examples[' + i + '].' + f).toBeTruthy()));
+  });
+});
+
 describe('Alltagswortschatz-Ergänzungen', () => {
   // Vier Wörter, die im Kurs fehlten; zwei davon wurden in Inhalten schon benutzt
   // (歯をみがきます in grammatik_plus, むすこ in einem Beispielsatz).
@@ -129,8 +157,13 @@ describe('Alltagswortschatz-Ergänzungen', () => {
   it('„Zähne putzen" folgt der Hausregel: Verb + Objekt-Hinweis im de-Feld', () => {
     const v = find('みがきます', 16)[0];
     expect(v.de).toContain('歯を～');
-    // konjugierbar als Gruppe-I-Verb
-    expect(win.Katalog ? true : true).toBe(true);
+  });
+
+  it('„Zähne" findet das Verb — der Begriff steht im de-Feld, nicht nur im Beispielsatz', () => {
+    // Beispielsätze werden bewusst NICHT durchsucht; stünde „Zähne" nur dort, wäre das Verb
+    // über das deutsche Stichwort unauffindbar.
+    const v = find('みがきます', 16)[0];
+    expect(v.de.toLowerCase()).toContain('zähne');
   });
 
   it('歯 „der Zahn" war schon da und wurde nicht dupliziert', () => {
