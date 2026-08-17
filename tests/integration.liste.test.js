@@ -223,3 +223,132 @@ describe('liste.html — Ausnahme-Hinweise', () => {
     expect(noteOf(win, made.v)).toBe('');
   });
 });
+
+// „Hinzufügen": aus der Liste heraus suchen und direkt einsortieren.
+describe('liste.html — Hinzufügen mit Suche', () => {
+  const ov = (win) => win.document.getElementById('add-overlay');
+  const openAdd = (win) => { click(win, win.document.querySelector('#li-actions .li-add')); return ov(win); };
+  const type = (win, q) => {
+    const i = ov(win).querySelector('.add-q');
+    i.value = q; i.dispatchEvent(new win.Event('input', { bubbles: true }));
+  };
+  const rows = (win) => [...ov(win).querySelectorAll('.add-item')];
+  const rowFor = (win, id) => rows(win).find((r) => r.dataset.id === id);
+  // Eine Liste, die NUR eine Vokabel enthält — für den Gruppen-Randfall.
+  function oneVocab(win) {
+    const l = win.SRS.createList('Nur Wörter');
+    win.SRS.addToList(l.id, [win.SRS.srsId('vocab', win.VOKABULAR[0])]);
+    return l;
+  }
+
+  it('der Knopf sitzt neben den anderen; die bleiben erhalten', () => {
+    const { win } = openListe('l1', mixedList);
+    expect(win.document.querySelector('#li-actions .li-add')).toBeTruthy();
+    ['.li-train', '.li-export', '.li-back'].forEach((s) => expect(win.document.querySelector('#li-actions ' + s), s).toBeTruthy());
+  });
+
+  it('öffnet ein Overlay; ohne Suchbegriff steht ein Hinweis statt tausend Treffern', () => {
+    const { win } = openListe('l1', mixedList);
+    const o = openAdd(win);
+    expect(o.hidden).toBe(false);
+    expect(rows(win)).toHaveLength(0);
+    expect(o.querySelector('.add-hint').textContent).toContain('Suchbegriff');
+  });
+
+  it('ein Suchbegriff liefert Treffer, nach Sorte gruppiert', () => {
+    const { win } = openListe('l1', mixedList);
+    openAdd(win);
+    type(win, win.VOKABULAR[0].kana);
+    expect(rows(win).length).toBeGreaterThan(0);
+    expect(ov(win).querySelector('.pick-lbl')).toBeTruthy();
+  });
+
+  it('findet auch Kanji und Grammatik, nicht nur Vokabeln', () => {
+    const { win } = openListe('l1', mixedList);
+    openAdd(win);
+    type(win, win.KANJI[0].k);
+    const kanjiIds = rows(win).map((r) => r.dataset.id).filter((id) => id.startsWith('k:'));
+    expect(kanjiIds).toContain('k:' + win.KANJI[0].k);
+    type(win, win.GRAMMATIK[0].pattern);
+    expect(rows(win).map((r) => r.dataset.id)).toContain('g:' + win.GRAMMATIK[0].pattern);
+  });
+
+  it('Tippen fügt hinzu: Häkchen, Zähler steigen, Eintrag steht sofort in der Liste', () => {
+    let made;
+    const { win } = openListe('l1', (w) => { made = oneVocab(w); return made; });
+    const target = win.VOKABULAR.find((v) => v !== win.VOKABULAR[0] && v.kana !== win.VOKABULAR[0].kana);
+    const id = win.SRS.srsId('vocab', target);
+    openAdd(win);
+    type(win, target.kana);
+    const row = rowFor(win, id);
+    expect(row).toBeTruthy();
+    expect(row.classList.contains('add-has')).toBe(false);
+    click(win, row);
+    expect(win.SRS.listItems(made.id).map((o) => o.id)).toContain(id);
+    expect(rowFor(win, id).classList.contains('add-has')).toBe(true);
+    expect(win.document.getElementById('li-sub').textContent).toContain('2 Einträge');
+    expect(win.document.getElementById('count').textContent).toContain('2 von 2');
+    expect(win.document.querySelector('#content [data-li-id="' + id + '"]')).toBeTruthy();
+  });
+
+  it('der Gruppen-Randfall: ein Kanji in einer Liste ohne Kanji legt die Sektion an', () => {
+    let made;
+    const { win } = openListe('l1', (w) => { made = oneVocab(w); return made; });
+    expect(win.document.querySelector('#content .group[data-group="kanji"]')).toBe(null);
+    openAdd(win);
+    type(win, win.KANJI[0].k);
+    click(win, rowFor(win, 'k:' + win.KANJI[0].k));
+    const grp = win.document.querySelector('#content .group[data-group="kanji"]');
+    expect(grp).toBeTruthy();
+    expect(grp.querySelector('.kanji-card.item')).toBeTruthy();
+    // die neue Sektion steht hinter den Vokabeln und wird von den Typ-Chips erfasst
+    const order = [...win.document.querySelectorAll('#content .group')].map((g) => g.dataset.group);
+    expect(order).toEqual(['vocab', 'kanji']);
+    click(win, win.document.querySelector('#type-filters .chip[data-tval="kanji"]'));
+    expect(visible(win, '#content .item')).toHaveLength(1);
+  });
+
+  it('nochmal tippen nimmt den Eintrag wieder heraus', () => {
+    let made;
+    const { win } = openListe('l1', (w) => { made = oneVocab(w); return made; });
+    openAdd(win);
+    type(win, win.KANJI[0].k);
+    const id = 'k:' + win.KANJI[0].k;
+    click(win, rowFor(win, id));
+    expect(win.SRS.listItems(made.id)).toHaveLength(2);
+    click(win, rowFor(win, id));
+    expect(win.SRS.listItems(made.id)).toHaveLength(1);
+    expect(rowFor(win, id).classList.contains('add-has')).toBe(false);
+    expect(win.document.querySelector('#content [data-li-id="' + id + '"]')).toBe(null);
+    expect(win.document.getElementById('li-sub').textContent).toContain('1 Eintrag');
+  });
+
+  it('Suchbegriff und Trefferliste bleiben nach dem Hinzufügen stehen', () => {
+    const { win } = openListe('l1', oneVocab);
+    openAdd(win);
+    type(win, win.KANJI[0].k);
+    const before = rows(win).length;
+    click(win, rowFor(win, 'k:' + win.KANJI[0].k));
+    expect(ov(win).querySelector('.add-q').value).toBe(win.KANJI[0].k);
+    expect(rows(win)).toHaveLength(before);
+    expect(ov(win).hidden).toBe(false);
+  });
+
+  it('ein bereits enthaltener Eintrag wird von Anfang an mit Häkchen gezeigt', () => {
+    const { win } = openListe('l1', mixedList);
+    openAdd(win);
+    type(win, win.VOKABULAR[0].kana);
+    const row = rowFor(win, win.SRS.srsId('vocab', win.VOKABULAR[0]));
+    expect(row.classList.contains('add-has')).toBe(true);
+  });
+
+  it('✕, Hintergrund-Klick und Escape schließen', () => {
+    const { win } = openListe('l1', mixedList);
+    openAdd(win); click(win, ov(win).querySelector('.add-close'));
+    expect(ov(win).hidden).toBe(true);
+    openAdd(win); click(win, ov(win));
+    expect(ov(win).hidden).toBe(true);
+    openAdd(win); win.document.dispatchEvent(new win.KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
+    expect(ov(win).hidden).toBe(true);
+  });
+});

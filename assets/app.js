@@ -470,7 +470,7 @@
     const exHtml=(k.examples||[]).map(e=>'<div class="ex"><span class="ex-w">'+ruby(e.w,e.r)+'</span><span class="ex-de">'+esc(e.m)+'</span></div>').join('');
     const card=el('article','kanji-card item');
     card.dataset.filter=k.level;
-    card.dataset.search=norm([k.k,on,kun,k.meaning,k.level,k.cls,(k.examples||[]).map(e=>e.w+' '+e.r+' '+e.m).join(' ')].join(' '));
+    card.dataset.search=kanjiSearchIndex(k);
     const kScore=(window.SRS&&window.SRS.scoreOf)?window.SRS.scoreOf('k:'+k.k):0;
     card.innerHTML=
       '<div class="kc-top"><div class="kanji-char">'+esc(k.k)+'</div>'+
@@ -519,6 +519,36 @@
     const kana=keys.map(k=>f[k]).filter(Boolean);
     return kana.concat(kana.map(kanaToRomaji)).concat(keys.map(k=>disp[k]).filter(Boolean)).join(' ');
   }
+  /* Suchindizes als REINE Funktionen — dieselben Strings landen an der gerenderten Zeile
+     (dataset.search) UND in der Suche des Hinzufügen-Overlays, das ohne DOM auskommen muss.
+     Nur eine Quelle, damit Katalog- und Overlay-Suche nicht auseinanderlaufen können. */
+  function vocabSearchIndex(w){ return norm([w.kanji,w.kana,w.romaji,w.de,w.pos,verbSearchIndex(w)].join(' ')); }
+  function kanjiSearchIndex(k){
+    const on=(k.on||[]).join('・'), kun=(k.kun||[]).join('・');
+    return norm([k.k,on,kun,k.meaning,k.level,k.cls,(k.examples||[]).map(e=>e.w+' '+e.r+' '+e.m).join(' ')].join(' '));
+  }
+  function grammarSearchIndex(g){
+    const base=norm([g.pattern,g.title,kanaToRomaji(g.pattern)].join(' '));
+    return base+' '+base.replace(/\s+/g,'');   // zweite, leerzeichenfreie Fassung für „hou ga“
+  }
+  function itemSearchIndex(o){
+    return o.type==='kanji'?kanjiSearchIndex(o.data):(o.type==='grammar'?grammarSearchIndex(o.data):vocabSearchIndex(o.data));
+  }
+  // Treffer-Test: Teilstring, plus zweiter Versuch ohne Leerzeichen (siehe applyFilter).
+  function searchHit(idx,q,qs){ if(!q)return true; idx=idx||'';
+    return idx.indexOf(q)!==-1||(!!qs&&idx.indexOf(qs)!==-1); }
+  /* Alle Katalog-Einträge als {id,type,data,idx} — einmal gebaut und gemerkt. Der Aufbau kostet
+     (pro Verb ein allForms-Lauf), passiert aber erst beim ersten Öffnen des Overlays. */
+  let catIdx=null;
+  function catalogIndex(){
+    if(catIdx)return catIdx;
+    const out=[]; const S=window.SRS;
+    if(!S||!S.srsId)return out;
+    (window.VOKABULAR||[]).forEach(v=>out.push({id:S.srsId('vocab',v),type:'vocab',data:v,idx:vocabSearchIndex(v)}));
+    (window.KANJI||[]).forEach(k=>out.push({id:S.srsId('kanji',k),type:'kanji',data:k,idx:kanjiSearchIndex(k)}));
+    (window.GRAMMATIK||[]).forEach(g=>out.push({id:S.srsId('grammar',g),type:'grammar',data:g,idx:grammarSearchIndex(g)}));
+    catIdx=out; return out;
+  }
   function vocabById(id){
     const m=/^v:(.*)\|(\d+)$/.exec(String(id||'')); if(!m)return null;
     return (window.VOKABULAR||[]).filter(v=>v.kana===m[1]&&String(v.lesson)===m[2])[0]||null;
@@ -545,7 +575,7 @@
     const bsp=(window.VOKABULAR_BEISPIELE||{})[w.kana+'|'+w.lesson];
     // Nur Kerndaten des Eintrags — der Beispielsatz wird zwar angezeigt, aber NICHT durchsucht:
     // sonst trifft jedes deutsche Wort aus einer Beispielübersetzung fremde Vokabeln.
-    row.dataset.search=norm([w.kanji,w.kana,w.romaji,w.de,w.pos,verbSearchIndex(w)].join(' '));
+    row.dataset.search=vocabSearchIndex(w);
     // Erweiterte Infos (ます-Form bei Verben, Beispielsatz + Notiz) klappen per Klick auf.
     if(bsp||dd)row.dataset.ext='1';
     const masuLine=dd?'<div class="v-masu-inline"><span class="v-masu-lbl">ます-Form</span> <span class="ja">'+esc(masuPrompt(w))+'</span></div>':'';
@@ -607,8 +637,7 @@
     // Muster und Titel — weder Beispielsätze noch die Erklärtexte. Die Rōmaji stünden sonst nur in
     // den Beispielen (das Muster selbst ist rein japanisch), darum wird die Umschrift aus dem
     // MUSTER erzeugt: „のほうが“ → „nohouga“, damit „houga“ weiterhin trifft.
-    const gSearch=norm([g.pattern,g.title,kanaToRomaji(g.pattern)].join(' '));
-    card.dataset.search=gSearch+' '+gSearch.replace(/\s+/g,'');
+    card.dataset.search=grammarSearchIndex(g);
     card.innerHTML=
       '<div class="gp-head card-toggle">'+scoreBadgeHtml('g:'+g.pattern)+'<span class="gp-pattern">'+esc(g.pattern)+'</span>'+
       (g.title?'<span class="gp-title">'+esc(g.title)+'</span>':'')+'<span class="tag">L'+L+'</span>'+
@@ -1007,7 +1036,7 @@
     document.body.classList.toggle('searching',q.length>0);
     items.forEach(it=>{ const idx=it.dataset.search||'';
       const okF=activeFilter==='all'||it.dataset.filter===activeFilter;
-      const okQ=!q||idx.indexOf(q)!==-1||(!!qs&&idx.indexOf(qs)!==-1);
+      const okQ=searchHit(idx,q,qs);
       const okT=activeType==='all'||it.dataset.type===activeType;
       const vis=okF&&okQ&&okT; it.classList.toggle('hidden',!vis); if(vis)shown++; });
     groups.forEach(g=>{ const n=g.querySelectorAll('.item:not(.hidden)').length; g.classList.toggle('hidden',n===0);
@@ -1667,6 +1696,76 @@
     return true;
   }
 
+  /* ---------- „Hinzufügen" auf der Listen-Detailseite: suchen und direkt einsortieren ----------
+     Die Umkehrung des Listen-Pickers: dort wählt man zu einem Eintrag die Liste, hier zu einer
+     Liste die Einträge. Chassis (.pick-overlay/.pick-modal/.pick-head) ist dasselbe; gesucht wird
+     über catalogIndex(), also ohne den Katalog zu rendern. Eigenes Suchfeld — die Seitensuche
+     darunter darf davon nichts mitbekommen. */
+  const ADD_MAX=30;   // Treffer je Sorte; darüber lieber die Suche verfeinern
+  const ADD_GROUPS=[['vocab','語彙 Vokabeln'],['kanji','漢字 Kanji'],['grammar','文法 Grammatik']];
+  let addPick=null;
+  function ensureAddPicker(){
+    if(addPick)return addPick;
+    const ov=el('div','add-overlay'); ov.id='add-overlay'; ov.hidden=true;
+    ov.innerHTML='<div class="pick-modal add-modal" role="dialog" aria-modal="true" aria-label="Zur Liste hinzufügen">'+
+      '<div class="pick-head"><span class="pick-title add-title"></span>'+
+        '<button class="drill-close add-close" type="button" aria-label="Schließen"><span class="msi" aria-hidden="true">close</span></button></div>'+
+      '<input class="add-q" type="search" enterkeyhint="search" placeholder="Suchen: Wort, Lesung, Rōmaji, Bedeutung, Kanji, Muster …" autocomplete="off" spellcheck="false" aria-label="Katalog durchsuchen">'+
+      '<div class="add-results"></div></div>';
+    document.body.appendChild(ov);
+    const close=()=>{ ov.hidden=true; };
+    ov.addEventListener('click',e=>{ if(e.target===ov)close(); });
+    ov.querySelector('.add-close').addEventListener('click',close);
+    document.addEventListener('keydown',e=>{ if(!ov.hidden&&e.key==='Escape')close(); });
+    addPick={ ov, title:ov.querySelector('.add-title'), q:ov.querySelector('.add-q'), res:ov.querySelector('.add-results') };
+    return addPick;
+  }
+  /* onChange(id, added, obj) meldet jede Änderung, damit die Seite darunter mitziehen kann. */
+  function openAddPicker(list, onChange){
+    if(!window.SRS)return;
+    const p=ensureAddPicker();
+    p.title.textContent='Zu „'+list.name+'" hinzufügen';
+    p.q.value='';
+    // „Schon drin" einmal als Set — listItems() baut sonst je Zeile den ganzen Katalogindex neu.
+    let inList=new Set((window.SRS.lists()||[]).filter(l=>l.id===list.id).map(l=>l.items||[])[0]||[]);
+    function rowFor(o){
+      const row=el('div','lst-item add-item'+(inList.has(o.id)?' add-has':''));
+      row.dataset.id=o.id;
+      row.innerHTML='<span class="add-mark" aria-hidden="true">'+(inList.has(o.id)?'✓':'＋')+'</span>'+
+        '<span class="lst-jp ja">'+itemFrontHtml(o)+'</span>'+
+        '<span class="lst-de">'+(o.type!=='vocab'?'<span class="lst-tag">'+(o.type==='kanji'?'漢字':'文法')+'</span>':'')+esc(itemMeaning(o))+'</span>'+
+        scoreBadgeHtml(o.id);
+      row.addEventListener('click',()=>{
+        const has=inList.has(o.id);
+        if(has){ window.SRS.removeFromList(list.id,[o.id]); inList.delete(o.id); }
+        else { window.SRS.addToList(list.id,[o.id]); inList.add(o.id); }
+        row.classList.toggle('add-has',!has);
+        row.querySelector('.add-mark').textContent=has?'＋':'✓';
+        refreshAddButtons([o.id]);
+        if(onChange)onChange(o.id,!has,o);
+      });
+      return row;
+    }
+    function render(){
+      const q=norm((p.q.value||'').trim()), qs=q.replace(/\s+/g,'');
+      p.res.innerHTML='';
+      if(!q){ p.res.appendChild(el('p','add-hint','Tippe einen Suchbegriff — Wort, Lesung, Rōmaji, Bedeutung, Kanji oder Grammatikmuster.')); return; }
+      const all=catalogIndex().filter(o=>searchHit(o.idx,q,qs));
+      if(!all.length){ p.res.appendChild(el('p','add-hint','Keine Treffer für „'+esc(p.q.value.trim())+'".')); return; }
+      ADD_GROUPS.forEach(([t,label])=>{
+        const arr=all.filter(o=>o.type===t); if(!arr.length)return;
+        p.res.appendChild(el('div','pick-lbl',esc(label)+' · '+arr.length));
+        arr.slice(0,ADD_MAX).forEach(o=>p.res.appendChild(rowFor(o)));
+        if(arr.length>ADD_MAX)p.res.appendChild(el('p','add-hint','… '+(arr.length-ADD_MAX)+' weitere — Suche verfeinern.'));
+      });
+    }
+    p.q.oninput=render;
+    p.q.onkeydown=e=>{ if(e.key==='Enter'){ e.preventDefault(); p.q.blur(); } };
+    render();
+    p.ov.hidden=false;
+    p.q.focus();
+  }
+
   let picker=null;
   function ensurePicker(){
     if(picker)return picker;
@@ -2119,8 +2218,11 @@
       train.addEventListener('click',()=>openTrainer(list));
       const exp=el('button','btn li-export','<span class="msi" aria-hidden="true">download</span> Export'); exp.type='button';
       exp.addEventListener('click',()=>runExport(exp,document.getElementById('li-msg'),'Liste „'+list.name+'"',()=>window.SRS.downloadList(list.id)));
+      const add=el('button','btn li-add','<span class="msi" aria-hidden="true">add</span> Hinzufügen'); add.type='button';
+      add.title='Vokabeln, Kanji oder Grammatik suchen und dieser Liste hinzufügen';
+      add.addEventListener('click',()=>openAddPicker(list,onListChange));
       const back=el('a','btn li-back','<span class="msi" aria-hidden="true">arrow_back</span> Alle Listen'); back.href='listen.html';
-      actionsEl.appendChild(train); actionsEl.appendChild(exp); actionsEl.appendChild(back);
+      actionsEl.appendChild(train); actionsEl.appendChild(add); actionsEl.appendChild(exp); actionsEl.appendChild(back);
     }
     // Ein Eintrag als Katalog-Element + Entfernen-Knopf. Der Klick auf ✕ darf die Karte NICHT
     // aufklappen → direkter Listener mit stopPropagation (wie .lst-rm auf der Listen-Seite).
@@ -2128,6 +2230,7 @@
       const node=o.type==='kanji'?kanjiCard(o.data)
         :(o.type==='grammar'?grammarCard(o.data,o.data.lesson):vocabRow(o.data,true));
       node.dataset.type=o.type; // Typ-Chips dieser Seite filtern nach Vokabel/Kanji/Grammatik
+      node.dataset.liId=o.id;   // damit das Hinzufügen-Overlay den Knoten wiederfindet
       const rm=el('button','li-rm','<span class="msi" aria-hidden="true">close</span>');
       rm.type='button'; rm.title='Aus dieser Liste entfernen';
       rm.addEventListener('click',e=>{
@@ -2139,9 +2242,40 @@
       node.appendChild(rm);
       return node;
     }
+    const GROUPS=[['vocab','語彙 Vokabeln','vocab-list'],['kanji','漢字 Kanji','kanji-grid'],['grammar','文法 Grammatik','gp-list']];
+    /* Die Box einer Sorte holen — und sie anlegen, falls die Liste bisher nichts davon enthielt.
+       Die neue Sektion muss an ihren Platz in der Reihenfolge Vokabeln → Kanji → Grammatik und
+       zusätzlich in `groups`, sonst filtert applyFilter sie nicht mit. */
+    function groupBox(t){
+      const g=content.querySelector('.group[data-group="'+t+'"]');
+      if(g)return g.querySelector('.vocab-list,.kanji-grid,.gp-list');
+      const def=GROUPS.filter(x=>x[0]===t)[0]; if(!def)return null;
+      const group=el('section','group'); group.dataset.group=t;
+      group.appendChild(groupHead(def[1],'',0));
+      const box=el('div',def[2]); group.appendChild(box);
+      // vor der ersten Sektion einhängen, die in der Reihenfolge NACH dieser kommt
+      const after=GROUPS.slice(GROUPS.indexOf(def)+1)
+        .map(x=>content.querySelector('.group[data-group="'+x[0]+'"]')).filter(Boolean)[0];
+      content.insertBefore(group,after||null);
+      groups.push(group);
+      return box;
+    }
+    /* Eine Änderung aus dem Hinzufügen-Overlay in die Seite einarbeiten — ohne Vollneuaufbau,
+       damit Suche, Filter und Scrollposition erhalten bleiben. */
+    function onListChange(id,added,o){
+      if(added){
+        const box=groupBox(o.type); if(!box)return;
+        const node=mountItem({id:id,type:o.type,data:o.data});
+        box.appendChild(node); items.push(node);
+      } else {
+        const node=items.filter(n=>n.dataset.liId===id)[0];
+        if(node){ const i=items.indexOf(node); if(i>=0)items.splice(i,1); node.remove(); }
+      }
+      head(); applyFilter();
+    }
     head();
     const objs=window.SRS.listItems(list.id);
-    [['vocab','語彙 Vokabeln','vocab-list'],['kanji','漢字 Kanji','kanji-grid'],['grammar','文法 Grammatik','gp-list']].forEach(([t,label,boxCls])=>{
+    GROUPS.forEach(([t,label,boxCls])=>{
       const arr=objs.filter(o=>o.type===t); if(!arr.length)return;
       const group=el('section','group'); group.dataset.group=t;
       group.appendChild(groupHead(label,'',arr.length));
@@ -2298,7 +2432,8 @@
   window.Katalog = {
     el, esc, ruby, rubyPair, norm, furiToRuby, kanaToRomaji, shuffle,
     conjugate, allForms, verbGroup, genVerbFormExercises, sakuraPetals, sakuraSvg, lsGet, lsSet, sessGet, sessSet, sessClear,
-    vtVerbs, vtPair, vtPartner, vtTask, vtAccept, VT_ORDER, VT_LABEL
+    vtVerbs, vtPair, vtPartner, vtTask, vtAccept, VT_ORDER, VT_LABEL,
+    vocabSearchIndex, kanjiSearchIndex, grammarSearchIndex, searchHit
   };
 
   if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',init); else init();
