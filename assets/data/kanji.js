@@ -129,5 +129,6 @@ window.KANJI = [
   /* ===== A1.7 ===== */
   {"k":"石","on":["セキ","シャク","コク"],"kun":["いし"],"meaning":"Stein","strokes":5,"level":"A1.7","cls":"Class 7","examples":[{"w":"石","r":"いし","m":"der Stein"},{"w":"石油","r":"せきゆ","m":"das Erdöl"},{"w":"宝石","r":"ほうせき","m":"der Edelstein"}]},
   {"k":"花","on":["カ"],"kun":["はな"],"meaning":"Blume","strokes":7,"level":"A1.7","cls":"Class 7","examples":[{"w":"花","r":"はな","m":"die Blume"},{"w":"花見","r":"はなみ","m":"die Kirschblütenschau"},{"w":"花火","r":"はなび","m":"das Feuerwerk"}]},
-  {"k":"末","on":["マツ","バツ"],"kun":["すえ"],"meaning":"Ende","strokes":5,"level":"A1.7","cls":"Class 8","examples":[{"w":"週末","r":"しゅうまつ","m":"das Wochenende"},{"w":"末","r":"すえ","m":"das Ende"},{"w":"年末","r":"ねんまつ","m":"das Jahresende"}]}
+  {"k":"末","on":["マツ","バツ"],"kun":["すえ"],"meaning":"Ende","strokes":5,"level":"A1.7","cls":"Class 8","examples":[{"w":"週末","r":"しゅうまつ","m":"das Wochenende"},{"w":"末","r":"すえ","m":"das Ende"},{"w":"年末","r":"ねんまつ","m":"das Jahresende"}]},
+  {"k":"強","on":["キョウ","ゴウ"],"kun":["つよ-い","つよ-まる"],"meaning":"stark","strokes":11,"level":"A1.7","cls":"Class 8","examples":[{"w":"強い","r":"つよい","m":"stark"},{"w":"勉強","r":"べんきょう","m":"das Lernen"},{"w":"強風","r":"きょうふう","m":"starker Wind"}]}
 ];

@@ -588,7 +588,7 @@
      Fragt die im Katalog hinterlegten (= häufigen) Lesungen ab. Eine Spalte entfällt, wenn die
      Lesungsliste leer ist (11 Kanji haben keine Kun-Lesung). */
   function stripOku(r) { return String(r).replace(/-/g, ''); }
-  // Distraktoren derselben Lesungsart anderer Kanji — bevorzugt gleiche Stufe (A1.7 hat nur 3 Kanji
+  // Distraktoren derselben Lesungsart anderer Kanji — bevorzugt gleiche Stufe (A1.7 hat nur wenige Kanji
   // → Gesamtbestand als Rückfall) und gleiche Okurigana-Form, damit das Format nichts verrät.
   // Ausgeschlossen sind Lesungen, die ohne Okurigana mit einer Lösung zusammenfallen (み vs. み-る).
   function readingDistractors(k, kind, need, pool) {

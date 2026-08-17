@@ -991,5 +991,5 @@ window.VOKABULAR = [
   {"kanji":"","kana":"おきゃくさん","romaji":"okyakusan","de":"der Kunde; der Gast","pos":"N.","lesson":6},
   {"kanji":"","kana":"むすこ","romaji":"musuko","de":"(mein) Sohn","pos":"N.","lesson":11},
   {"kanji":"","kana":"むすめ","romaji":"musume","de":"(meine) Tochter","pos":"N.","lesson":11},
-  {"kanji":"","kana":"みがきます","romaji":"migakimasu","de":"putzen (歯を～)","pos":"V. I","lesson":16}
+  {"kanji":"","kana":"みがきます","romaji":"migakimasu","de":"putzen, Zähne putzen (歯を～)","pos":"V. I","lesson":16}
 ];
